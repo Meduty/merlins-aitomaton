@@ -408,7 +408,7 @@ def get_images(cards, output_dir, method="download", config=None):
             logging.error(f"Error in get_images ({method}): {e}")
 
 
-def export_to_zip(output_text, cards, image_method="download", output_dir="out/mse-out", filename="set", config=None):
+def export_to_zip(output_text, cards, image_method="download", output_dir="output/mse-out", filename="set", config=None):
     os.makedirs(output_dir, exist_ok=True)
     set_path = os.path.join(output_dir, filename)
     with open(set_path, "w", encoding="utf-8") as f:
@@ -465,7 +465,7 @@ def main_with_config(config_path=None):
             config=config
         )
 
-        logging.info("Packaged set into out/mse-out.mse-set")
+        logging.info("Packaged set into output/mse-out.mse-set")
         time.sleep(sleepy_time)
         logging.info("=== Conversion complete ===")
         time.sleep(sleepy_time)

@@ -27,12 +27,7 @@ import numpy as np
 from tqdm import tqdm
 from tqdm.contrib.logging import logging_redirect_tqdm
 
-from typing import Optional
-
-import yaml
-
-import copy
-from copy import deepcopy
+from copy import copy, deepcopy
 
 from dotenv import load_dotenv
 
@@ -104,8 +99,8 @@ class APIParams:
         return APIParams(
             api_key=self.api_key,
             auth_token=self.auth_token,
-            userPrompt=copy.copy(self.userPrompt),
-            setParams=copy.copy(self.setParams),
+            userPrompt=copy(self.userPrompt),
+            setParams=copy(self.setParams),
             generate_image_prompt=self.generate_image_prompt,
             creative=self.creative,
             include_explanation=self.include_explanation,
@@ -118,10 +113,10 @@ class APIParams:
         Deep copy: nested structures are fully copied.
         """
         return APIParams(
-            api_key=copy.deepcopy(self.api_key, memo),
-            auth_token=copy.deepcopy(self.auth_token, memo),
-            userPrompt=copy.deepcopy(self.userPrompt, memo),
-            setParams=copy.deepcopy(self.setParams, memo),
+            api_key=deepcopy(self.api_key, memo),
+            auth_token=deepcopy(self.auth_token, memo),
+            userPrompt=deepcopy(self.userPrompt, memo),
+            setParams=deepcopy(self.setParams, memo),
             generate_image_prompt=self.generate_image_prompt,
             creative=self.creative,
             include_explanation=self.include_explanation,
@@ -161,6 +156,8 @@ class APIParams:
     def update_auth_token(self, new_auth_token: str, sleepy_time: float = 0) -> None:
         """
         Update the authorization token in the headers.
+        Note: In multi-threaded environments, this should be called within a lock
+        to prevent race conditions when multiple threads attempt to update simultaneously.
         """
         self.auth_token = new_auth_token
         self.headers["Authorization"] = f"Bearer {new_auth_token}"
@@ -189,7 +186,7 @@ class APIParams:
         return cls(**kwargs)
 
 
-class skeletonParams:
+class SkeletonParams:
     """
     Class to hold parameters for card skeleton generation.
     """
@@ -203,7 +200,7 @@ class skeletonParams:
         mana_curves: Optional[dict[str, list[float]]] = None,
         color_bleed_factor: int = 20,  # in %
         land_color_bleed_overlinear: int = 2,  # overlinear factor for land color bleed
-        mutation_factor: int = 1,  # in % used for flat legendaries
+        legend_mutation_factor: int = 1,  # in % used for flat legendaries
         type_mutation_factor: int = 10,  # in %
         wildcard_mutation_factor: int = 5,  # in %
         wildcard_supertype: bool = False,
@@ -262,7 +259,7 @@ class skeletonParams:
 
         self.color_bleed_factor = color_bleed_factor
         self.land_color_bleed_overlinear = land_color_bleed_overlinear
-        self.mutation_factor = mutation_factor
+        self.legend_mutation_factor = legend_mutation_factor
         self.type_mutation_factor = type_mutation_factor
         self.wildcard_mutation_factor = wildcard_mutation_factor
         self.wildcard_supertype = wildcard_supertype
@@ -488,7 +485,7 @@ def chance_advantage(input_bleed, steigung=1) -> float:
 
 
 def card_skeleton_generator(
-    index, api_params: APIParams, skeletonParams: skeletonParams, config: Dict[str, Any]
+    index, api_params: APIParams, skeleton_params: SkeletonParams, config: Dict[str, Any]
 ) -> APIParams:
     """
     Generates a card skeleton with fixed values and random attributes.
@@ -510,21 +507,22 @@ def card_skeleton_generator(
     ############## Set dynamic values for each card
 
     # Base color identity
-    colors = skeletonParams.colors
-    colors_weights = skeletonParams.colors_weights
+    colors = skeleton_params.colors
+    colors_weights = skeleton_params.colors_weights
     selected_colors = random.choices(colors, weights=colors_weights, k=1)
     logging.debug(f"[Card #{index+1}] Selected base color identity: {selected_colors}")
 
     # Types
-    t = skeletonParams.card_types.copy()
-    card_types_weights = skeletonParams.card_types_weights[selected_colors[0]]
+    t = skeleton_params.card_types.copy()
+    card_types_weights = skeleton_params.card_types_weights[selected_colors[0]]
     selected_types = random.choices(t, weights=card_types_weights, k=1)
     logging.debug(f"[Card #{index+1}] Selected type: {selected_types[0]}")
 
-    t_chance = skeletonParams.type_mutation_factor
+    t_chance = skeleton_params.type_mutation_factor
 
     basic_land_flag = False
     primary_land_flag = False
+    spell_flag = False
 
     # Raise a basic land flag, if the selected type is basic land
     if selected_types[0].lower() == "basic land":
@@ -585,10 +583,10 @@ def card_skeleton_generator(
     # Mana value for non-land cards
     selected_mana_value = None
     if not basic_land_flag and not primary_land_flag:
-        mana_values = skeletonParams.mana_values
-        curve = skeletonParams.mana_curves.get(
+        mana_values = skeleton_params.mana_values
+        curve = skeleton_params.mana_curves.get(
             selected_colors[0],
-            skeletonParams.mana_curves["default"]
+            skeleton_params.mana_curves["default"]
         )
         selected_mana_value = random.choices(mana_values, weights=curve, k=1)[0]
         logging.info(f"[Card #{index+1}] Selected mana value: {selected_mana_value}")
@@ -598,13 +596,13 @@ def card_skeleton_generator(
     # Bleeding colors
     c = [
         col
-        for col in skeletonParams.colors
+        for col in skeleton_params.colors
         if col not in selected_colors and col != "colorless"
     ]
-    color_bleed_factor = skeletonParams.color_bleed_factor
+    color_bleed_factor = skeleton_params.color_bleed_factor
 
     if primary_land_flag:
-        land_color_bleed_overlinear = skeletonParams.land_color_bleed_overlinear
+        land_color_bleed_overlinear = skeleton_params.land_color_bleed_overlinear
         logging.info(
             f"[Card #{index+1}] Land color bleed factor: {land_color_bleed_overlinear}, "
             f"original bleed chance: {color_bleed_factor}"
@@ -627,7 +625,7 @@ def card_skeleton_generator(
             break
 
         # Build weights for available colors
-        weights = [skeletonParams.colors_weights_dict[col] for col in c]
+        weights = [skeleton_params.colors_weights_dict[col] for col in c]
 
         logging.debug(f"[Card #{index+1}] Adding color bleed to {selected_colors}.")
         logging.debug(
@@ -647,8 +645,8 @@ def card_skeleton_generator(
     card_skeleton["colorIdentity"] = ", ".join(selected_colors)
 
     # Rarity
-    rarities = skeletonParams.rarities
-    rarity_weights = skeletonParams.rarities_weights
+    rarities = skeleton_params.rarities
+    rarity_weights = skeleton_params.rarities_weights
     selected_rarity = random.choices(rarities, weights=rarity_weights, k=1)[0]
     logging.info(f"[Card #{index+1}] Selected rarity: {selected_rarity}")
     time.sleep(sleepy_time)
@@ -656,13 +654,13 @@ def card_skeleton_generator(
 
     # Legendary
     supertypes = []
-    if not (basic_land_flag and spell_flag) and merlinAI_lib.check_mutation(
-        skeletonParams.mutation_factor
+    if not basic_land_flag and not spell_flag and merlinAI_lib.check_mutation(
+        skeleton_params.legend_mutation_factor
     ):
         supertypes.append("Legendary")
         logging.debug(f"[Card #{index+1}] Added legendary supertype.")
-    elif not (basic_land_flag and spell_flag) and skeletonParams.rarity_based_mutation:
-        a, b = skeletonParams.rarity_based_mutation[selected_rarity]
+    elif not basic_land_flag and not spell_flag and skeleton_params.rarity_based_mutation:
+        a, b = skeleton_params.rarity_based_mutation[selected_rarity]
         den = a + b
         legend_chance = (a / den * 100.0) if den > 0 else 0.0
         logging.debug(
@@ -675,8 +673,8 @@ def card_skeleton_generator(
             )
 
     # WILDCARD!
-    if skeletonParams.wildcard_supertype and merlinAI_lib.check_mutation(
-        skeletonParams.wildcard_mutation_factor
+    if skeleton_params.wildcard_supertype and merlinAI_lib.check_mutation(
+        skeleton_params.wildcard_mutation_factor
     ):
         supertypes.append("Wildcard")
         logging.debug(f"[Card #{index+1}] WILDCARD! Added wildcard supertype.")
@@ -689,8 +687,7 @@ def card_skeleton_generator(
         time.sleep(sleepy_time)
 
     # Extra creative
-
-    a, b = skeletonParams.rarity_based_mutation[selected_rarity]
+    a, b = skeleton_params.rarity_based_mutation[selected_rarity]
     den = a + b
     extra_creative_chance = (a / den * 100.0) if den > 0 else 0.0
     if merlinAI_lib.check_mutation(extra_creative_chance):
@@ -699,7 +696,7 @@ def card_skeleton_generator(
         time.sleep(sleepy_time)
 
     # function tags
-    function_tags = skeletonParams.function_tags
+    function_tags = skeleton_params.function_tags
     selected_tags = []
     logging.debug(
         f"[Card #{index+1}] Checking for function tags. Available tags: {function_tags}"
@@ -715,7 +712,7 @@ def card_skeleton_generator(
     logging.info(f"[Card #{index+1}] Selected function tags: {selected_tags}")
     time.sleep(sleepy_time)
 
-    otag_max = skeletonParams.tags_maximum
+    otag_max = skeleton_params.tags_maximum
 
     if basic_land_flag:
         logging.info(f"[Card #{index+1}] Basic land card, no function tags allowed.")
@@ -747,15 +744,15 @@ def card_skeleton_generator(
         card_skeleton["function_tags"] = "Basic Land, SHOULD NOT HAVE ANY ABILITIES"
 
     # Card power level
-    if skeletonParams.power_level is not None:
+    if skeleton_params.power_level is not None:
         assert isinstance(
-            skeletonParams.power_level, (int, float)
+            skeleton_params.power_level, (int, float)
         ), "Power level must be a number."
         assert (
-            1.0 <= float(skeletonParams.power_level) <= 10.0
+            1.0 <= float(skeleton_params.power_level) <= 10.0
         ), "Power level must be between 1 and 10."
 
-        powerLevel = skeletonParams.power_level
+        powerLevel = skeleton_params.power_level
         powerLevel = bounded_value_with_rarity(
             mean=powerLevel,
             low=1,
@@ -763,12 +760,12 @@ def card_skeleton_generator(
             sd=stdDePL,
             rarity=selected_rarity,
             rarity_skew=powSkew,  # Adjust this value as needed
-            rarity_to_skew=skeletonParams.rarity_to_skew,
+            rarity_to_skew=skeleton_params.rarity_to_skew,
         )
         powerLevel = round(powerLevel, 2)  # Round to 2 decimal places
         card_skeleton["powerLevel"] = f"{powerLevel} out of 10"
         logging.info(
-            f"[Card #{index+1}] Set power level to {skeletonParams.power_level}"
+            f"[Card #{index+1}] Set power level to {skeleton_params.power_level}"
         )
         time.sleep(sleepy_time)
 
@@ -780,7 +777,7 @@ def card_skeleton_generator(
 
         selected_themes = []
         th = themes.copy()
-        amount = skeletonParams.fixed_amount_themes
+        amount = skeleton_params.fixed_amount_themes
 
         if isinstance(amount, int) and amount > 0:
             logging.debug(f"[Card #{index+1}] Fixed amount of themes: {amount}")
@@ -796,10 +793,10 @@ def card_skeleton_generator(
             for theme in th:
                 logging.debug(f"[Card #{index+1}] Checking theme: {theme}")
                 logging.debug(
-                    f"[Card #{index+1}] Theme weight: {skeletonParams.mutation_chance_per_theme}"
+                    f"[Card #{index+1}] Theme weight: {skeleton_params.mutation_chance_per_theme}"
                 )
                 if merlinAI_lib.check_mutation(
-                    skeletonParams.mutation_chance_per_theme
+                    skeleton_params.mutation_chance_per_theme
                 ):
                     selected_themes.append(theme)
                     logging.debug(f"[Card #{index+1}] Added theme: {theme}")
@@ -824,8 +821,10 @@ def card_skeleton_generator(
 def generate_card(index, api_params: APIParams, metrics: GenerationMetrics, config: Dict[str, Any]) -> dict:
     """API parameters with metrics tracking and config passed as arguments."""
     sleepy_time = config["square_config"]["sleepy_time"]
+    timeout = config["http_config"]["timeout"]
+    polling_interval = config["http_config"]["polling_interval"]
 
-    local_api_params = copy.copy(api_params)
+    local_api_params = copy(api_params)
 
     card_start = time.time()
     logging.info(f"[#{index+1}] Send card generation request...")
@@ -839,8 +838,8 @@ def generate_card(index, api_params: APIParams, metrics: GenerationMetrics, conf
         "imageModel": local_api_params.image_model,
         "model": local_api_params.model,
         "userPrompt": json.dumps(
-            local_api_params.userPrompt, indent=2
-        ),  # Use the updated user prompt from API params
+            local_api_params.userPrompt, separators=(',', ':')
+        ),  # Use compact JSON to minimize URL length
     }
 
     if params["imageModel"] == "none":
@@ -854,10 +853,20 @@ def generate_card(index, api_params: APIParams, metrics: GenerationMetrics, conf
     try:
         logging.info(f"[#{index+1}] Sending request...")
         time.sleep(sleepy_time)
+        
+        # Check URL length to warn about potential 414 errors
+        url_with_params = requests.Request('GET', 
+            "https://mtgcardgenerator.azurewebsites.net/api/GenerateMagicCard",
+            params=params
+        ).prepare().url
+        
+        if len(url_with_params) > 2000:  # Conservative limit
+            logging.warning(f"[#{index+1}] Long URL detected ({len(url_with_params)} chars) - may cause HTTP 414 error")
         resp = requests.get(
             "https://mtgcardgenerator.azurewebsites.net/api/GenerateMagicCard",
             headers=auth,
             params=params,
+            timeout=timeout
         )
         logging.debug(f"[#{index+1}] server response: {resp.status_code}")
         resp.raise_for_status()
@@ -867,7 +876,7 @@ def generate_card(index, api_params: APIParams, metrics: GenerationMetrics, conf
             raise Exception("No card ID returned from API response.")
     except Exception as e:
         logging.error(f"[#{index+1}] Card generation failed: {e}")
-        raise e
+        raise Exception("Card generation failed") from e
 
     logging.info(f"[#{index+1}] Received card ID: {card_id}")
     time.sleep(sleepy_time)
@@ -877,7 +886,7 @@ def generate_card(index, api_params: APIParams, metrics: GenerationMetrics, conf
     status_url = f"https://mtgcardgenerator.azurewebsites.net/api/GetMagicCardGenerationStatus?instanceId={card_id}"
     while True:
         try:
-            status_resp = requests.get(status_url, headers=auth)
+            status_resp = requests.get(status_url, headers=auth, timeout=timeout)
             status_resp.raise_for_status()
             status_data = status_resp.json()
             logging.debug(
@@ -893,16 +902,16 @@ def generate_card(index, api_params: APIParams, metrics: GenerationMetrics, conf
                     f"[#{index+1}] Unexpected status: {status_data['runtimeStatus']}"
                 )
                 raise Exception(f"Unexpected status: {status_data['runtimeStatus']}")
-            elif time.time() - card_start > 60:  # Timeout after 60 seconds
+            elif time.time() - card_start > timeout:  # Timeout after {timeout} seconds
                 logging.error(
-                    f"[#{index+1}] Card generation timed out after 60 seconds."
+                    f"[#{index+1}] Card generation timed out after {timeout} seconds."
                 )
-                raise TimeoutError("Card generation timed out after 60 seconds.")
-            time.sleep(1)
+                raise TimeoutError(f"Card generation timed out after {timeout} seconds.")
+            time.sleep(polling_interval)
 
         except Exception as e:
             logging.error(f"[#{index+1}] Polling failed: {e}")
-            raise e
+            raise Exception("Polling failed") from e
 
     output_json_str = status_data.get("output", "")
     if not output_json_str:
@@ -940,9 +949,9 @@ def generate_card(index, api_params: APIParams, metrics: GenerationMetrics, conf
     return output_data
 
 
-def get_card_graceful(i, api_params: APIParams, skeleton_params: skeletonParams, 
+def get_card_graceful(i, api_params: APIParams, skeleton_params: SkeletonParams, 
                      metrics: GenerationMetrics, config: Dict[str, Any], 
-                     retries=3, retry_delay=10) -> dict:
+                     retries=3, retry_delay=10, auth_lock=None) -> dict:
     """
     Wrapper to handle card generation with retries.
     """
@@ -958,7 +967,7 @@ def get_card_graceful(i, api_params: APIParams, skeleton_params: skeletonParams,
         try:
 
             local_api_params = card_skeleton_generator(
-                i, api_params=api_params, skeletonParams=skeleton_params, config=config
+                i, api_params=api_params, skeleton_params=skeleton_params, config=config
             )
 
             logging.info(
@@ -973,8 +982,15 @@ def get_card_graceful(i, api_params: APIParams, skeleton_params: skeletonParams,
             if e.response is not None and e.response.status_code == 401:
                 logging.error(f"[Card #{i+1}] Unauthorized (401). Attempting re-login.")
                 try:
-                    new_auth_token = login_mtgcg()
-                    api_params.update_auth_token(new_auth_token, sleepy_time)
+                    # Use lock to prevent multiple threads from updating auth token simultaneously
+                    if auth_lock:
+                        with auth_lock:
+                            new_auth_token = login_mtgcg()
+                            api_params.update_auth_token(new_auth_token, sleepy_time)
+                            logging.info(f"[Card #{i+1}] Auth token updated under lock")
+                    else:
+                        new_auth_token = login_mtgcg()
+                        api_params.update_auth_token(new_auth_token, sleepy_time)
                 except Exception as login_err:
                     logging.error(f"[Card #{i+1}] Re-login failed: {login_err}")
                     break
@@ -1005,7 +1021,7 @@ def get_card_graceful(i, api_params: APIParams, skeleton_params: skeletonParams,
 ################# Main Execution #################
 
 
-def card_worker(card_queue, pbar, api_params, skeleton_params, metrics, config, max_retries, retry_delay):
+def card_worker(card_queue, pbar, api_params, skeleton_params, metrics, config, max_retries, retry_delay, auth_lock):
     """Worker function for threaded card generation."""
     while True:
         try:
@@ -1016,7 +1032,8 @@ def card_worker(card_queue, pbar, api_params, skeleton_params, metrics, config, 
         try:
             card = get_card_graceful(
                 i, api_params=api_params, skeleton_params=skeleton_params,
-                metrics=metrics, config=config, retries=max_retries, retry_delay=retry_delay
+                metrics=metrics, config=config, retries=max_retries, retry_delay=retry_delay,
+                auth_lock=auth_lock
             )
             metrics.add_card(card["cards"][0])
 
@@ -1056,8 +1073,11 @@ if __name__ == "__main__":
     
     # Initialize metrics tracking
     metrics = GenerationMetrics()
+    
+    # Create a lock for thread-safe auth token updates
+    auth_lock = threading.Lock()
 
-    card_skeleton_params = skeletonParams(**config["skeleton_params"])
+    card_skeleton_params = SkeletonParams(**config["skeleton_params"])
     api_params = APIParams(
         api_key=API_KEY,
         auth_token=AUTH_TOKEN,
@@ -1069,8 +1089,9 @@ if __name__ == "__main__":
         logging.info("No auth token found, attempting to login...")
         time.sleep(sleepy_time)
         try:
-            new_auth_token = login_mtgcg()
-            api_params.update_auth_token(new_auth_token, sleepy_time)
+            with auth_lock:
+                new_auth_token = login_mtgcg()
+                api_params.update_auth_token(new_auth_token, sleepy_time)
         except Exception as e:
             logging.error(f"Login failed: {e}")
             raise
@@ -1105,6 +1126,7 @@ if __name__ == "__main__":
                         config,
                         max_retries,
                         retry_delay,
+                        auth_lock,
                     ),
                     daemon=True,
                 )
