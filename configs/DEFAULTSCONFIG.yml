@@ -3,10 +3,10 @@
 # User configs will override these values
 
 square_config:
-  total_cards: 15
-  concurrency: 1
-  sleepy_time: 0
-  standard_deviation_powerLevel: 0.7
+  total_cards: 60
+  concurrency: 4
+  sleepy_time: 0.5
+  standard_deviation_powerLevel: 0.5
   power_level_rarity_skew: 0.5
   output_dir: "output"
 
@@ -16,26 +16,6 @@ http_config:
   retry_delay: 10
   polling_interval: 1
 
-mtgcg_mse_config:
-  image_method: "none"
-
-SD_config:
-  max_tag_weight: 2.0
-  forge_url_base: "http://127.0.0.1:7860"
-  sd_output_dir: "forge_out"
-  base_output_dir: "output"
-  random_lora_weights: true
-  lora_weight_standard_deviation: 0.35
-  apply_lora_chance: 50
-  use_special_tags: true
-  varying_special_tags_weight: true
-  model_swap_chance: 20
-  max_retries: 3
-  retry_delay: 10
-  sleepy_time: 0
-  randomise_negative_prompt: true
-  chance_no_negative_prompt: 50
-
 api_params:
   generate_image_prompt: false
   creative: false
@@ -43,7 +23,23 @@ api_params:
   image_model: "dall-e-3"
   model: "gpt-41"
 
-set_params: {}
+
+mtgcg_mse_config:
+  image_method: "download" # options: none, localSD, download
+
+set_params:
+  set: "Default Set"
+  themes:
+    - "Magic and mystery"
+    - "Heroic adventures"
+    - "Ancient powers"
+    - "Mystical creatures"
+    - "Epic battles"
+    - "Forgotten realms"
+    - "Elemental forces"
+    - "Divine intervention"
+    - "Dark secrets"
+    - "Legendary artifacts"
 
 skeleton_params:
   canonical_card_types:
@@ -59,20 +55,24 @@ skeleton_params:
     - "basic land"
     - "artifact"
     - "kindred"
+  ### used for decks
   card_types_weights:
     _default:
-      creature: 50
-      artifact creature: 0
-      planeswalker: 2
-      instant: 12
-      sorcery: 12
-      enchantment: 12
-      saga: 0
-      battle: 0
-      land: 12
-      basic land: 0
-      artifact: 0
-      kindred: 0
+      creature: 30
+      artifact creature: 1
+      planeswalker: 1
+      instant: 8
+      sorcery: 9
+      enchantment: 8
+      saga: 2
+      battle: 2
+      land: 18
+      basic land: 18
+      artifact: 2
+      kindred: 1
+    colorless:
+      artifact: 70
+      "artifact creature": 30
   colors:
     - "white"
     - "blue"
@@ -91,23 +91,23 @@ skeleton_params:
     - "7"
     - "8+"
   mana_curves:
-    white: [1, 8, 27, 23, 19, 14, 6, 1, 1]
-    blue: [1, 7, 25, 22, 20, 16, 7, 1, 1]
-    black: [1, 6, 27, 25, 18, 14, 5, 2, 2]
-    red: [1, 10, 28, 23, 18, 13, 5, 1, 1]
-    green: [1, 7, 22, 22, 20, 17, 6, 3, 2]
-    colorless: [3, 10, 25, 23, 19, 12, 5, 2, 1]
+    white: [1, 10, 27, 23, 19, 12, 6, 1, 1]
+    blue: [1, 9, 25, 22, 20, 14, 7, 1, 1]
+    black: [1, 8, 27, 25, 18, 12, 5, 2, 2]
+    red: [1, 12, 28, 23, 18, 11, 5, 1, 1]
+    green: [1, 9, 22, 22, 20, 15, 6, 3, 2]
+    colorless: [3, 12, 25, 23, 19, 10, 5, 2, 1]
     default: [4, 12, 22, 22, 18, 12, 6, 3, 1]
   rarities:
     - "common"
     - "uncommon"
     - "rare"
     - "mythic"
-  rarity_based_mutation:
-    common: [1, 12]
-    uncommon: [2, 12]
-    rare: [4, 12]
-    mythic: [8, 12]
+  rarities_weights:
+    common: 636
+    uncommon: 273
+    rare: 78
+    mythic: 13
   function_tags:
     "ramp or mana fixing": 15
     "draw or card advantage": 15
@@ -132,15 +132,197 @@ skeleton_params:
   color_bleed_factor: 20
   land_color_bleed_overlinear: 2
   legend_mutation_factor: 1
+  rarity_based_mutation:
+    common: [1, 12]
+    uncommon: [2, 12]
+    rare: [4, 12]
+    mythic: [8, 12]
   type_mutation_factor: 10
   wildcard_mutation_factor: 5
-  wildcard_supertype: false
-  rarities_weights:
-    common: 25.0
-    uncommon: 25.0
-    rare: 25.0
-    mythic: 25.0
-  tags_maximum: null
+  wildcard_supertype: true
+  tags_maximum: 2
   mutation_chance_per_theme: 20
-  fixed_amount_themes: 1
-  power_level: 5.0
+  fixed_amount_themes: 2
+  power_level: 7.5
+
+
+SD_config:
+  max_tag_weight: 2.5
+  forge_url_base: "http://127.0.0.1:7860"
+  sd_output_dir: "forge_out"
+  base_output_dir: "output"
+  random_lora_weights: true
+  lora_weight_standard_deviation: 0.35
+  apply_lora_chance: 50
+  use_special_tags: true
+  varying_special_tags_weight: true
+  model_swap_chance: 33
+  max_retries: 3
+  retry_delay: 10
+  sleepy_time: 0
+  randomise_negative_prompt: true
+  chance_no_negative_prompt: 50
+  special_tags:
+    Fantasy World:
+      weight: 1.2
+      chance: 100
+    NSFW:
+      weight: 1.5
+      chance: 5
+    Gore:
+      weight: 1.5
+      chance: 5
+    Porn:
+      weight: 1.5
+      chance: 5
+    Hentai:
+      weight: 1.5
+      chance: 5
+  image_options:
+    # FLUX model - Fast generation with good quality
+    - name: FLUX
+      weight: 10.0
+      option_params:
+        model: FLUX1DEV_HYPERNF4_FLUX1DEVBNB_FLUX1DEVHYPERNF4
+        loras:
+          FantasyWorldPonyV2: 0.1
+          fantasyV1.1: 0.1
+          dungeons_and_dragons_xl_v3: 0.1
+          Dark_Fantasy_1.5_IL: 0.1
+        steps: 24
+        cfg_scale: 1
+        distilled_cfg_scale: 3.5
+        width: 1024
+        height: 748
+        sampler_name: Euler
+        scheduler: Simple
+        seed: -1
+        n_iter: 1
+        batch_size: 1
+    
+    # Illustrious model - High quality anime/illustration style
+    - name: PILLU
+      weight: 1.0
+      option_params:
+        model: PREFECT_ILLUSTRIOUS_XL_V20P
+        loras:
+          FantasyWorldPonyV2: 0.1
+          fantasyV1.1: 0.1
+          dungeons_and_dragons_xl_v3: 0.1
+          Dark_Fantasy_1.5_IL: 0.85
+        steps: 128
+        cfg_scale: 5
+        sampler_name: "DPM++ 2M SDE"
+        scheduler: Simple
+        width: 1024
+        height: 748
+        seed: -1
+        n_iter: 1
+        batch_size: 1
+    
+    # Pony model - Versatile fantasy art generation
+    - name: PEPONY
+      weight: 0.5
+      option_params:
+        model: PREFECT_PONY_XL_V50
+        loras:
+          FantasyWorldPonyV2: 0.85
+          fantasyV1.1: 0.1
+          dungeons_and_dragons_xl_v3: 0.1
+          Dark_Fantasy_1.5_IL: 0.1
+        steps: 128
+        cfg_scale: 5
+        sampler_name: "DPM++ 2M SDE"
+        scheduler: Simple
+        width: 1024
+        height: 748
+        seed: -1
+        n_iter: 1
+        batch_size: 1
+        negative_prompt: "blurry, low quality, watermark, text, signature, cropped, extra limbs, disfigured, bad anatomy"
+    
+    # Real Dream model - Realistic fantasy art
+    - name: REDREAM
+      weight: 1.0
+      option_params:
+        model: REAL_DREAM_SDXL_PONY15
+        loras:
+          FantasyWorldPonyV2: 0.1
+          fantasyV1.1: 0.85
+          dungeons_and_dragons_xl_v3: 0.1
+          Dark_Fantasy_1.5_IL: 0.1
+        steps: 128
+        cfg_scale: 5
+        sampler_name: "DPM++ 2M SDE"
+        scheduler: Simple
+        width: 1024
+        height: 748
+        seed: -1
+        n_iter: 1
+        batch_size: 1
+        negative_prompt: "blurry, low quality, watermark, text, signature, cropped, extra limbs, disfigured, bad anatomy"
+    
+    # Realism Yogi model - Photorealistic style
+    - name: REALISM_YOGI
+      weight: 0.5
+      option_params:
+        model: REALISM_BY_STABLE_YOGI_V40FP16
+        loras:
+          FantasyWorldPonyV2: 0.1
+          fantasyV1.1: 0.1
+          dungeons_and_dragons_xl_v3: 0.1
+          Dark_Fantasy_1.5_IL: 0.85
+        steps: 128
+        cfg_scale: 5
+        sampler_name: "DPM++ 2M SDE"
+        scheduler: Simple
+        width: 1024
+        height: 748
+        seed: -1
+        n_iter: 1
+        batch_size: 1
+        negative_prompt: "blurry, low quality, watermark, text, signature, cropped, extra limbs, disfigured, bad anatomy"
+    
+    # Unstable Diffusers model - Enhanced D&D style
+    - name: UNSTABLE_DIFFUSERS
+      weight: 2.0
+      option_params:
+        model: SDXL_UNSTABLE_DIFFUSERS_V9_DIVINITYMACHINEVAE
+        loras:
+          FantasyWorldPonyV2: 0.1
+          fantasyV1.1: 0.1
+          dungeons_and_dragons_xl_v3: 0.85
+          Dark_Fantasy_1.5_IL: 0.1
+        steps: 128
+        cfg_scale: 5
+        sampler_name: "DPM++ 2M SDE"
+        scheduler: Simple
+        width: 1024
+        height: 748
+        seed: -1
+        n_iter: 1
+        batch_size: 1
+        negative_prompt: "blurry, low quality, watermark, text, signature, cropped, extra limbs, disfigured, bad anatomy"
+    
+    # NSFW model - Adult content (adjust weights/remove as needed)
+    - name: WAI_NSFW_ILLUSTRIOUS
+      weight: 0.1  # Low weight by default
+      option_params:
+        model: WAI_NSFW_ILLUSTRIOUS_V110
+        loras:
+          FantasyWorldPonyV2: 0.85
+          fantasyV1.1: 0.1
+          dungeons_and_dragons_xl_v3: 0.1
+          Dark_Fantasy_1.5_IL: 0.1
+        steps: 128
+        cfg_scale: 5
+        sampler_name: "DPM++ 2M SDE"
+        scheduler: Simple
+        width: 1024
+        height: 748
+        seed: -1
+        n_iter: 1
+        batch_size: 1
+        negative_prompt: "blurry, low quality, watermark, text, signature, cropped, extra limbs, disfigured, bad anatomy"
+
+

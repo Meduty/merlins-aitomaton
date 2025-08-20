@@ -31,6 +31,8 @@ python merlinAI.py --batch mse images   # Only convert and generate images
 python merlinAI.py my_config.yml --batch cards mse
 ```
 
+> **📋 Note**: For image generation, see the [Required Stable Diffusion Models](#4-required-stable-diffusion-models) section below for model setup.
+
 ### Progress Bar Modes
 
 - **Default Mode**: Clean output with only progress bars and essential messages
@@ -175,7 +177,7 @@ API_KEY=your_openai_api_key
 AUTH_TOKEN=your_auth_token
 ```
 
-### 3. Configuration
+### 5. Configuration
 
 The orchestrator uses `configs/config.yml` by default. You can:
 
@@ -183,9 +185,54 @@ The orchestrator uses `configs/config.yml` by default. You can:
 - **Customize settings:** Edit `configs/config.yml`
 - **Create custom configs:** Copy and modify for different scenarios
 
-### 4. Stable Diffusion Setup (Optional)
+### 3. Stable Diffusion Setup (Optional)
 
 For local image generation, ensure a Stable Diffusion API is running and update the `forge_url_base` in your configuration.
+
+### 4. Required Stable Diffusion Models
+
+MerlinAI comes with a comprehensive configuration for multiple Stable Diffusion models. For the default configuration to work, your Stable Diffusion installation should have these models available:
+
+#### 🎨 **Core Models**
+- **`flux1DevHyperNF4Flux1DevBNB_flux1DevHyperNF4`** - Fast FLUX model (Primary)
+- **`prefectIllustriousXL_v20p`** - High-quality illustration style
+- **`prefectPonyXL_v50`** - Versatile fantasy art
+- **`realDream_sdxlPony15`** - Realistic fantasy style
+- **`realismByStableYogi_v40FP16`** - Photorealistic generation
+- **`sdxlUnstableDiffusers_v9DIVINITYMACHINEVAE`** - Enhanced D&D style
+- **`waiNSFWIllustrious_v110`** - Adult content (optional)
+
+#### 🔧 **Required LoRA Models**
+- **`FantasyWorldPonyV2`** - Core fantasy enhancement
+- **`fantasyV1.1`** - Fantasy world styling
+- **`dungeons_and_dragons_xl_v3`** - D&D specific enhancement
+- **`Dark_Fantasy_1.5_IL`** - Dark fantasy aesthetics
+
+#### 📝 **Customization Options**
+
+**Option 1: Use Provided Configuration**
+Copy the complete configuration from `configs/DEFAULTSCONFIG.yml`:
+```bash
+cp configs/DEFAULTSCONFIG.yml configs/config.yml
+# Edit config.yml to adjust weights, remove unwanted models, etc.
+```
+
+**Option 2: Minimal Configuration**
+Remove models you don't have and adjust weights:
+```yaml
+SD_config:
+  image_options:
+    - name: FLUX_ONLY
+      weight: 1.0
+      option_params:
+        model: FLUX1DEV_HYPERNF4_FLUX1DEVBNB_FLUX1DEVHYPERNF4
+        # ... minimal LoRA setup
+```
+
+**Option 3: Disable Image Generation**
+Set `image_method: "none"` in `mtgcg_mse_config` to skip image generation entirely.
+
+💡 **Note**: The default `DEFAULTSCONFIG.yml` includes all supported models with optimal settings. You can easily remove or modify any models you don't have installed.
 
 ---
 
