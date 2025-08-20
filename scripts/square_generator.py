@@ -926,8 +926,18 @@ def generate_card(index, api_params: APIParams, metrics: GenerationMetrics, conf
         logging.error(f"[#{index+1}] output: {output_json_str}")
         raise ValueError(f"JSON decode error for card ID {card_id}: {e}")
 
-    color_identity = output_data["cards"][0].get("colorIdentity", "").lower()
-    generated_rarity = output_data["cards"][0].get("rarity", "").lower()
+    try:
+        color_identity = output_data["cards"][0].get("colorIdentity", "").lower()
+        generated_rarity = output_data["cards"][0].get("rarity", "").lower()
+    except (KeyError, IndexError, TypeError) as e:
+        logging.error(f"[#{index+1}] Error accessing card data for card ID {card_id}: {e}")
+        logging.error(f"[#{index+1}] Available keys in output_data: {list(output_data.keys()) if isinstance(output_data, dict) else 'Not a dict'}")
+        if isinstance(output_data, dict) and "cards" in output_data:
+            logging.error(f"[#{index+1}] Cards array length: {len(output_data['cards']) if isinstance(output_data['cards'], list) else 'Not a list'}")
+            if isinstance(output_data["cards"], list) and len(output_data["cards"]) > 0:
+                logging.error(f"[#{index+1}] First card keys: {list(output_data['cards'][0].keys()) if isinstance(output_data['cards'][0], dict) else 'Not a dict'}")
+        logging.error(f"[#{index+1}] Full output_data structure: {json.dumps(output_data, indent=2)}")
+        raise ValueError(f"Invalid card data structure for card ID {card_id}: {e}")
 
     # Update metrics using the passed metrics object instead of global variables
     metrics.update_color(color_identity)
