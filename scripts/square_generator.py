@@ -36,9 +36,15 @@ from copy import deepcopy
 
 from dotenv import load_dotenv
 
-import merlinAI_lib
-import config_manager
-from metrics import GenerationMetrics
+try:
+    from . import merlinAI_lib
+    from . import config_manager
+    from .metrics import GenerationMetrics
+except ImportError:
+    # When running directly (not as a module)
+    import merlinAI_lib
+    import config_manager
+    from metrics import GenerationMetrics
 
 from typing import Any, Dict, Optional
 
@@ -191,7 +197,6 @@ class skeletonParams:
     def __init__(
         self,
         canonical_card_types: Optional[list[str]] = None,
-        default_type_weights: Optional[dict[str, float]] = None,
         colors: Optional[list[str]] = None,
         colors_weights: Optional[dict[str, float] | list[float]] = None,
         mana_values: Optional[list[str]] = None,
@@ -214,18 +219,23 @@ class skeletonParams:
         power_level: float = 5,  # Power level of the card, 1–10
         rarity_to_skew: Optional[dict[str, int]] = None,  # rarity skew mapping
     ):
-        # Set up canonical card types and default weights from config
-        self.canonical_card_types = canonical_card_types or [
-            "creature", "artifact creature", "planeswalker", "instant", "sorcery",
-            "enchantment", "saga", "battle", "land", "basic land", "artifact", "kindred"
-        ]
-        self.default_type_weights = default_type_weights or {
-            "creature": 50, "artifact creature": 0, "planeswalker": 2, "instant": 12,
-            "sorcery": 12, "enchantment": 12, "saga": 0, "battle": 0, "land": 12,
-            "basic land": 0, "artifact": 0, "kindred": 0
-        }
+        # Set up canonical card types and default weights from config - NO FALLBACKS
+        if canonical_card_types is None:
+            raise ValueError("canonical_card_types must be provided in configuration")
+        if colors is None:
+            raise ValueError("colors must be provided in configuration")
         
-        self.colors = colors or ["white", "blue", "black", "red", "green", "colorless"]
+        # Extract default type weights from card_types_weights._default
+        if card_types_weights is None or "_default" not in card_types_weights:
+            raise ValueError("card_types_weights._default must be provided in configuration")
+        
+        default_type_weights = card_types_weights["_default"]
+        if not isinstance(default_type_weights, dict):
+            raise ValueError("card_types_weights._default must be a dictionary")
+        
+        self.canonical_card_types = canonical_card_types
+        self.default_type_weights = default_type_weights
+        self.colors = colors
 
         cw = colors_weights
         default_cw = {c: 100.0 / len(self.colors) for c in self.colors}
@@ -242,16 +252,13 @@ class skeletonParams:
         }
         self.colors_weights = [self.colors_weights_dict[c] for c in self.colors]
 
-        self.mana_values = mana_values or ["0", "1", "2", "3", "4", "5", "6", "7", "8+"]
-        self.mana_curves = mana_curves or {
-            "white": [1, 8, 27, 23, 19, 14, 6, 1, 1],
-            "blue": [1, 7, 25, 22, 20, 16, 7, 1, 1],
-            "black": [1, 6, 27, 25, 18, 14, 5, 2, 2],
-            "red": [1, 10, 28, 23, 18, 13, 5, 1, 1],
-            "green": [1, 7, 22, 22, 20, 17, 6, 3, 2],
-            "colorless": [3, 10, 25, 23, 19, 12, 5, 2, 1],
-            "default": [4, 12, 22, 22, 18, 12, 6, 3, 1],
-        }
+        if mana_values is None:
+            raise ValueError("mana_values must be provided in configuration")
+        self.mana_values = mana_values
+        
+        if mana_curves is None:
+            raise ValueError("mana_curves must be provided in configuration")
+        self.mana_curves = mana_curves
 
         self.color_bleed_factor = color_bleed_factor
         self.land_color_bleed_overlinear = land_color_bleed_overlinear
@@ -259,14 +266,15 @@ class skeletonParams:
         self.type_mutation_factor = type_mutation_factor
         self.wildcard_mutation_factor = wildcard_mutation_factor
         self.wildcard_supertype = wildcard_supertype
-        self.rarity_based_mutation = rarity_based_mutation or {
-            "common": [1, 12],
-            "uncommon": [2, 12],
-            "rare": [4, 12],
-            "mythic": [8, 12],
-        }
+        
+        if rarity_based_mutation is None:
+            raise ValueError("rarity_based_mutation must be provided in configuration")
+        self.rarity_based_mutation = rarity_based_mutation
 
-        self.card_types = card_types or self.canonical_card_types
+        if card_types is None:
+            card_types = self.canonical_card_types
+        self.card_types = card_types
+        
         self.card_types_weights = self._build_type_weights(
             card_types=self.card_types,
             weights_by_color=card_types_weights or {},
@@ -274,7 +282,9 @@ class skeletonParams:
             code_defaults=self.default_type_weights,
         )
 
-        self.rarities = rarities or ["common", "uncommon", "rare", "mythic"]
+        if rarities is None:
+            raise ValueError("rarities must be provided in configuration")
+        self.rarities = rarities
         rw = rarities_weights
         default_rw = {r: 100.0 / len(self.rarities) for r in self.rarities}
         if isinstance(rw, list):
@@ -290,16 +300,9 @@ class skeletonParams:
         }
         self.rarities_weights = [self.rarities_weights_dict[r] for r in self.rarities]
 
-        self.function_tags = function_tags or {
-            "ramp or mana fixing": 15,
-            "draw or card advantage": 15,
-            "removal or control": 10,
-            "board wipe or mass removal": 5,
-            "activated ability": 5,
-            "Flying or other evasion": 5,
-            "simple or straightforward": 10,
-            "vanilla or no abilities": 5,
-        }
+        if function_tags is None:
+            raise ValueError("function_tags must be provided in configuration")
+        self.function_tags = function_tags
 
         self.tags_maximum = tags_maximum
         self.mutation_chance_per_theme = mutation_chance_per_theme
@@ -307,12 +310,9 @@ class skeletonParams:
         self.power_level = power_level
         
         # Rarity to skew mapping with defaults
-        self.rarity_to_skew = rarity_to_skew or {
-            "common": -2,
-            "uncommon": -1,
-            "rare": 1,
-            "mythic": 2,
-        }
+        if rarity_to_skew is None:
+            raise ValueError("rarity_to_skew must be provided in configuration")
+        self.rarity_to_skew = rarity_to_skew
 
     @staticmethod
     def _normalize_row_to_sum(row, total=100.0):

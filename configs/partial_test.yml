@@ -1,0 +1,31 @@
+skeleton_params:
+  card_types_weights:
+    _default:
+      creature: 60.2
+      artifact creature: 0.0
+      planeswalker: 3.8
+      instant: 9.0
+      sorcery: 9.0
+      enchantment: 9.0
+      saga: 0.0
+      battle: 0.0
+      land: 9.0
+      basic land: 0.0
+      artifact: 0.0
+      kindred: 0.0
+  colors_weights:
+    white: 50.0
+    blue: 50.0
+  card_types:
+  - creature
+  - artifact creature
+  - planeswalker
+  - instant
+  - sorcery
+  - enchantment
+  - saga
+  - battle
+  - land
+  - basic land
+  - artifact
+  - kindred

@@ -1,0 +1,26 @@
+skeleton_params:
+  colors_weights:
+    white: 20.0
+    blue: 30.0
+    black: 50.0
+  rarities_weights:
+    common: 60.0
+    uncommon: 30.0
+    rare: 10.0
+  card_types_weights:
+    _default:
+      creature: 67.567568
+      instant: 16.216216
+      sorcery: 16.216216
+    white:
+      creature: 68.837209
+      instant: 17.209302
+      sorcery: 13.953488
+    blue:
+      creature: 40.0
+      instant: 30.0
+      sorcery: 30.0
+  card_types:
+  - creature
+  - instant
+  - sorcery

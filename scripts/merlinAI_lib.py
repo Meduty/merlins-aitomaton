@@ -13,34 +13,8 @@ from pathlib import Path
 _EPS = 1e-12
 
 
-CANONICAL_CARD_TYPES = [
-    "creature",
-    "artifact creature",
-    "planeswalker",
-    "instant",
-    "sorcery",
-    "enchantment",
-    "saga",
-    "battle",
-    "land",
-    "basic land",
-    "artifact",
-    "kindred",
-]
-DEFAULT_TYPE_WEIGHTS = {
-    "creature": 50,
-    "artifact creature": 0,
-    "planeswalker": 2,
-    "instant": 12,
-    "sorcery": 12,
-    "enchantment": 12,
-    "saga": 0,
-    "battle": 0,
-    "land": 12,
-    "basic land": 0,
-    "artifact": 0,
-    "kindred": 0,
-}
+# NOTE: These constants have been moved to configs/DEFAULTSCONFIG.yml
+# Import here for backward compatibility with config checker
 # --- canonical color order (W U B R G, then colorless) ---
 CANONICAL_COLOR_ORDER = ["white", "blue", "black", "red", "green", "colorless"]
 
@@ -119,6 +93,7 @@ def check_and_normalize_config(config_path: str, save: bool = False, total: floa
     """
     User-facing CLI helper to check + normalize weights in a config.yaml.
 
+    - Loads DEFAULTSCONFIG.yml first for fallback values
     - Normalizes colors_weights (dict or list), rarities_weights (dict or list),
       and card_types_weights rows (dict or list) to sum `total`.
     - If lists are provided where dicts are preferred, converts them to dicts using labels.
@@ -130,10 +105,19 @@ def check_and_normalize_config(config_path: str, save: bool = False, total: floa
         print(f"❌ Config file not found: {path}")
         return
 
+    # Load defaults first
+    defaults_path = path.parent / "DEFAULTSCONFIG.yml"
+    if not defaults_path.exists():
+        print(f"❌ DEFAULTSCONFIG.yml not found at: {defaults_path}")
+        return
+        
+    with open(defaults_path, "r") as f:
+        defaults = yaml.safe_load(f) or {}
+
     with open(path, "r") as f:
         config = yaml.safe_load(f) or {}
 
-    fixed = _normalize_all_weights_with_diffs(config, total=total)
+    fixed = _normalize_all_weights_with_diffs(config, defaults, total=total)
 
     if save:
         with open(path, "w") as f:
@@ -161,7 +145,7 @@ def _reorder_color_dict(d: dict) -> dict:
         ordered[k] = d[k]
     return ordered
 
-def _normalize_all_weights_with_diffs(config: dict, total: float = 100.0) -> dict:
+def _normalize_all_weights_with_diffs(config: dict, defaults: dict, total: float = 100.0) -> dict:
     """
     Walk through config and normalize known weight sections:
       - skeleton_params.colors_weights   (dict preferred; list accepted)
@@ -172,23 +156,27 @@ def _normalize_all_weights_with_diffs(config: dict, total: float = 100.0) -> dic
       - skeleton_params.colors
       - skeleton_params.rarities
       - skeleton_params.card_types
+    Uses fallback values from defaults config.
     """
     sp = config.get("skeleton_params", {})
     if not isinstance(sp, dict):
         print("⚠️  'skeleton_params' missing or not a dict; nothing to do.")
         return config
 
-    colors = sp.get("colors", [])
-    rarities = sp.get("rarities", [])
-    card_types = sp.get("card_types")
-
-    if not card_types:
-        # Try to derive from weights; fall back to canonical if nothing found
-        ctw = sp.get("card_types_weights", {})
-        derived = _derive_card_types(ctw) if isinstance(ctw, dict) else []
-        card_types = derived or CANONICAL_CARD_TYPES
+    # Get defaults for skeleton_params
+    default_sp = defaults.get("skeleton_params", {})
+    
+    colors = sp.get("colors", default_sp.get("colors", []))
+    rarities = sp.get("rarities", default_sp.get("rarities", []))
+    
+    # Always use canonical_card_types from defaults as the authoritative list
+    # Don't derive from user's partial config as this loses missing types
+    card_types = sp.get("card_types") or default_sp.get("canonical_card_types", [])
+    
+    # Update the user config to have the complete card_types list
+    if card_types and card_types != sp.get("card_types"):
         sp["card_types"] = list(card_types)
-        print("ℹ️  Inserted 'skeleton_params.card_types' into config (derived or canonical).")
+        print("ℹ️  Updated 'skeleton_params.card_types' to use complete canonical list.")
 
     # ---- colors_weights (dict preferred; list accepted) ----
     if "colors_weights" in sp:
@@ -246,26 +234,30 @@ def _normalize_all_weights_with_diffs(config: dict, total: float = 100.0) -> dic
     # ---- card_types_weights (resolve against _default, then normalize) ----
     if "card_types_weights" in sp and isinstance(sp["card_types_weights"], dict):
         ctw: dict = sp["card_types_weights"]
+        
+        # Get default type weights from defaults config (now in card_types_weights._default)
+        default_sp_ctw = default_sp.get("card_types_weights", {})
+        default_type_weights = default_sp_ctw.get("_default", {})
 
         # 1) Build/normalize the baseline default_map first
-        #    Source priority: YAML _default (dict/list) → DEFAULT_TYPE_WEIGHTS
-        #    Then restrict to current card_types and fill missing from code defaults
+        #    Source priority: YAML _default (dict/list) → default_type_weights from defaults config
+        #    Then restrict to current card_types and fill missing from defaults
         if isinstance(ctw.get("_default"), list):
             default_map_raw = _list_to_labeled_dict(ctw["_default"], card_types)
         elif isinstance(ctw.get("_default"), dict):
             default_map_raw = dict(ctw["_default"])
         else:
-            default_map_raw = {t: DEFAULT_TYPE_WEIGHTS.get(t, 0.0) for t in card_types}
+            default_map_raw = {t: default_type_weights.get(t, 0.0) for t in card_types}
 
-        # Coerce to numeric, keep only declared card_types, fill missing from code defaults
+        # Coerce to numeric, keep only declared card_types, fill missing from defaults
         default_map_coerced = {}
         for t in card_types:
-            v = default_map_raw.get(t, DEFAULT_TYPE_WEIGHTS.get(t, 0.0))
+            v = default_map_raw.get(t, default_type_weights.get(t, 0.0))
             try:
                 default_map_coerced[t] = float(v)
             except Exception:
                 print(f"⚠️  Skipping non-numeric default for type {t!r}: {v!r}")
-                default_map_coerced[t] = float(DEFAULT_TYPE_WEIGHTS.get(t, 0.0))
+                default_map_coerced[t] = float(default_type_weights.get(t, 0.0))
 
         # Normalize default row and write it back (so YAML has the clean baseline)
         default_norm = _normalize_dict_with_diffs(
@@ -422,7 +414,7 @@ def _normalize_dict_with_diffs(key: str, d: dict, total: float):
         return d
 
     factor = total / s
-    normalized = {k: round(v * factor, 6) for k, v in numeric.items()}
+    normalized = {k: round(v * factor, 1) for k, v in numeric.items()}
 
     _print_dict_diff(key, original, normalized, total=total)
     return normalized

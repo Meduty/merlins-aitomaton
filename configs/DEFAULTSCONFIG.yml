@@ -54,19 +54,20 @@ skeleton_params:
     - "basic land"
     - "artifact"
     - "kindred"
-  default_type_weights:
-    creature: 50
-    artifact creature: 0
-    planeswalker: 2
-    instant: 12
-    sorcery: 12
-    enchantment: 12
-    saga: 0
-    battle: 0
-    land: 12
-    basic land: 0
-    artifact: 0
-    kindred: 0
+  card_types_weights:
+    _default:
+      creature: 50
+      artifact creature: 0
+      planeswalker: 2
+      instant: 12
+      sorcery: 12
+      enchantment: 12
+      saga: 0
+      battle: 0
+      land: 12
+      basic land: 0
+      artifact: 0
+      kindred: 0
   colors:
     - "white"
     - "blue"
@@ -74,6 +75,48 @@ skeleton_params:
     - "red"
     - "green"
     - "colorless"
+  mana_values:
+    - "0"
+    - "1"
+    - "2"
+    - "3"
+    - "4"
+    - "5"
+    - "6"
+    - "7"
+    - "8+"
+  mana_curves:
+    white: [1, 8, 27, 23, 19, 14, 6, 1, 1]
+    blue: [1, 7, 25, 22, 20, 16, 7, 1, 1]
+    black: [1, 6, 27, 25, 18, 14, 5, 2, 2]
+    red: [1, 10, 28, 23, 18, 13, 5, 1, 1]
+    green: [1, 7, 22, 22, 20, 17, 6, 3, 2]
+    colorless: [3, 10, 25, 23, 19, 12, 5, 2, 1]
+    default: [4, 12, 22, 22, 18, 12, 6, 3, 1]
+  rarities:
+    - "common"
+    - "uncommon"
+    - "rare"
+    - "mythic"
+  rarity_based_mutation:
+    common: [1, 12]
+    uncommon: [2, 12]
+    rare: [4, 12]
+    mythic: [8, 12]
+  function_tags:
+    "ramp or mana fixing": 15
+    "draw or card advantage": 15
+    "removal or control": 10
+    "board wipe or mass removal": 5
+    "activated ability": 5
+    "Flying or other evasion": 5
+    "simple or straightforward": 10
+    "vanilla or no abilities": 5
+  rarity_to_skew:
+    common: -2
+    uncommon: -1
+    rare: 1
+    mythic: 2
   colors_weights:
     white: 16.67
     blue: 16.67
