@@ -35,7 +35,14 @@ import urllib.request
 import time
 from openai import OpenAI
 
-import imagesSD
+# Handle imports for both direct execution and module import
+try:
+    from . import imagesSD
+    from . import config_manager
+except ImportError:
+    # When running directly (not as a module)
+    import imagesSD
+    import config_manager
 
 from tqdm import tqdm
 from tqdm.contrib.logging import logging_redirect_tqdm
@@ -47,22 +54,19 @@ logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
 )
 
-config = yaml.safe_load(open("config.yml"))
-
-
-
+# NOTE: Configuration now loaded via config_manager instead of global loading
+# Global constants only
 API_KEY = os.getenv("API_KEY")
 
-max_retries = config["http_config"].get("retries", 3)
-retry_delay = config["http_config"].get("retry_delay", 10)
-timeout = config["http_config"].get("timeout", 60)  # seconds
-
-image_method = config["mtgcg_mse_config"].get("image_method", "none")
-
-model_swap_chance = config["SD_config"].get("model_swap_chance", 20)
-
-sleepy_time = config["square_config"].get("sleepy_time", 0)
-concurrency = int(config["square_config"].get("concurrency", 1))
+# TODO: These will be set dynamically in main() - should be refactored to pass as parameters
+# Module-level variables (will be set by main)
+max_retries = None
+retry_delay = None
+timeout = None
+image_method = None
+model_swap_chance = None
+sleepy_time = None
+concurrency = None
 
 BAR_FMT = (
     "{desc}: {percentage:3.0f}%|{bar}| {n_fmt}/{total_fmt} "
@@ -301,9 +305,9 @@ def download_images(cards, output_dir, on_done=None):
     - Calls on_done(1) once per card (even on failure or missing URL).
     """
     os.makedirs(output_dir, exist_ok=True)
-    concurrency = int(config.get("square_config", {}).get("concurrency", 4))
+    # TODO: Should accept config as parameter instead of using globals
     # Use your existing HTTP timeout if set; fall back to 60s
-    http_timeout = int(config.get("http_config", {}).get("timeout", 60))
+    http_timeout = timeout
 
     def _worker(i_card):
         i, card = i_card
@@ -362,11 +366,12 @@ def _handle_download(cards, output_dir, on_done):
     time.sleep(sleepy_time)
     download_images(cards, output_dir, on_done=on_done)
 
-def _handle_localsd(cards, output_dir, on_done):
+def _handle_localsd(cards, output_dir, on_done, config):
     logging.info("Using local SD for image generation.")
     time.sleep(sleepy_time)
     out_dir = imagesSD.generate_images_from_dict(
         cards,
+        config,  # Pass config to imagesSD
         option_change_chance=model_swap_chance,
         on_done=on_done,  # overall bar ticks as each image finishes
     )
@@ -379,7 +384,7 @@ def _handle_none(cards, output_dir, on_done):
     for _ in cards:
         on_done()
 
-def get_images(cards, output_dir, method="download"):
+def get_images(cards, output_dir, method="download", config=None):
     total = len(cards)
     with tqdm(total=total, desc="Images", unit="img",
               dynamic_ncols=True, bar_format=BAR_FMT, position=1) as pbar:
@@ -388,9 +393,9 @@ def get_images(cards, output_dir, method="download"):
             pbar.update(1)
 
         handlers = {
-            "download": _handle_download,
-            "localSD": _handle_localsd,
-            "none": _handle_none,
+            "download": lambda c, o, d: _handle_download(c, o, d),
+            "localSD": lambda c, o, d: _handle_localsd(c, o, d, config),
+            "none": lambda c, o, d: _handle_none(c, o, d),
         }
 
         handler = handlers.get(method)
@@ -403,12 +408,12 @@ def get_images(cards, output_dir, method="download"):
             logging.error(f"Error in get_images ({method}): {e}")
 
 
-def export_to_zip(output_text, cards, image_method="download", output_dir="out/mse-out", filename="set"):
+def export_to_zip(output_text, cards, image_method="download", output_dir="out/mse-out", filename="set", config=None):
     os.makedirs(output_dir, exist_ok=True)
     set_path = os.path.join(output_dir, filename)
     with open(set_path, "w", encoding="utf-8") as f:
         f.write(output_text)
-    get_images(cards, output_dir, method=image_method)
+    get_images(cards, output_dir, method=image_method, config=config)
     with zipfile.ZipFile(f"{output_dir}.mse-set", "w", zipfile.ZIP_DEFLATED) as zipf:
         for root, _, files in os.walk(output_dir):
             for file in files:
@@ -417,9 +422,26 @@ def export_to_zip(output_text, cards, image_method="download", output_dir="out/m
                 zipf.write(file_path, arcname=arcname)
 
 
-if __name__ == "__main__":
+def main_with_config(config_path=None):
+    """Main function that loads config and runs the MSE conversion."""
+    global max_retries, retry_delay, timeout, image_method, model_swap_chance, sleepy_time, concurrency
+    
+    if config_path is None:
+        config_path = "configs/config.yml"
+    
+    config = config_manager.load_config(config_path)
+    
+    # Extract config values (no fallbacks - values guaranteed by config validation)
+    max_retries = config["http_config"]["retries"]
+    retry_delay = config["http_config"]["retry_delay"]
+    timeout = config["http_config"]["timeout"]
+    image_method = config["mtgcg_mse_config"]["image_method"]
+    model_swap_chance = config["SD_config"]["model_swap_chance"]
+    sleepy_time = config["square_config"]["sleepy_time"]
+    concurrency = int(config["square_config"]["concurrency"])
+    
     with logging_redirect_tqdm():
-        outdir = config["square_config"].get("output_dir", "output")
+        outdir = config["square_config"]["output_dir"]
         cardsjson = os.path.join(outdir, "generated_cards.json")
         with open(cardsjson, "r", encoding="utf-8") as f:
             cards_data = json.load(f)
@@ -430,14 +452,17 @@ if __name__ == "__main__":
         time.sleep(sleepy_time)
         mse_output = convert_cards(cards_data, ai=openai_client)
 
+        mse_outpath = os.path.join(outdir, "mse-out")
+
         logging.info("=== Exporting to .mse-set ===")
         time.sleep(sleepy_time)
         export_to_zip(
             mse_output,
             cards_data,
             image_method=image_method,
-            output_dir="out/mse-out",
-            filename="set"
+            output_dir=mse_outpath,
+            filename="set",
+            config=config
         )
 
         logging.info("Packaged set into out/mse-out.mse-set")
@@ -445,4 +470,16 @@ if __name__ == "__main__":
         logging.info("=== Conversion complete ===")
         time.sleep(sleepy_time)
 
-        
+if __name__ == "__main__":
+    # Load configuration using new config system with proper argument parsing
+    import argparse
+    
+    parser = argparse.ArgumentParser(description="Convert MTG Card Generator JSON to MSE (Magic Set Editor) format")
+    parser.add_argument("config", nargs="?", default="configs/config.yml", 
+                       help="Path to configuration file (default: configs/config.yml)")
+    parser.add_argument("--output-dir", help="Override output directory")
+    
+    args = parser.parse_args()
+    config_path = args.config
+    
+    main_with_config(config_path)

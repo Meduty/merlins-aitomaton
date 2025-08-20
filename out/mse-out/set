@@ -1,0 +1,186 @@
+mse_version: 2.0.2
+game: magic
+game_version: 2024-10-01
+stylesheet: m15-altered
+stylesheet_version: 2024-09-23
+set_info:
+	symbol: 
+	masterpiece_symbol: 
+	automatic_reminder_text: 
+	sort_multicolor_in_pairs: yes
+	sort_hybrid_in_pairs: yes
+styling:
+	magic-m15-altered:
+		text_box_mana_symbols: magic-mana-small.mse-symbol-font
+		level_mana_symbols: magic-mana-large.mse-symbol-font
+		overlay: 
+	magic-m15-mainframe-dfc:
+		text_box_mana_symbols: magic-mana-small.mse-symbol-font
+		level_mana_symbols: magic-mana-large.mse-symbol-font
+		overlay: 
+	magic-m15-mainframe-planeswalker:
+		text_box_mana_symbols: magic-mana-small.mse-symbol-font
+		overlay: 
+card:
+	has_styling: true
+	styling_data:
+		text_box_mana_symbols: magic-mana-small.mse-symbol-font
+		level_mana_symbols: magic-mana-large.mse-symbol-font
+		overlay: 
+	notes:
+		raw:
+		Chamber of Forgotten Echoes
+		{2}{B}
+		Legendary Enchantment
+		Black
+		mythic
+		At the beginning of your end step, if you drew no cards this turn, exile the top card of your library face down. You may look at and play cards exiled with Chamber of Forgotten Echoes.
+		Whenever an opponent discards a card or a creature dies, you may put a card exiled with Chamber of Forgotten Echoes into your hand.
+		If Chamber of Forgotten Echoes would leave the battlefield, exile all cards exiled with it.
+		"When the world goes silent, only the faithful remember what was lost.—Oblivion Cult Proverb"
+		()
+	time_created: 2025-08-20 20:28:40
+	time_modified: 2025-08-20 20:28:40
+	name: Chamber of Forgotten Echoes
+	casting_cost: 2B
+	image: 3df7d77d-0255-453f-a68b-5a8a40a38578.png
+	image_2: 
+	mainframe_image: 
+	mainframe_image_2: 
+	super_type: <word-list-type-en>Legendary Enchantment</word-list-type-en>
+	sub_type: <word-list-type-en></word-list-type-en>
+	rarity: mythic
+	rule_text:
+		At the beginning of your end step, if you drew no cards this turn, exile the top card of your library face down. You may look at and play cards exiled with Chamber of Forgotten Echoes.
+		Whenever an opponent discards a card or a creature dies, you may put a card exiled with Chamber of Forgotten Echoes into your hand.
+		If Chamber of Forgotten Echoes would leave the battlefield, exile all cards exiled with it.
+	flavor_text:
+		"When the world goes silent, only the faithful remember what was lost.—Oblivion Cult Proverb"
+	power: 
+	toughness: 
+	card_code_text: 
+	card_code_text_2: 
+	card_code_text_3: 
+	copyright: 
+	copyright_2: 
+card:
+	has_styling: true
+	styling_data:
+		text_box_mana_symbols: magic-mana-small.mse-symbol-font
+		level_mana_symbols: magic-mana-large.mse-symbol-font
+		overlay: 
+	notes:
+		raw:
+		Echoes of Tranquil Void
+		{2}{U}
+		Sorcery
+		Blue
+		mythic
+		Draw two cards. If you have no cards in hand after drawing this way, draw three additional cards instead. Then, if your hand is empty, you may exile Echoes of Tranquil Void from your graveyard. If you do, return a card from your graveyard to your hand.
+		When thoughts fade and memory whispers, all that remains is silent clarity.
+		()
+	time_created: 2025-08-20 20:28:40
+	time_modified: 2025-08-20 20:28:40
+	name: Echoes of Tranquil Void
+	casting_cost: 2U
+	image: 36afbcf5-80d9-4fd3-a4e2-8cd5e3be1236.png
+	image_2: 
+	mainframe_image: 
+	mainframe_image_2: 
+	super_type: <word-list-type-en>Sorcery</word-list-type-en>
+	sub_type: <word-list-type-en></word-list-type-en>
+	rarity: mythic
+	rule_text:
+		Draw two cards. If you have no cards in hand after drawing this way, draw three additional cards instead. Then, if your hand is empty, you may exile Echoes of Tranquil Void from your graveyard. If you do, return a card from your graveyard to your hand.
+	flavor_text:
+		When thoughts fade and memory whispers, all that remains is silent clarity.
+	power: 
+	toughness: 
+	card_code_text: 
+	card_code_text_2: 
+	card_code_text_3: 
+	copyright: 
+	copyright_2: 
+card:
+	has_styling: true
+	styling_data:
+		text_box_mana_symbols: magic-mana-small.mse-symbol-font
+		level_mana_symbols: magic-mana-large.mse-symbol-font
+		overlay: 
+	notes:
+		raw:
+		Oblivion's Embrace
+		{2}{B}{R}
+		Sorcery
+		Rakdos
+		mythic
+		If you have no cards in hand, exile target creature or planeswalker. Otherwise, each opponent sacrifices a creature or planeswalker and discards a card.
+		
+		Oblivion — If you have no cards in hand as this spell resolves, until end of turn, you may cast an instant or sorcery card from your graveyard. If you do, exile that card as it resolves.
+		"Only in utter emptiness does the cult's true revelation bloom."
+		()
+	time_created: 2025-08-20 20:28:40
+	time_modified: 2025-08-20 20:28:40
+	name: Oblivion's Embrace
+	casting_cost: 2BR
+	image: 754e11ac-deec-4fb2-8646-3c399e6778d8.png
+	image_2: 
+	mainframe_image: 
+	mainframe_image_2: 
+	super_type: <word-list-type-en>Sorcery</word-list-type-en>
+	sub_type: <word-list-type-en></word-list-type-en>
+	rarity: mythic
+	rule_text:
+		If you have no cards in hand, exile target creature or planeswalker. Otherwise, each opponent sacrifices a creature or planeswalker and discards a card.
+		Oblivion — If you have no cards in hand as this spell resolves, until end of turn, you may cast an instant or sorcery card from your graveyard. If you do, exile that card as it resolves.
+	flavor_text:
+		"Only in utter emptiness does the cult's true revelation bloom."
+	power: 
+	toughness: 
+	card_code_text: 
+	card_code_text_2: 
+	card_code_text_3: 
+	copyright: 
+	copyright_2: 
+card:
+	has_styling: true
+	styling_data:
+		text_box_mana_symbols: magic-mana-small.mse-symbol-font
+		level_mana_symbols: magic-mana-large.mse-symbol-font
+		overlay: 
+	notes:
+		raw:
+		Silent Maw Expanse
+		
+		Legendary Basic Land
+		Colorless
+		rare
+		Silent Maw Expanse enters the battlefield tapped.
+		{T}: Add {B}.
+		{2}, {T}, Exile a card from your graveyard: Draw a card. Activate only as a sorcery and only if you control no other untapped lands.
+		"Once the winds die, all that's left is our footsteps and what they cannot carry."
+		()
+	time_created: 2025-08-20 20:28:40
+	time_modified: 2025-08-20 20:28:40
+	name: Silent Maw Expanse
+	casting_cost: 
+	image: 7fc2ee33-721a-4d15-9284-d17f0a268612.png
+	image_2: 
+	mainframe_image: 
+	mainframe_image_2: 
+	super_type: <word-list-type-en>Legendary Basic Land</word-list-type-en>
+	sub_type: <word-list-type-en></word-list-type-en>
+	rarity: rare
+	rule_text:
+		Silent Maw Expanse enters the battlefield tapped.
+		[T]: Add [B].
+		[2], [T], Exile a card from your graveyard: Draw a card. Activate only as a sorcery and only if you control no other untapped lands.
+	flavor_text:
+		"Once the winds die, all that's left is our footsteps and what they cannot carry."
+	power: 
+	toughness: 
+	card_code_text: 
+	card_code_text_2: 
+	card_code_text_3: 
+	copyright: 
+	copyright_2: 

@@ -4,6 +4,7 @@ import base64
 import json
 import time
 import os
+import sys
 from enum import Enum
 
 import logging
@@ -20,7 +21,12 @@ from dotenv import load_dotenv
 
 import numpy as np
 
-import merlinAI_lib
+# Handle imports for both direct execution and module import
+try:
+    from . import merlinAI_lib
+except ImportError:
+    # When running directly (not as a module)
+    import merlinAI_lib
 
 # Load environment variables from .env file
 load_dotenv()
@@ -33,31 +39,29 @@ logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
 )
 
-config = yaml.safe_load(open("config.yml"))
-
-forge_url_base = config["SD_config"].get("forge_url_base", "http://127.0.0.1:7860")
-forge_out = config["SD_config"].get("sd_output_dir", "forge_out")
-random_lora_weights = config["SD_config"].get("random_lora_weights", True)  # Set to True to randomize Lora weights
-apply_lora_chance = config["SD_config"].get("apply_lora_chance", 50)  # Chance to apply Lora (0-100)
-loraStDe = config["SD_config"].get("lora_weight_standard_deviation", 0.35)  # Standard deviation for Lora weights
-use_special_tags = config["SD_config"].get("use_special_tags", True)  # Set to True to use special tags
-vary_special_tags_weights = config["SD_config"].get("varying_special_tags_weight", True)  # Set to True to vary special tags weights
-
-model_swap_chance = config["SD_config"].get("model_swap_chance", 20)  # Chance to change model for each card (0-100)
-
-max_retries = config["http_config"].get("retries", 3)
-retry_delay = config["http_config"].get("retry_delay", 10)
-
-max_tag_weight = config["SD_config"].get("max_tag_weight", 2.0)  # Maximum weight for special tags
-
-sleepy_time = config["square_config"].get("sleepy_time", 0)
-
-out_dir = os.path.join("out", forge_out)
-os.makedirs(out_dir, exist_ok=True)
-
+# NOTE: Configuration now passed as parameters instead of global loading
+# Global constants only
 API_KEY = os.getenv("API_KEY")
 
-special_tags = config["SD_config"].get("special_tags", {})
+# These are set by generate_images_from_dict based on config parameters
+# Keeping as module variables for backward compatibility with functions that don't take config yet
+forge_url_base = "http://127.0.0.1:7860"
+forge_out = "forge_out"
+random_lora_weights = True
+apply_lora_chance = 50
+loraStDe = 0.35
+use_special_tags = True
+vary_special_tags_weights = True
+model_swap_chance = 20
+max_retries = 3
+retry_delay = 10
+max_tag_weight = 2.0
+sleepy_time = 0
+special_tags = {}
+
+# This will be updated by generate_images_from_dict based on config
+out_dir = os.path.join("out", "forge_out")
+os.makedirs(out_dir, exist_ok=True)
 
 BAR_FMT = (
     "{desc}: {percentage:3.0f}%|{bar}| {n_fmt}/{total_fmt} "
@@ -336,6 +340,7 @@ def get_special_tags(index: int) -> str:
 
 def generate_images_from_dict(
     cards: list[dict],
+    config: dict,  # Add config parameter
     option_change_chance: int = 20,
     on_done: Optional[Callable[[dict], None]] = None,  # <- NEW
 ) -> str:
@@ -344,6 +349,29 @@ def generate_images_from_dict(
     Calls `on_done(card)` once per card when its image attempt finishes.
     Returns the directory where images were written.
     """
+    
+    # Extract config values and set module globals for backward compatibility
+    global forge_url_base, forge_out, random_lora_weights, apply_lora_chance
+    global loraStDe, use_special_tags, vary_special_tags_weights, model_swap_chance
+    global max_retries, retry_delay, max_tag_weight, sleepy_time, out_dir
+    
+    sd_config = config["SD_config"]
+    forge_url_base = sd_config["forge_url_base"]
+    forge_out = sd_config["sd_output_dir"]
+    random_lora_weights = sd_config["random_lora_weights"]
+    apply_lora_chance = sd_config["apply_lora_chance"]
+    loraStDe = sd_config["lora_weight_standard_deviation"]
+    use_special_tags = sd_config["use_special_tags"]
+    vary_special_tags_weights = sd_config["varying_special_tags_weight"]
+    model_swap_chance = sd_config["model_swap_chance"]
+    max_retries = sd_config["max_retries"]
+    retry_delay = sd_config["retry_delay"]
+    max_tag_weight = sd_config["max_tag_weight"]
+    sleepy_time = sd_config["sleepy_time"]
+    
+    # Update output directory path
+    out_dir = os.path.join(sd_config["base_output_dir"], forge_out)
+    os.makedirs(out_dir, exist_ok=True)
 
     cards_data = cards
 
@@ -444,16 +472,44 @@ def generate_images_from_dict(
     return out_dir
 
 if __name__ == "__main__":
+    # Load configuration using new config system with proper argument parsing
+    import argparse
+    
+    # Handle imports for config_manager
+    try:
+        from . import config_manager
+    except ImportError:
+        import config_manager
+    
+    parser = argparse.ArgumentParser(description="Generate Stable Diffusion images for MTG cards")
+    parser.add_argument("config", nargs="?", default="configs/config.yml", 
+                       help="Path to configuration file (default: configs/config.yml)")
+    
+    args = parser.parse_args()
+    
+    try:
+        config = config_manager.load_config(args.config)
+    except FileNotFoundError:
+        logging.error(f"Config file {args.config} not found")
+        sys.exit(1)
 
+    # Config values will be extracted within generate_images_from_dict function
     logging.info("Starting image generation from JSON...")
+    sleepy_time = config["SD_config"]["sleepy_time"]
     time.sleep(sleepy_time)
-    outdir = config["square_config"].get("output_dir", "output")
+    outdir = config["square_config"]["output_dir"]
     cardsjson = os.path.join(outdir, "generated_cards.json")
-    with open(cardsjson, "r", encoding="utf-8") as f:
-        cards_data = json.load(f)
+    
+    try:
+        with open(cardsjson, "r", encoding="utf-8") as f:
+            cards_data = json.load(f)
+    except FileNotFoundError:
+        logging.error(f"Generated cards file not found: {cardsjson}")
+        logging.error("Please run square_generator.py first to generate cards")
+        exit(1)
 
     try:
-        output = generate_images_from_dict(cards_data, option_change_chance=model_swap_chance)
+        output = generate_images_from_dict(cards_data, config, option_change_chance=model_swap_chance)
         logging.info(f"Images generated and saved to {output}")
         time.sleep(sleepy_time)
     except Exception as e:

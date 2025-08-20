@@ -495,9 +495,9 @@ def card_skeleton_generator(
     Config is passed as argument instead of using global variables.
     """
     # Extract config values instead of using globals
-    sleepy_time = config["square_config"].get("sleepy_time", 0)
-    stdDePL = config["square_config"].get("standard_deviation_powerLevel", 0.7)
-    powSkew = config["square_config"].get("power_level_rarity_skew", 0.5)
+    sleepy_time = config["square_config"]["sleepy_time"]
+    stdDePL = config["square_config"]["standard_deviation_powerLevel"]
+    powSkew = config["square_config"]["power_level_rarity_skew"]
 
     out_params = deepcopy(api_params)
 
@@ -588,7 +588,7 @@ def card_skeleton_generator(
         mana_values = skeletonParams.mana_values
         curve = skeletonParams.mana_curves.get(
             selected_colors[0],
-            skeletonParams.mana_curves.get("colorless", [1] * len(mana_values)),
+            skeletonParams.mana_curves["default"]
         )
         selected_mana_value = random.choices(mana_values, weights=curve, k=1)[0]
         logging.info(f"[Card #{index+1}] Selected mana value: {selected_mana_value}")
@@ -823,7 +823,7 @@ def card_skeleton_generator(
 
 def generate_card(index, api_params: APIParams, metrics: GenerationMetrics, config: Dict[str, Any]) -> dict:
     """API parameters with metrics tracking and config passed as arguments."""
-    sleepy_time = config["square_config"].get("sleepy_time", 0)
+    sleepy_time = config["square_config"]["sleepy_time"]
 
     local_api_params = copy.copy(api_params)
 
@@ -946,7 +946,7 @@ def get_card_graceful(i, api_params: APIParams, skeleton_params: skeletonParams,
     """
     Wrapper to handle card generation with retries.
     """
-    sleepy_time = config["square_config"].get("sleepy_time", 0)
+    sleepy_time = config["square_config"]["sleepy_time"]
 
     logging.debug(
         f"[Card #{i+1}] User prompt: {api_params.userPrompt}, Creative: {api_params.creative}"
@@ -1025,7 +1025,7 @@ def card_worker(card_queue, pbar, api_params, skeleton_params, metrics, config, 
         finally:
             card_queue.task_done()
             pbar.update(1)  # <- keeps the bar in sync
-            sleepy_time = config["square_config"].get("sleepy_time", 0)
+            sleepy_time = config["square_config"]["sleepy_time"]
             logging.info(f"[Card #{i+1}] task done.")
             time.sleep(sleepy_time)
 
@@ -1042,7 +1042,7 @@ if __name__ == "__main__":
     max_retries = config["http_config"]["retries"]
     retry_delay = config["http_config"]["retry_delay"]
     sleepy_time = config["square_config"]["sleepy_time"]
-    set_params = config.get("set_params", {})
+    set_params = config["set_params"]
     
     # Load API credentials from environment variables
     API_KEY = os.getenv("API_KEY")
@@ -1132,7 +1132,7 @@ if __name__ == "__main__":
     time.sleep(sleepy_time)
     logging.info("=== End of Generation ===")
 
-    outdir = config["square_config"].get("output_dir", "output")
+    outdir = config["square_config"]["output_dir"]
     os.makedirs(outdir, exist_ok=True)
     outname = os.path.join(outdir, "generated_cards.json")
 

@@ -117,6 +117,18 @@ def check_and_normalize_config(config_path: str, save: bool = False, total: floa
     with open(path, "r") as f:
         config = yaml.safe_load(f) or {}
 
+    # Perform validation checks before normalization
+    print("🔍 Validating configuration...")
+    validation_issues = _validate_config_integrity(config, defaults)
+    _print_validation_results(validation_issues)
+    
+    # Check if there are critical errors that should stop processing
+    critical_errors = [issue for issue in validation_issues if "❌ ERROR:" in issue]
+    if critical_errors:
+        print("\n🛑 Stopping due to critical errors. Please fix the errors above and try again.")
+        return None
+
+    print("\n📊 Normalizing weights...")
     fixed = _normalize_all_weights_with_diffs(config, defaults, total=total)
 
     if save:
@@ -648,6 +660,111 @@ def _derive_card_types(ctw: dict) -> list[str]:
                 seen.add(k)
 
     return derived
+
+def _validate_config_integrity(config: dict, defaults: dict) -> list[str]:
+    """
+    Perform additional validation checks on the configuration.
+    Returns a list of warning/error messages.
+    """
+    issues = []
+    
+    # Check if skeleton_params exists
+    if "skeleton_params" not in config:
+        issues.append("❌ CRITICAL: Missing 'skeleton_params' section")
+        return issues
+    
+    sp = config["skeleton_params"]
+    default_sp = defaults.get("skeleton_params", {})
+    
+    # 1. Check for extremely unbalanced color weights
+    if "colors_weights" in sp:
+        colors = sp["colors_weights"]
+        if isinstance(colors, dict):
+            total = sum(v for v in colors.values() if isinstance(v, (int, float)))
+            if total > 0:
+                max_weight = max(v for v in colors.values() if isinstance(v, (int, float)))
+                min_weight = min(v for v in colors.values() if isinstance(v, (int, float)) and v > 0)
+                if max_weight / min_weight > 20:  # More than 20:1 ratio
+                    issues.append(f"⚠️  WARNING: Extremely unbalanced color weights (max {max_weight}, min {min_weight})")
+    
+    # 2. Check for missing critical sections
+    critical_sections = ["colors_weights", "card_types_weights"]
+    for section in critical_sections:
+        if section not in sp:
+            issues.append(f"⚠️  WARNING: Missing '{section}' section, will use defaults")
+    
+    # 3. Check card_types_weights structure
+    if "card_types_weights" in sp:
+        ctw = sp["card_types_weights"]
+        if isinstance(ctw, dict):
+            # Check if _default exists
+            if "_default" not in ctw:
+                issues.append("⚠️  WARNING: Missing '_default' in card_types_weights, system may behave unexpectedly")
+            
+            # Check for color-specific weights without _default
+            color_keys = [k for k in ctw.keys() if k in CANONICAL_COLOR_ORDER]
+            if color_keys and "_default" not in ctw:
+                issues.append("⚠️  WARNING: Color-specific weights defined without '_default' baseline")
+            
+            # Check for extremely low or high individual type weights
+            for key, weights in ctw.items():
+                if isinstance(weights, dict):
+                    for card_type, weight in weights.items():
+                        if isinstance(weight, (int, float)):
+                            if weight < 0:
+                                issues.append(f"❌ ERROR: Negative weight in {key}.{card_type}: {weight}")
+                            elif weight > 200:  # Suspiciously high
+                                issues.append(f"⚠️  WARNING: Very high weight in {key}.{card_type}: {weight}")
+    
+    # 4. Check for deprecated or suspicious keys
+    suspicious_keys = ["card_type", "color", "rarity"]  # Common typos
+    for key in sp.keys():
+        if key in suspicious_keys:
+            issues.append(f"⚠️  WARNING: Suspicious key '{key}' - did you mean '{key}s_weights'?")
+    
+    # 5. Check generation parameters
+    if "generations" in sp:
+        gen = sp["generations"]
+        if isinstance(gen, (int, float)):
+            if gen <= 0:
+                issues.append("❌ ERROR: 'generations' must be positive")
+            elif gen > 1000:
+                issues.append("⚠️  WARNING: Very high generation count may take a long time")
+    
+    # 6. Check thread safety
+    if "threads" in sp:
+        threads = sp["threads"]
+        if isinstance(threads, (int, float)):
+            if threads <= 0:
+                issues.append("❌ ERROR: 'threads' must be positive")
+            elif threads > 20:
+                issues.append("⚠️  WARNING: Very high thread count may cause performance issues")
+    
+    return issues
+
+def _print_validation_results(issues: list[str]):
+    """Print validation issues in a organized way."""
+    if not issues:
+        print("✅ Configuration validation passed - no issues found!")
+        return
+    
+    errors = [issue for issue in issues if "❌ ERROR:" in issue]
+    warnings = [issue for issue in issues if "⚠️  WARNING:" in issue]
+    
+    if errors:
+        print(f"\n❌ ERRORS FOUND ({len(errors)}):")
+        for error in errors:
+            print(f"  {error}")
+    
+    if warnings:
+        print(f"\n⚠️  WARNINGS ({len(warnings)}):")
+        for warning in warnings:
+            print(f"  {warning}")
+    
+    if errors:
+        print("\n🚨 Configuration has ERRORS that should be fixed before use!")
+    elif warnings:
+        print("\n💡 Configuration has warnings but should work correctly.")
 
 # ---------- CLI entrypoint ----------
 if __name__ == "__main__":

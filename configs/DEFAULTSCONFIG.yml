@@ -4,7 +4,7 @@
 
 square_config:
   total_cards: 15
-  concurrency: 2
+  concurrency: 1
   sleepy_time: 0
   standard_deviation_powerLevel: 0.7
   power_level_rarity_skew: 0.5
@@ -16,18 +16,22 @@ http_config:
   retry_delay: 10
 
 mtgcg_mse_config:
-  image_method: "download"
+  image_method: "none"
 
 SD_config:
-  max_tag_weight: 2.5
+  max_tag_weight: 2.0
   forge_url_base: "http://127.0.0.1:7860"
-  sd_output_dir: "forge-out"
+  sd_output_dir: "forge_out"
+  base_output_dir: "out"
   random_lora_weights: true
   lora_weight_standard_deviation: 0.35
   apply_lora_chance: 50
   use_special_tags: true
   varying_special_tags_weight: true
-  model_swap_chance: 66
+  model_swap_chance: 20
+  max_retries: 3
+  retry_delay: 10
+  sleepy_time: 0
   randomise_negative_prompt: true
   chance_no_negative_prompt: 50
 

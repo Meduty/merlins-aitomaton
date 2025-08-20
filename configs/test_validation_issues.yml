@@ -1,0 +1,20 @@
+skeleton_params:
+  # Missing colors_weights section entirely
+  
+  card_types_weights:
+    # Missing _default section
+    white:
+      creature: -5.0  # Negative weight - error
+      instant: 250.0  # Very high weight - warning
+      sorcery: 10.0
+    
+    red:
+      creature: 100.0  # Missing other types completely
+  
+  # Typo in key name
+  color_weights:  # Should be colors_weights
+    white: 50.0
+    blue: 50.0
+  
+  generations: -5  # Negative generations - error
+  threads: 50      # Very high thread count - warning
