@@ -765,7 +765,7 @@ def card_skeleton_generator(
         powerLevel = round(powerLevel, 2)  # Round to 2 decimal places
         card_skeleton["powerLevel"] = f"{powerLevel} out of 10"
         logging.info(
-            f"[Card #{index+1}] Set power level to {skeleton_params.power_level}"
+            f"[Card #{index+1}] Set power level to {skeleton_params.power_level}, adjusted to {powerLevel}."
         )
         time.sleep(sleepy_time)
 
@@ -1138,7 +1138,7 @@ if __name__ == "__main__":
                         retry_delay,
                         auth_lock,
                     ),
-                    daemon=True,
+                    daemon=False,
                 )
                 t.start()
                 threads.append(t)

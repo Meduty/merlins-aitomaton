@@ -1,128 +1,359 @@
-# merlinAI
+# MerlinAI 🎯
 
-**merlinAI** is an AI-powered Magic: The Gathering (MTG) card generator and utility suite. It generates custom MTG cards using AI models, manages configuration, and exports sets compatible with Magic Set Editor (MSE). It also supports image generation via Stable Diffusion or external APIs.
-
----
-
-## Features
-
-- **Automated Card Generation:**  
-  Generates MTG cards using AI (OpenAI GPT models) and the MTG Card Generator API, with configurable parameters for color, rarity, type, and more.
-
-- **Image Generation:**  
-  Supports generating card art using Stable Diffusion (local) or downloading from external sources, with advanced prompt and Lora support.
-
-- **MSE Export:**  
-  Converts generated cards into Magic Set Editor (.mse-set) format, including images and metadata, for easy set creation and sharing.
-
-- **Configurable Workflows:**  
-  All parameters (card skeleton, image options, API settings) are managed via a single `config.yml` file.
-
-- **Concurrency & Progress Tracking:**  
-  Multi-threaded generation and downloading with progress bars and logging.
+**MerlinAI** is a comprehensive AI-powered Magic: The Gathering (MTG) card generation and utility suite. It generates custom MTG cards using AI models, manages configuration externally, and exports sets compatible with Magic Set Editor (MSE). The system supports image generation via Stable Diffusion and provides a complete orchestrator for seamless workflow management.
 
 ---
 
-## Project Structure
+## 🚀 Quick Start
 
+### Using the Orchestrator (Recommended)
+
+The easiest way to use MerlinAI is through the main orchestrator:
+
+```bash
+# Interactive mode - guided setup with prompts
+python merlinAI.py
+
+# Batch mode - run all steps automatically  
+python merlinAI.py --batch cards mse images
+
+# Run specific steps only
+python merlinAI.py --batch cards  # Only generate cards
+python merlinAI.py --batch mse images  # Only convert and generate images
+
+# Use custom configuration
+python merlinAI.py my_config.yml --batch cards mse
 ```
-.
-├── .env                  # Environment variables (API keys, credentials)
-├── config.yml            # Main configuration file
-├── square_generator.py   # Main card generation script
-├── imagesSD.py           # Stable Diffusion image generation utilities
-├── MTGCG_mse.py          # MSE export and image packaging
-├── merlinAI_lib.py       # Shared library (weights, helpers, normalization)
-├── README.md             # This file
-├── LICENSE               # MIT License
-└── generated_cards.json  # (Generated) Output cards
+
+### Manual Execution
+
+You can also run individual components:
+
+```bash
+# 1. Generate cards
+python scripts/square_generator.py --config configs/config.yml
+
+# 2. Convert to Magic Set Editor format
+python scripts/MTGCG_mse.py configs/config.yml
+
+# 3. Generate images with Stable Diffusion
+python scripts/imagesSD.py configs/config.yml
 ```
 
 ---
 
-## Setup
+## ✨ Features
 
-1. **Install Dependencies**
+- **🎛️ Interactive Orchestrator:**  
+  Guided pipeline execution with real-time configuration, prerequisite checking, and smart error handling.
 
-   - Python 3.8+
-   - Required packages:  
-     ```
-     pip install requests tqdm numpy pyyaml python-dotenv openai scipy
-     ```
+- **🤖 AI-Powered Card Generation:**  
+  Creates MTG cards using OpenAI GPT models via MTG Card Generator API, with configurable parameters for colors, rarities, types, and themes.
 
-2. **Configure Environment**
+- **🎨 Advanced Image Generation:**  
+  Supports Stable Diffusion (local), external API downloads, with Lora weights, custom prompts, and model swapping.
 
-   - Copy `.env` and fill in your API keys and credentials:
-     ```
-     MTGCG_USERNAME = "your_username"
-     MTGCG_PASSWORD = "your_password"
-     API_KEY = "your_openai_api_key"
-     AUTH_TOKEN = None
-     ```
+- **📋 Magic Set Editor Integration:**  
+  Converts generated cards into MSE (.mse-set) format with images and metadata for easy set creation and sharing.
 
-   - Edit `config.yml` to adjust card generation, image, and export settings.
+- **🔧 External Configuration Management:**  
+  All parameters managed via YAML configuration files with CLI overrides and runtime modifications.
 
-3. **(Optional) Stable Diffusion**
+- **⚡ Concurrent Processing:**  
+  Multi-threaded generation with progress tracking, metrics collection, and thread-safe operations.
 
-   - For local image generation, ensure a Stable Diffusion API is running and update `forge_url_base` in `config.yml`.
+- **🛡️ Robust Error Handling:**  
+  Comprehensive validation, graceful failure recovery, and detailed logging throughout the pipeline.
 
 ---
 
-## Usage
-
-### 1. Generate Cards
-
-Run the card generator to create a batch of cards:
+## 📁 Project Structure
 
 ```
-python square_generator.py
+merlinAI/
+├── merlinAI.py                 # 🎯 Main orchestrator (START HERE)
+├── configs/
+│   ├── config.yml             # 🔧 Main configuration file
+│   └── DEFAULTSCONFIG.yml     # 📋 Default configuration template
+├── scripts/
+│   ├── square_generator.py    # 🎲 Core card generation
+│   ├── MTGCG_mse.py          # 📋 MSE conversion & export
+│   ├── imagesSD.py           # 🎨 Stable Diffusion image generation
+│   ├── config_manager.py     # ⚙️ Configuration loading & validation
+│   ├── metrics.py            # 📊 Generation metrics & tracking
+│   └── merlinAI_lib.py       # 🧰 Shared utilities & helpers
+├── output/                    # 📁 Generated files (created automatically)
+│   ├── generated_cards.json  # 🃏 Card data
+│   ├── mse-out.mse-set       # 📦 Magic Set Editor file
+│   ├── mse-out/              # 🖼️ Card images
+│   └── forge_out/            # ⚡ Forge format files
+├── ORCHESTRATOR_GUIDE.md     # 📖 Detailed orchestrator usage
+├── README.md                 # 📝 This file
+└── LICENSE                   # 📄 MIT License
 ```
-
-- Outputs cards to `generated_cards.json`.
-
-### 2. Generate Images
-
-Generate images for the cards using Stable Diffusion or download:
-
-```
-python imagesSD.py
-```
-
-- Images are saved to the configured output directory.
-
-### 3. Export to Magic Set Editor
-
-Convert cards and images to MSE format:
-
-```
-python MTGCG_mse.py
-```
-
-- Produces an `.mse-set` archive in `out/mse-out.mse-set`.
 
 ---
 
-## Configuration
+## 🔧 Setup
 
-All major options are in [config.yml](config.yml):
+### 1. Prerequisites
 
-- **square_config:** Number of cards, concurrency, power level, etc.
-- **SD_config:** Image generation models, Lora weights, prompt options.
-- **api_params:** AI model selection, prompt/explanation toggles.
-- **skeleton_params:** Card color/type/rarity weights, function tags, themes.
+- **Python 3.8+**
+- **Required packages:**
+  ```bash
+  pip install -r requirements.txt
+  ```
 
-See comments in [config.yml](config.yml) for details.
+### 2. Environment Configuration
+
+Create a `.env` file in the project root with your API credentials:
+
+```env
+# Required for card generation
+MTGCG_USERNAME=your_mtg_username
+MTGCG_PASSWORD=your_mtg_password
+API_KEY=your_openai_api_key
+
+# Optional - will auto-login if not provided
+AUTH_TOKEN=your_auth_token
+```
+
+### 3. Configuration
+
+The orchestrator uses `configs/config.yml` by default. You can:
+
+- **Use defaults:** Just run `python merlinAI.py` 
+- **Customize settings:** Edit `configs/config.yml`
+- **Create custom configs:** Copy and modify for different scenarios
+
+### 4. Stable Diffusion Setup (Optional)
+
+For local image generation, ensure a Stable Diffusion API is running and update the `forge_url_base` in your configuration.
 
 ---
 
-## License
+## 🎯 Orchestrator Features
 
-MIT License. See [LICENSE](LICENSE).
+### Interactive Mode
+
+The orchestrator provides a guided experience:
+
+```bash
+python merlinAI.py
+```
+
+**What happens:**
+1. **🔧 Configuration Summary:** Shows current settings (cards, models, output dir)
+2. **🔍 Prerequisites Check:** Validates environment variables and dependencies  
+3. **🎯 Pipeline Steps:** Guides you through each step with clear prompts
+4. **⚙️ Runtime Modifications:** Allows you to change settings on-the-fly
+5. **📊 Results Summary:** Shows generated files and next steps
+
+### Prerequisites Checking
+
+The system validates:
+- ✅ **Required environment variables** (`MTGCG_USERNAME`, `MTGCG_PASSWORD`, `API_KEY`)
+- ⚠️ **Optional variables** (`AUTH_TOKEN` - will attempt auto-login if missing)
+- 📁 **Output directories** (creates them if missing)
+- 📄 **Script files** (ensures all components are present)
+
+### User Information Flow
+
+1. **Configuration Display:**
+   ```
+   🔧 CONFIGURATION SUMMARY
+   📊 Total Cards: 4
+   🤖 AI Model: gpt-41
+   🎨 Image Model: dall-e-3
+   📁 Output Directory: output
+   ```
+
+2. **Prerequisites Validation:**
+   ```
+   🔍 CHECKING PREREQUISITES...
+   ⚠️ WARNINGS:
+      • Optional environment variable not set: AUTH_TOKEN
+   ✅ All prerequisites met!
+   ```
+
+3. **Interactive Prompts:**
+   ```
+   🎲 Generate 4 cards with image model 'dall-e-3'? [Y/n]: 
+   Modify any settings? [y/N]:
+   Total cards [4]: 8
+   Image model (dall-e-3/dall-e-2/none) [dall-e-3]: none
+   ```
+
+4. **Progress Feedback:**
+   ```
+   🎲 RUNNING CARD GENERATION...
+   ✅ Card generation completed successfully!
+   
+   📋 RUNNING MSE CONVERSION...
+   ✅ MSE conversion completed successfully!
+   ```
+
+5. **Results Summary:**
+   ```
+   📊 Generated files:
+      ✅ generated_cards.json - Card data
+      ✅ mse-out.mse-set - MSE set file  
+      ✅ mse-out/ - 8 card images
+   
+   💡 To view your cards, open output/mse-out.mse-set in Magic Set Editor
+   ```
+
+### Batch Mode
+
+For automation and scripting:
+
+```bash
+# Full pipeline
+python merlinAI.py --batch cards mse images
+
+# Selective execution  
+python merlinAI.py --batch cards      # Only generate cards
+python merlinAI.py --batch mse images # Skip card generation
+
+# Custom configuration
+python merlinAI.py my_config.yml --batch cards mse
+```
 
 ---
 
-## Credits
+## 🛠️ Individual Components
 
-- Author: Merlin Duty-Knez
-- Uses OpenAI, Stable Diffusion, and Magic
+### Card Generation (`square_generator.py`)
+
+Generates MTG cards using AI with threading support:
+
+```bash
+python scripts/square_generator.py --config configs/config.yml \
+  --total-cards 10 --concurrency 4 --image-model none
+```
+
+**Features:**
+- 🔀 Multi-threaded generation with thread-safe auth token management
+- 🎯 Configurable card parameters (colors, types, rarities, themes)
+- 📊 Real-time metrics and progress tracking
+- 🛡️ Robust error handling with retry mechanisms
+- 🔒 Thread-safe operations for concurrent processing
+
+### MSE Conversion (`MTGCG_mse.py`)
+
+Converts card data to Magic Set Editor format:
+
+```bash
+python scripts/MTGCG_mse.py configs/config.yml
+```
+
+**Outputs:**
+- 📦 `mse-out.mse-set` - Complete MSE set file
+- 🖼️ `mse-out/` - Individual card images
+- ⚡ `forge_out/` - Forge-compatible format
+
+### Image Generation (`imagesSD.py`)
+
+Generates custom card art using Stable Diffusion:
+
+```bash
+python scripts/imagesSD.py configs/config.yml
+```
+
+**Features:**
+- 🎨 Multiple model support with dynamic switching
+- 🔧 Lora weights and custom prompts
+- 📈 Progress tracking and error handling
+- 🖼️ High-quality image generation
+
+---
+
+## ⚙️ Configuration
+
+### Main Configuration File (`configs/config.yml`)
+
+Key sections:
+
+```yaml
+square_config:
+  total_cards: 4              # Number of cards to generate
+  concurrency: 4              # Parallel threads  
+  output_dir: "output"        # Output directory
+  sleepy_time: 0.1           # Delay between operations
+
+api_params:
+  model: "gpt-41"            # AI model for card generation
+  image_model: "dall-e-3"    # Image generation model
+  generate_image_prompt: false
+
+skeleton_params:
+  colors: ["white", "blue", "black", "red", "green", "colorless"]
+  rarities: ["common", "uncommon", "rare", "mythic"]
+  # ... detailed card generation parameters
+
+set_params:
+  setName: "Custom Set"       # Your set name
+  setCode: "CST"             # 3-letter set code
+```
+
+### CLI Overrides
+
+Most settings can be overridden via command line:
+
+```bash
+python scripts/square_generator.py --config config.yml \
+  --total-cards 20 \
+  --concurrency 8 \
+  --output-dir custom_output \
+  --image-model none
+```
+
+---
+
+## 🔍 Troubleshooting
+
+### Common Issues
+
+1. **Import Errors in IDE:**
+   - The `# type: ignore` comments suppress VS Code linting errors
+   - These are false positives due to dynamic path manipulation
+   - Code runs correctly despite IDE warnings
+
+2. **Missing Environment Variables:**
+   - The orchestrator will clearly indicate missing variables
+   - Required: `MTGCG_USERNAME`, `MTGCG_PASSWORD`, `API_KEY`
+   - Optional: `AUTH_TOKEN` (will auto-login if missing)
+
+3. **API Authentication Issues:**
+   - Check your MTGCG credentials in `.env`
+   - The system will attempt automatic re-authentication
+   - Look for "401 Unauthorized" errors in logs
+
+4. **Threading Issues:**
+   - All auth token updates are thread-safe with locks
+   - Progress bars work correctly with multi-threading
+   - Metrics collection is synchronized across threads
+
+### Getting Help
+
+- 📖 See `ORCHESTRATOR_GUIDE.md` for detailed usage examples
+- 🔧 Check `configs/DEFAULTSCONFIG.yml` for all available options
+- 📊 Run with `--verbose` flag for detailed logging
+- 🛡️ Use interactive mode for guided troubleshooting
+
+---
+
+## 📄 License
+
+MIT License. See [LICENSE](LICENSE) for details.
+
+---
+
+## 🙏 Credits
+
+- **Author:** Merlin Duty-Knez
+- **AI Integration:** OpenAI GPT models, MTG Card Generator API
+- **Image Generation:** Stable Diffusion, AUTOMATIC1111
+- **Export Format:** Magic Set Editor compatibility
+- **Threading & Concurrency:** Python threading with safety locks
 
