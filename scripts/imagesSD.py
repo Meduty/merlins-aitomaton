@@ -34,34 +34,48 @@ load_dotenv()
 
 from openai import OpenAI
 
-# Logging setup
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
-)
+# Logging setup - respect orchestrator's verbose setting
+def setup_logging():
+    """Setup logging based on environment variable from orchestrator."""
+    verbose = os.environ.get("MERLIN_VERBOSE", "1") == "1"
+    if verbose:
+        logging.basicConfig(
+            level=logging.INFO,
+            format="%(asctime)s - %(levelname)s - %(message)s",
+            force=True
+        )
+    else:
+        # Suppress all logs except errors in quiet mode
+        logging.basicConfig(
+            level=logging.WARNING,
+            format="%(message)s",
+            force=True
+        )
+
+setup_logging()
 
 # NOTE: Configuration now passed as parameters instead of global loading
 # Global constants only
 API_KEY = os.getenv("API_KEY")
 
 # These are set by generate_images_from_dict based on config parameters
-# Keeping as module variables for backward compatibility with functions that don't take config yet
-forge_url_base = "http://127.0.0.1:7860"
-forge_out = "forge_out"
-random_lora_weights = True
-apply_lora_chance = 50
-loraStDe = 0.35
-use_special_tags = True
-vary_special_tags_weights = True
-model_swap_chance = 20
-max_retries = 3
-retry_delay = 10
-max_tag_weight = 2.0
-sleepy_time = 0
-special_tags = {}
+# NO DEFAULT VALUES - all must be provided in configuration for strict validation
+forge_url_base = None
+forge_out = None
+random_lora_weights = None
+apply_lora_chance = None
+loraStDe = None
+use_special_tags = None
+vary_special_tags_weights = None
+model_swap_chance = None
+max_retries = None
+retry_delay = None
+max_tag_weight = None
+sleepy_time = None
+special_tags = None
 
-# This will be updated by generate_images_from_dict based on config
-out_dir = os.path.join("out", "forge_out")
-os.makedirs(out_dir, exist_ok=True)
+# This will be set by generate_images_from_dict based on config
+out_dir = None
 
 BAR_FMT = (
     "{desc}: {percentage:3.0f}%|{bar}| {n_fmt}/{total_fmt} "
@@ -353,24 +367,87 @@ def generate_images_from_dict(
     # Extract config values and set module globals for backward compatibility
     global forge_url_base, forge_out, random_lora_weights, apply_lora_chance
     global loraStDe, use_special_tags, vary_special_tags_weights, model_swap_chance
-    global max_retries, retry_delay, max_tag_weight, sleepy_time, out_dir
+    global max_retries, retry_delay, max_tag_weight, sleepy_time, out_dir, special_tags
     
-    sd_config = config["SD_config"]
+    # Strict config validation - NO FALLBACKS
+    try:
+        sd_config = config["SD_config"]
+    except KeyError:
+        raise ValueError("SD_config section missing from configuration")
+    
+    # Required configuration keys with strict validation
+    required_keys = [
+        "forge_url_base", "sd_output_dir", "random_lora_weights", "apply_lora_chance",
+        "lora_weight_standard_deviation", "use_special_tags", "varying_special_tags_weight",
+        "model_swap_chance", "max_retries", "retry_delay", "max_tag_weight", "sleepy_time",
+        "base_output_dir", "image_options"
+    ]
+    
+    # Check for missing required keys
+    missing_keys = [key for key in required_keys if key not in sd_config]
+    if missing_keys:
+        raise ValueError(f"Missing required SD_config keys: {missing_keys}")
+    
+    # Extract and validate all config values
     forge_url_base = sd_config["forge_url_base"]
+    if not isinstance(forge_url_base, str) or not forge_url_base:
+        raise ValueError("forge_url_base must be a non-empty string")
+    
     forge_out = sd_config["sd_output_dir"]
+    if not isinstance(forge_out, str) or not forge_out:
+        raise ValueError("sd_output_dir must be a non-empty string")
+    
     random_lora_weights = sd_config["random_lora_weights"]
+    if not isinstance(random_lora_weights, bool):
+        raise ValueError("random_lora_weights must be a boolean")
+    
     apply_lora_chance = sd_config["apply_lora_chance"]
+    if not isinstance(apply_lora_chance, (int, float)) or not (0 <= apply_lora_chance <= 100):
+        raise ValueError("apply_lora_chance must be a number between 0 and 100")
+    
     loraStDe = sd_config["lora_weight_standard_deviation"]
+    if not isinstance(loraStDe, (int, float)) or loraStDe < 0:
+        raise ValueError("lora_weight_standard_deviation must be a non-negative number")
+    
     use_special_tags = sd_config["use_special_tags"]
+    if not isinstance(use_special_tags, bool):
+        raise ValueError("use_special_tags must be a boolean")
+    
     vary_special_tags_weights = sd_config["varying_special_tags_weight"]
+    if not isinstance(vary_special_tags_weights, bool):
+        raise ValueError("varying_special_tags_weight must be a boolean")
+    
     model_swap_chance = sd_config["model_swap_chance"]
+    if not isinstance(model_swap_chance, (int, float)) or not (0 <= model_swap_chance <= 100):
+        raise ValueError("model_swap_chance must be a number between 0 and 100")
+    
     max_retries = sd_config["max_retries"]
+    if not isinstance(max_retries, int) or max_retries < 1:
+        raise ValueError("max_retries must be a positive integer")
+    
     retry_delay = sd_config["retry_delay"]
+    if not isinstance(retry_delay, (int, float)) or retry_delay < 0:
+        raise ValueError("retry_delay must be a non-negative number")
+    
     max_tag_weight = sd_config["max_tag_weight"]
+    if not isinstance(max_tag_weight, (int, float)) or max_tag_weight <= 0:
+        raise ValueError("max_tag_weight must be a positive number")
+    
     sleepy_time = sd_config["sleepy_time"]
+    if not isinstance(sleepy_time, (int, float)) or sleepy_time < 0:
+        raise ValueError("sleepy_time must be a non-negative number")
+    
+    # Special tags validation
+    special_tags = sd_config.get("special_tags", {})
+    if not isinstance(special_tags, dict):
+        raise ValueError("special_tags must be a dictionary")
     
     # Update output directory path
-    out_dir = os.path.join(sd_config["base_output_dir"], forge_out)
+    base_output_dir = sd_config["base_output_dir"]
+    if not isinstance(base_output_dir, str) or not base_output_dir:
+        raise ValueError("base_output_dir must be a non-empty string")
+    
+    out_dir = os.path.join(base_output_dir, forge_out)
     os.makedirs(out_dir, exist_ok=True)
 
     cards_data = cards
@@ -509,6 +586,7 @@ if __name__ == "__main__":
         exit(1)
 
     try:
+        model_swap_chance = config["SD_config"]["model_swap_chance"]
         output = generate_images_from_dict(cards_data, config, option_change_chance=model_swap_chance)
         logging.info(f"Images generated and saved to {output}")
         time.sleep(sleepy_time)

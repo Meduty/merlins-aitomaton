@@ -1,6 +1,6 @@
 # MerlinAI 🎯
 
-**MerlinAI** is a comprehensive AI-powered Magic: The Gathering (MTG) card generation and utility suite. It generates custom MTG cards using AI models, manages configuration externally, and exports sets compatible with Magic Set Editor (MSE). The system supports image generation via Stable Diffusion and provides a complete orchestrator for seamless workflow management.
+**MerlinAI** is a comprehensive AI-powered Magic: The Gathering (MTG) card generation and utility suite. It generates custom MTG cards using AI models with externalized configuration, exports sets compatible with Magic Set Editor (MSE), and supports image generation via Stable Diffusion. The system features a complete orchestrator with clean progress bars and verbose debugging modes.
 
 ---
 
@@ -11,19 +11,30 @@
 The easiest way to use MerlinAI is through the main orchestrator:
 
 ```bash
-# Interactive mode - guided setup with prompts
+# Interactive mode - guided setup with prompts (clean output)
 python merlinAI.py
 
-# Batch mode - run all steps automatically  
+# Verbose mode - full debugging output  
+python merlinAI.py --verbose
+
+# Batch mode - run all steps automatically with clean progress bars
 python merlinAI.py --batch cards mse images
 
+# Batch mode with full logging for debugging
+python merlinAI.py --batch cards mse images --verbose
+
 # Run specific steps only
-python merlinAI.py --batch cards  # Only generate cards
-python merlinAI.py --batch mse images  # Only convert and generate images
+python merlinAI.py --batch cards         # Only generate cards
+python merlinAI.py --batch mse images   # Only convert and generate images
 
 # Use custom configuration
 python merlinAI.py my_config.yml --batch cards mse
 ```
+
+### Progress Bar Modes
+
+- **Default Mode**: Clean output with only progress bars and essential messages
+- **Verbose Mode** (`--verbose`): Full debugging logs plus progress bars
 
 ### Manual Execution
 
@@ -45,7 +56,10 @@ python scripts/imagesSD.py configs/config.yml
 ## ✨ Features
 
 - **🎛️ Interactive Orchestrator:**  
-  Guided pipeline execution with real-time configuration, prerequisite checking, and smart error handling.
+  Guided pipeline execution with real-time configuration, prerequisite checking, smart error handling, and clean progress visualization.
+
+- **📊 Clean Progress Bars:**  
+  Beautiful progress tracking in default mode, with optional verbose logging for debugging.
 
 - **🤖 AI-Powered Card Generation:**  
   Creates MTG cards using OpenAI GPT models via MTG Card Generator API, with configurable parameters for colors, rarities, types, and themes.
@@ -57,13 +71,13 @@ python scripts/imagesSD.py configs/config.yml
   Converts generated cards into MSE (.mse-set) format with images and metadata for easy set creation and sharing.
 
 - **🔧 External Configuration Management:**  
-  All parameters managed via YAML configuration files with CLI overrides and runtime modifications.
+  All parameters managed via YAML configuration files with strict validation, fast-failing error handling, and CLI overrides.
 
 - **⚡ Concurrent Processing:**  
-  Multi-threaded generation with progress tracking, metrics collection, and thread-safe operations.
+  Multi-threaded generation with real-time progress tracking, thread-safe operations, and clean progress visualization.
 
 - **🛡️ Robust Error Handling:**  
-  Comprehensive validation, graceful failure recovery, and detailed logging throughout the pipeline.
+  Comprehensive validation, graceful failure recovery, detailed logging (when verbose), and fast-failing configuration validation.
 
 ---
 
@@ -91,6 +105,49 @@ merlinAI/
 ├── README.md                 # 📝 This file
 └── LICENSE                   # 📄 MIT License
 ```
+
+---
+
+## 🎨 Output Modes
+
+MerlinAI offers two distinct output modes for different use cases:
+
+### 🔇 Clean Mode (Default)
+Perfect for regular use - shows only essential information and beautiful progress bars:
+
+```
+🤖 RUNNING BATCH MODE: cards
+
+🎲 RUNNING CARD GENERATION...
+Generating card information: 100%|████████████| 4/4 [Elapsed: 00:28 | Avg: 7.05s/card]
+✅ Card generation completed successfully!
+```
+
+### 🔊 Verbose Mode (`--verbose`)
+Ideal for debugging - includes all logs, timing, and detailed information:
+
+```
+2025-08-20 22:21:31,605 - INFO - ✅ Configuration loaded from configs/config.yml
+🤖 RUNNING BATCH MODE: cards
+
+🎲 RUNNING CARD GENERATION...
+2025-08-20 22:21:31,605 - INFO - Executing: /usr/bin/python scripts/square_generator.py
+2025-08-20 22:21:32,073 - INFO - No auth token found, attempting to login...
+2025-08-20 22:21:33,234 - INFO - Authorization token updated successfully.
+[... detailed logs ...]
+Generating card information: 100%|████████████| 4/4 [Elapsed: 00:28 | Avg: 7.05s/card]
+✅ Card generation completed successfully!
+```
+
+## 🔧 Configuration System
+
+MerlinAI uses a **strict configuration system** with **fast-failing validation**:
+
+- **📋 YAML Configuration**: All settings in `configs/config.yml`
+- **🚫 No Global Variables**: Configuration passed as function parameters
+- **⚡ Fast Failing**: Missing or invalid config causes immediate errors
+- **✅ Type Validation**: All values validated for correct types and ranges
+- **🔄 Runtime Loading**: Configuration loaded at execution time from CLI arguments
 
 ---
 
@@ -129,6 +186,67 @@ The orchestrator uses `configs/config.yml` by default. You can:
 ### 4. Stable Diffusion Setup (Optional)
 
 For local image generation, ensure a Stable Diffusion API is running and update the `forge_url_base` in your configuration.
+
+---
+
+## 📚 Usage Examples
+
+### Example 1: Quick Start (Clean Mode)
+```bash
+$ python merlinAI.py --batch cards
+🤖 RUNNING BATCH MODE: cards
+
+🎲 RUNNING CARD GENERATION...
+Generating card information: 100%|████████████| 4/4 [Elapsed: 00:28 | Avg: 7.05s/card]
+✅ Card generation completed successfully!
+
+🎉 BATCH PROCESSING COMPLETE!
+```
+
+### Example 2: Full Pipeline with Debugging
+```bash
+$ python merlinAI.py --batch cards mse images --verbose
+2025-08-20 22:21:31,605 - INFO - ✅ Configuration loaded from configs/config.yml
+
+🤖 RUNNING BATCH MODE: cards mse images
+
+🎲 RUNNING CARD GENERATION...
+2025-08-20 22:21:31,605 - INFO - Executing: /usr/bin/python scripts/square_generator.py
+[... detailed logs ...]
+Generating card information: 100%|████████████| 4/4 [Elapsed: 00:28 | Avg: 7.05s/card]
+✅ Card generation completed successfully!
+
+📋 RUNNING MSE CONVERSION...
+[... MSE conversion logs ...]
+✅ MSE conversion completed successfully!
+
+🎨 RUNNING IMAGE GENERATION...
+Image 1: 100%|████████████| 100/100 [Elapsed: 00:15 | Speed: 6.67%/s]
+[... more image progress bars ...]
+✅ Image generation completed successfully!
+
+🎉 BATCH PROCESSING COMPLETE!
+```
+
+### Example 3: Interactive Mode
+```bash
+$ python merlinAI.py
+🚀 WELCOME TO MERLINAI - MTG CARD GENERATION ORCHESTRATOR
+
+🔧 CONFIGURATION SUMMARY
+📊 Total Cards: 4
+🔀 Concurrency: 4
+📁 Output Directory: output
+🤖 AI Model: gpt-41
+
+🔍 CHECKING PREREQUISITES...
+✅ All prerequisites met!
+
+🎲 Generate 4 cards with image model 'dall-e-3' using 4 threads? [Y/n]: y
+Modify any settings? [y/N]: n
+
+[... pipeline execution ...]
+```
 
 ---
 
@@ -314,32 +432,80 @@ python scripts/square_generator.py --config config.yml \
 
 ### Common Issues
 
-1. **Import Errors in IDE:**
+1. **Configuration Errors:**
+   - **Fast-failing validation** will immediately show missing or invalid config keys
+   - Check `configs/config.yml` against `configs/DEFAULTSCONFIG.yml` for reference
+   - All required keys must be present - no fallback defaults
+   - Use `--verbose` to see detailed configuration loading
+
+2. **Import Errors in IDE:**
    - The `# type: ignore` comments suppress VS Code linting errors
    - These are false positives due to dynamic path manipulation
    - Code runs correctly despite IDE warnings
 
-2. **Missing Environment Variables:**
-   - The orchestrator will clearly indicate missing variables
+3. **Missing Environment Variables:**
+   - The orchestrator will clearly indicate missing variables during prerequisite check
    - Required: `MTGCG_USERNAME`, `MTGCG_PASSWORD`, `API_KEY`
    - Optional: `AUTH_TOKEN` (will auto-login if missing)
 
-3. **API Authentication Issues:**
+4. **API Authentication Issues:**
    - Check your MTGCG credentials in `.env`
    - The system will attempt automatic re-authentication
-   - Look for "401 Unauthorized" errors in logs
+   - Look for "401 Unauthorized" errors in verbose logs
 
-4. **Threading Issues:**
-   - All auth token updates are thread-safe with locks
+5. **Progress Bar Issues:**
+   - Use default mode for clean progress bars only
+   - Use `--verbose` if progress bars seem stuck (shows detailed logs)
    - Progress bars work correctly with multi-threading
+
+6. **Threading Issues:**
+   - All auth token updates are thread-safe with locks
+   - Configuration sharing across threads is safe
    - Metrics collection is synchronized across threads
+
+### Debug Modes
+
+- **Clean Mode (Default)**: `python merlinAI.py` - Only progress bars and essential messages
+- **Verbose Mode**: `python merlinAI.py --verbose` - Full debugging output
+- **Interactive Mode**: Step-by-step guided execution with confirmations
 
 ### Getting Help
 
 - 📖 See `ORCHESTRATOR_GUIDE.md` for detailed usage examples
 - 🔧 Check `configs/DEFAULTSCONFIG.yml` for all available options
-- 📊 Run with `--verbose` flag for detailed logging
-- 🛡️ Use interactive mode for guided troubleshooting
+- 📊 Run with `--verbose` flag for detailed logging and debugging
+- 🛡️ Use interactive mode for guided troubleshooting and configuration checking
+- ⚡ Configuration errors show immediate, specific error messages
+
+---
+
+## 🏆 Recent Improvements
+
+MerlinAI has been significantly modernized with:
+
+### 🔧 **Configuration Externalization**
+- Eliminated global variables throughout codebase
+- Configuration passed as function parameters 
+- Fast-failing validation with descriptive errors
+- Strict type checking and required key validation
+
+### 📊 **Clean Progress Visualization**  
+- Beautiful progress bars in default mode
+- Optional verbose debugging with `--verbose` flag
+- Real-time progress tracking for all operations
+- Clean, focused output for regular use
+
+### 🎛️ **Comprehensive Orchestrator**
+- Interactive and batch execution modes
+- Prerequisite validation and environment checking
+- Runtime configuration display and modification
+- Seamless pipeline coordination with error handling
+
+### 🧵 **Threading Safety**
+- Thread-safe auth token management with locks
+- Concurrent card generation with progress tracking
+- Safe configuration sharing across worker threads
+- Synchronized metrics collection and reporting
 
 ---
 
@@ -356,4 +522,5 @@ MIT License. See [LICENSE](LICENSE) for details.
 - **Image Generation:** Stable Diffusion, AUTOMATIC1111
 - **Export Format:** Magic Set Editor compatibility
 - **Threading & Concurrency:** Python threading with safety locks
+- **Configuration System:** YAML-based with strict validation
 

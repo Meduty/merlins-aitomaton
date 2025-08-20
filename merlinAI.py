@@ -34,19 +34,34 @@ except ImportError as e:
     print("Make sure you're running from the project root directory")
     sys.exit(1)
 
-# Setup logging
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(levelname)s - %(message)s"
-)
+# Setup logging (will be configured based on verbose flag)
+def setup_logging(verbose: bool = False):
+    """Configure logging based on verbose flag."""
+    if verbose:
+        # Verbose mode: show all logs
+        logging.basicConfig(
+            level=logging.INFO,
+            format="%(asctime)s - %(levelname)s - %(message)s",
+            force=True
+        )
+    else:
+        # Quiet mode: suppress logs, only show errors and user messages
+        logging.basicConfig(
+            level=logging.ERROR,
+            format="%(message)s",
+            force=True
+        )
+        # Also suppress logs from sub-modules
+        logging.getLogger().setLevel(logging.ERROR)
 
 
 class MerlinAIOrchestrator:
     """Main orchestrator class for the MTG card generation pipeline."""
     
-    def __init__(self, config_path: str):
+    def __init__(self, config_path: str, verbose: bool = False):
         """Initialize orchestrator with configuration."""
         self.config_path = config_path
+        self.verbose = verbose
         self.config = self._load_config()
         self.project_root = Path(__file__).parent
         self.scripts_dir = self.project_root / "scripts"
@@ -63,6 +78,13 @@ class MerlinAIOrchestrator:
         except Exception as e:
             logging.error(f"❌ Error loading config: {e}")
             sys.exit(1)
+    
+    def _get_subprocess_env(self) -> Dict[str, str]:
+        """Get environment variables for subprocesses."""
+        env = os.environ.copy()
+        # Pass verbose flag to subprocesses
+        env["MERLIN_VERBOSE"] = "1" if self.verbose else "0"
+        return env
     
     def display_config_summary(self):
         """Display a summary of the current configuration."""
@@ -165,24 +187,16 @@ class MerlinAIOrchestrator:
                 cmd.extend(["--image-model", str(value)])
         
         try:
-            logging.info(f"Executing: {' '.join(cmd)}")
-            result = subprocess.run(cmd, check=True, capture_output=True, text=True)
+            if self.verbose:
+                logging.info(f"Executing: {' '.join(cmd)}")
+            # Use streaming output so progress bars are visible
+            result = subprocess.run(cmd, check=True, text=True, env=self._get_subprocess_env())
             
             print("✅ Card generation completed successfully!")
-            if result.stdout:
-                print("📄 Output summary:")
-                # Show last few lines of output
-                lines = result.stdout.strip().split('\n')
-                for line in lines[-5:]:
-                    if line.strip():
-                        print(f"   {line}")
-            
             return True
             
         except subprocess.CalledProcessError as e:
             print(f"❌ Card generation failed with exit code {e.returncode}")
-            if e.stderr:
-                print(f"Error output: {e.stderr}")
             return False
         except Exception as e:
             print(f"❌ Unexpected error during card generation: {e}")
@@ -195,23 +209,16 @@ class MerlinAIOrchestrator:
         cmd = [sys.executable, str(self.scripts_dir / "MTGCG_mse.py"), self.config_path]
         
         try:
-            logging.info(f"Executing: {' '.join(cmd)}")
-            result = subprocess.run(cmd, check=True, capture_output=True, text=True)
+            if self.verbose:
+                logging.info(f"Executing: {' '.join(cmd)}")
+            # Use streaming output so progress bars are visible
+            result = subprocess.run(cmd, check=True, text=True, env=self._get_subprocess_env())
             
             print("✅ MSE conversion completed successfully!")
-            if result.stdout:
-                print("📄 Output summary:")
-                lines = result.stdout.strip().split('\n')
-                for line in lines[-3:]:
-                    if line.strip():
-                        print(f"   {line}")
-            
             return True
             
         except subprocess.CalledProcessError as e:
             print(f"❌ MSE conversion failed with exit code {e.returncode}")
-            if e.stderr:
-                print(f"Error output: {e.stderr}")
             return False
         except Exception as e:
             print(f"❌ Unexpected error during MSE conversion: {e}")
@@ -233,23 +240,16 @@ class MerlinAIOrchestrator:
         cmd = [sys.executable, str(self.scripts_dir / "imagesSD.py"), self.config_path]
         
         try:
-            logging.info(f"Executing: {' '.join(cmd)}")
-            result = subprocess.run(cmd, check=True, capture_output=True, text=True)
+            if self.verbose:
+                logging.info(f"Executing: {' '.join(cmd)}")
+            # Use streaming output so progress bars are visible
+            result = subprocess.run(cmd, check=True, text=True, env=self._get_subprocess_env())
             
             print("✅ Image generation completed successfully!")
-            if result.stdout:
-                print("📄 Output summary:")
-                lines = result.stdout.strip().split('\n')
-                for line in lines[-3:]:
-                    if line.strip():
-                        print(f"   {line}")
-            
             return True
             
         except subprocess.CalledProcessError as e:
             print(f"❌ Image generation failed with exit code {e.returncode}")
-            if e.stderr:
-                print(f"Error output: {e.stderr}")
             return False
         except Exception as e:
             print(f"❌ Unexpected error during image generation: {e}")
@@ -414,11 +414,11 @@ Examples:
     
     args = parser.parse_args()
     
-    if args.verbose:
-        logging.getLogger().setLevel(logging.DEBUG)
+    # Setup logging based on verbose flag
+    setup_logging(verbose=args.verbose)
     
     # Initialize orchestrator
-    orchestrator = MerlinAIOrchestrator(args.config)
+    orchestrator = MerlinAIOrchestrator(args.config, verbose=args.verbose)
     
     # Run in appropriate mode
     if args.batch is not None:

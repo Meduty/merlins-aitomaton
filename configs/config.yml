@@ -23,6 +23,10 @@ SD_config:
   model_swap_chance: 66 # Chance to change model for each card (0-100)
   randomise_negative_prompt: true # Set to true to use negative prompts
   chance_no_negative_prompt: 50 # Chance to not use negative prompt
+  max_retries: 3 # Maximum number of retries for failed image generation
+  retry_delay: 1.0 # Delay between retries in seconds
+  sleepy_time: 0.5 # Sleep time between API calls
+  base_output_dir: "output" # Base output directory for all files
   special_tags:
     Fantasy World:
       weight: 1.2

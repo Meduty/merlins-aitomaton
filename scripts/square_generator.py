@@ -48,10 +48,25 @@ load_dotenv()
 
 import os
 
-# Logging setup
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
-)
+# Logging setup - respect orchestrator's verbose setting
+def setup_logging():
+    """Setup logging based on environment variable from orchestrator."""
+    verbose = os.environ.get("MERLIN_VERBOSE", "1") == "1"
+    if verbose:
+        logging.basicConfig(
+            level=logging.INFO, 
+            format="%(asctime)s - %(levelname)s - %(message)s",
+            force=True
+        )
+    else:
+        # Suppress all logs except errors in quiet mode
+        logging.basicConfig(
+            level=logging.WARNING,
+            format="%(message)s",
+            force=True
+        )
+
+setup_logging()
 
 
 class APIParams:
