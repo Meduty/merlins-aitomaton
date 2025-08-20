@@ -163,7 +163,7 @@ def ask_overlord_for_loyalty(index: int, card: dict, ai: OpenAI):
         time.sleep(sleepy_time)
 
     else:
-        logging.info(f"[Card #{index+1}] Error:", response.status, response.text)
+        logging.info(f"[Card #{index+1}] Error:{response.status}, {response.text}")
         time.sleep(sleepy_time)
 
     return loyalty
@@ -423,13 +423,20 @@ def get_images(cards, output_dir, method="download", config=None):
             logging.error(f"Error in get_images ({method}): {e}")
 
 
-def export_to_zip(output_text, cards, image_method="download", output_dir="output/mse-out", filename="set", config=None):
+def export_to_zip(output_text, cards, image_method="download", output_dir="output/mse-out", filename="set", config=None, config_name=None):
     os.makedirs(output_dir, exist_ok=True)
     set_path = os.path.join(output_dir, filename)
     with open(set_path, "w", encoding="utf-8") as f:
         f.write(output_text)
     get_images(cards, output_dir, method=image_method, config=config)
-    with zipfile.ZipFile(f"{output_dir}.mse-set", "w", zipfile.ZIP_DEFLATED) as zipf:
+    
+    # Create zip filename with config name prefix if provided
+    if config_name:
+        zip_filename = os.path.join(os.path.dirname(output_dir), f"{config_name}-{os.path.basename(output_dir)}.mse-set")
+    else:
+        zip_filename = f"{output_dir}.mse-set"
+        
+    with zipfile.ZipFile(zip_filename, "w", zipfile.ZIP_DEFLATED) as zipf:
         for root, _, files in os.walk(output_dir):
             for file in files:
                 file_path = os.path.join(root, file)
@@ -469,6 +476,9 @@ def main_with_config(config_path=None):
 
         mse_outpath = os.path.join(outdir, "mse-out")
 
+        # Extract config name for file prefixing (remove path and extension)
+        config_name = os.path.splitext(os.path.basename(config_path))[0]
+
         logging.info("=== Exporting to .mse-set ===")
         time.sleep(sleepy_time)
         export_to_zip(
@@ -477,10 +487,13 @@ def main_with_config(config_path=None):
             image_method=image_method,
             output_dir=mse_outpath,
             filename="set",
-            config=config
+            config=config,
+            config_name=config_name
         )
 
-        logging.info("Packaged set into output/mse-out.mse-set")
+        # Calculate the zip filename for logging (same logic as in export_to_zip)
+        zip_filename = os.path.join(outdir, f"{config_name}-{os.path.basename(mse_outpath)}.mse-set")
+        logging.info(f"Packaged set into {zip_filename}")
         time.sleep(sleepy_time)
         logging.info("=== Conversion complete ===")
         time.sleep(sleepy_time)
@@ -492,7 +505,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Convert MTG Card Generator JSON to MSE (Magic Set Editor) format")
     parser.add_argument("config", nargs="?", default="configs/config.yml", 
                        help="Path to configuration file (default: configs/config.yml)")
-    parser.add_argument("--output-dir", help="Override output directory")
+    parser.add_argument("--output-dir", help="Override output directory") # is not used
     
     args = parser.parse_args()
     config_path = args.config

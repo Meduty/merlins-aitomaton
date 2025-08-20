@@ -14,7 +14,7 @@ mtgcg_mse_config:
 SD_config:
   max_tag_weight: 2.5
   forge_url_base: "http://127.0.0.1:7860"
-  sd_output_dir: "forge-out"
+  sd_output_dir: "forge_out"
   random_lora_weights: true # Set to true to use random weights for Loras
   lora_weight_standard_deviation: 0.35 # Standard deviation for Lora weights
   apply_lora_chance: 50 # Chance to skip Lora application

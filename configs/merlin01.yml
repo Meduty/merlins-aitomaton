@@ -2,43 +2,41 @@ square_config:
   total_cards: 60
   concurrency: 4
 set_params:
-  set: "Null Revelation"
+  set: "Monkeys in Space"
   themes:
-    - "No cards in hand"
-    - "Emptiness and void"
-    - "Forgotten Echoes"
-    - "Oblivion Cult"
-    - "Ascetic Wanderers"
-    - "Solitude"
-    - "The silence after the storm has passed, when only memories remain"
-    - "Echoes of a world lost to time, where nothing remains but dust"
-    - "Stillness"
-    - "The last candle flickering in endless darkness"
+    - "Space"
+    - "Monkeys"
+    - "Chaos"
+    - "Adventure"
+    - "Exploration"
+    - "Surrealism"
+    - "Absurdity"
+    - "Humor"
+    - "Intergalactic"
+    - "Futurism"
 skeleton_params:
   power_level: 7.5 # Power level of the card, 1-10 or None
   wildcard_supertype: false
   fixed_amount_themes: 0 # if not zero, will select a fixed amount of themes from the available ones instead of mutating them randomly
   mutation_chance_per_theme: 12.5 # Chance to mutate each theme, ignored if fixed_amount_themes is not zero
-  colors: ["white", "red", "colorless"]
+  colors: ["green", "red", "colorless"]
   colors_weights:
-    white: 45
-    red: 45
+    green: 55
+    red: 25
     colorless: 10
   card_types_weights:
     _default:
       kindred: 0
-    white:
-      creature: 33
-      enchantment: 10
+      creature: 45
+      land: 20
+      basic land: 20
   function_tags:
     ramp or mana fixing: 15
     draw or card advantage: 5
     removal or control: 10
-    No cards in hand payoff: 20
-    Discard to gain benefit: 15
-    If discarded, gain benefit: 20
-    Discard Synergy: 10
-    impulse draw: 15
+    apes together strong: 40
+    banana token or counter: 20
+    coconut token or counter: 20
     board wipe or mass removal: 5
     activated ability: 5
     Flying or other evasion: 5

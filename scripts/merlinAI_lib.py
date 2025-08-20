@@ -30,11 +30,6 @@ def truncated_normal_random(mean: float, sd=0.35, low=0.0, high=1.0):
     low  : lower bound
     high : upper bound
     """
-    if truncnorm is None:
-        raise RuntimeError(
-            "scipy is required for truncated_normal_random; "
-            "install with `pip install scipy`."
-        )
 
     # Compute a, b for truncnorm (in standard normal space)
     a, b = (low - mean) / sd, (high - mean) / sd
@@ -83,6 +78,8 @@ def check_mutation(mutation_chance) -> bool:
     """
     Check if a mutation occurs based on the given chance.
     """
+    assert 0 <= mutation_chance <= 100, "mutation_chance must be between 0 and 100"
+
     d100 = random.random() * 100
 
     return d100 <= mutation_chance

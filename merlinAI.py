@@ -23,6 +23,10 @@ import subprocess
 from pathlib import Path
 from typing import Dict, Any, Optional
 
+from dotenv import load_dotenv
+# Load environment variables from .env file
+load_dotenv()
+
 # Add scripts directory to path for imports
 sys.path.append(os.path.join(os.path.dirname(__file__), 'scripts'))
 
@@ -106,9 +110,9 @@ class MerlinAIOrchestrator:
         
         # Set information
         set_params = self.config.get("set_params", {})
-        print(f"🃏 Set Name: {set_params.get('setName', 'N/A')}")
-        print(f"🔣 Set Code: {set_params.get('setCode', 'N/A')}")
-        
+        print(f"🃏 Set Name: {set_params.get('set', 'N/A')}")
+        print(f"🔣 Set Themes: {set_params.get('themes', 'N/A')}")
+
         print("="*60)
     
     def check_prerequisites(self) -> bool:
@@ -333,14 +337,27 @@ class MerlinAIOrchestrator:
         print("="*30)
         
         # Show final results
+        self.show_results()
+        
+    def show_results(self):
+        """Display results summary after completion."""
         output_dir = Path(self.config["square_config"]["output_dir"])
         print(f"📁 Check your results in: {output_dir.absolute()}")
+        
+        # Extract config name for finding the MSE set file
+        config_name = os.path.splitext(os.path.basename(self.config_path))[0]
         
         results = []
         if (output_dir / "generated_cards.json").exists():
             results.append("✅ generated_cards.json - Card data")
-        if (output_dir / "mse-out.mse-set").exists():
+        
+        # Look for MSE set file with config name prefix
+        mse_set_file = output_dir / f"{config_name}-mse-out.mse-set"
+        if mse_set_file.exists():
+            results.append(f"✅ {config_name}-mse-out.mse-set - MSE set file")
+        elif (output_dir / "mse-out.mse-set").exists():  # Fallback for old naming
             results.append("✅ mse-out.mse-set - MSE set file")
+            
         if (output_dir / "mse-out").exists() and list((output_dir / "mse-out").glob("*.png")):
             png_count = len(list((output_dir / "mse-out").glob("*.png")))
             results.append(f"✅ mse-out/ - {png_count} card images")
@@ -354,7 +371,11 @@ class MerlinAIOrchestrator:
         else:
             print("⚠️  No output files detected")
         
-        print(f"\n💡 To view your cards, open {output_dir / 'mse-out.mse-set'} in Magic Set Editor")
+        # Show the appropriate MSE file path
+        if mse_set_file.exists():
+            print(f"\n💡 To view your cards, open {mse_set_file} in Magic Set Editor")
+        elif (output_dir / "mse-out.mse-set").exists():
+            print(f"\n💡 To view your cards, open {output_dir / 'mse-out.mse-set'} in Magic Set Editor")
     
     def batch_mode(self, steps: list):
         """Run the orchestrator in batch mode with specified steps."""
