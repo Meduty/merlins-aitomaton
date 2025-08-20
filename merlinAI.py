@@ -17,6 +17,7 @@ import os
 import sys
 import json
 import time
+import yaml
 import logging
 import argparse
 import subprocess
@@ -33,6 +34,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), 'scripts'))
 try:
     import config_manager  # type: ignore
     from metrics import GenerationMetrics  # type: ignore
+    from merlinAI_lib import check_and_normalize_config  # type: ignore
 except ImportError as e:
     print(f"Error importing required modules: {e}")
     print("Make sure you're running from the project root directory")
@@ -75,12 +77,42 @@ class MerlinAIOrchestrator:
         try:
             config = config_manager.load_config(self.config_path)
             logging.info(f"✅ Configuration loaded from {self.config_path}")
+            
+            # Validate configuration integrity
+            self._validate_config(config)
+            
             return config
         except FileNotFoundError:
             logging.error(f"❌ Config file not found: {self.config_path}")
             sys.exit(1)
         except Exception as e:
             logging.error(f"❌ Error loading config: {e}")
+            sys.exit(1)
+    
+    def _validate_config(self, config: Dict[str, Any]):
+        """Validate configuration using merlinAI_lib full check."""
+        config_path = Path(self.config_path)
+        defaults_path = config_path.parent / "DEFAULTSCONFIG.yml"
+        
+        if not defaults_path.exists():
+            logging.warning(f"⚠️ DEFAULTSCONFIG.yml not found at: {defaults_path}, skipping advanced validation")
+            return
+        
+        try:
+            print("\n🔍 RUNNING FULL CONFIGURATION CHECK...")
+            print("="*60)
+            
+            # Run the full configuration check and normalize
+            # This will validate, normalize weights, and show detailed analysis
+            check_and_normalize_config(self.config_path, save=False)
+            
+            print("="*60)
+            print("📋 Configuration check complete - proceeding with validated config")
+            print()  # Add spacing after validation results
+                
+        except Exception as e:
+            logging.error(f"❌ Configuration validation failed: {e}")
+            logging.error("Cannot proceed with invalid configuration!")
             sys.exit(1)
     
     def _get_subprocess_env(self) -> Dict[str, str]:

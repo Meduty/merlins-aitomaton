@@ -1,0 +1,15 @@
+square_config:
+  total_cards: 4
+  concurrency: 4
+
+# Missing skeleton_params entirely - should trigger error
+set_params:
+  set: "Test Set"
+  themes:
+    - "Test"
+
+api_params:
+  model: "gpt-41"
+  image_model: "dall-e-3"
+  
+# Missing critical sections to test validation
