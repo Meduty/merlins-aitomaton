@@ -239,32 +239,83 @@ def _normalize_all_weights_with_diffs(config: dict, defaults: dict, total: float
         default_sp_ctw = default_sp.get("card_types_weights", {})
         default_type_weights = default_sp_ctw.get("_default", {})
 
-        # 1) Build/normalize the baseline default_map first
-        #    Source priority: YAML _default (dict/list) → default_type_weights from defaults config
-        #    Then restrict to current card_types and fill missing from defaults
+        # 1) Build the baseline default_map with smart filling logic
+        #    - If user provided ALL types: normalize their input directly
+        #    - If user provided PARTIAL types: preserve user values, scale missing ones to fit remainder
         if isinstance(ctw.get("_default"), list):
-            default_map_raw = _list_to_labeled_dict(ctw["_default"], card_types)
+            user_default_raw = _list_to_labeled_dict(ctw["_default"], card_types)
         elif isinstance(ctw.get("_default"), dict):
-            default_map_raw = dict(ctw["_default"])
+            user_default_raw = dict(ctw["_default"])
         else:
-            default_map_raw = {t: default_type_weights.get(t, 0.0) for t in card_types}
+            user_default_raw = {}
 
-        # Coerce to numeric, keep only declared card_types, fill missing from defaults
-        default_map_coerced = {}
+        # Coerce user values to numeric
+        user_default_numeric = {}
         for t in card_types:
-            v = default_map_raw.get(t, default_type_weights.get(t, 0.0))
-            try:
-                default_map_coerced[t] = float(v)
-            except Exception:
-                print(f"⚠️  Skipping non-numeric default for type {t!r}: {v!r}")
-                default_map_coerced[t] = float(default_type_weights.get(t, 0.0))
+            if t in user_default_raw:
+                try:
+                    user_default_numeric[t] = float(user_default_raw[t])
+                except Exception:
+                    print(f"⚠️  Skipping non-numeric user value for type {t!r}: {user_default_raw[t]!r}")
 
-        # Normalize default row and write it back (so YAML has the clean baseline)
-        default_norm = _normalize_dict_with_diffs(
-            key="skeleton_params.card_types_weights[_default]",
-            d=default_map_coerced,
-            total=total,
-        )
+        # Check if user provided all types or just partial
+        user_provided_types = set(user_default_numeric.keys())
+        all_types = set(card_types)
+        missing_types = all_types - user_provided_types
+        
+        if missing_types:
+            # PARTIAL input: preserve user values, scale missing ones to fit remainder
+            user_sum = sum(user_default_numeric.values())
+            remaining = total - user_sum
+            
+            if remaining < 0:
+                print(f"⚠️  User _default values sum to {user_sum} > {total}, will normalize all values")
+                # User exceeded total, normalize everything
+                default_map_coerced = user_default_numeric
+                for t in missing_types:
+                    default_map_coerced[t] = 0.0
+            else:
+                # Fill missing types proportionally from defaults to use remaining percentage
+                missing_defaults = {t: default_type_weights.get(t, 0.0) for t in missing_types}
+                missing_sum = sum(missing_defaults.values())
+                
+                default_map_coerced = dict(user_default_numeric)  # Preserve user values exactly
+                
+                if missing_sum > 0 and remaining > 0:
+                    # Scale missing types to fit in remaining space
+                    scale_factor = remaining / missing_sum
+                    for t in missing_types:
+                        default_map_coerced[t] = missing_defaults[t] * scale_factor
+                else:
+                    # No defaults or no remaining space, set missing to 0
+                    for t in missing_types:
+                        default_map_coerced[t] = 0.0
+                        
+                print(f"ℹ️  Preserved user _default values, filled {len(missing_types)} missing types with {remaining:.1f}% remaining")
+        else:
+            # COMPLETE input: user provided all types, normalize their input
+            default_map_coerced = user_default_numeric
+            print(f"ℹ️  User provided complete _default, normalizing all values")
+
+        # Only normalize if user exceeded total or provided complete input
+        if missing_types and sum(default_map_coerced.values()) <= total + 0.001:  # Small tolerance for floating point
+            # Don't normalize - we already have the right total
+            default_norm = {k: round(v, 1) for k, v in default_map_coerced.items()}
+            current_sum = sum(default_norm.values())
+            _print_smart_partial_result(
+                key="skeleton_params.card_types_weights[_default]",
+                user_values=user_default_raw,
+                final_values=default_norm,
+                total=current_sum
+            )
+        else:
+            # Normalize (either complete user input or user exceeded total)
+            default_norm = _normalize_dict_with_diffs(
+                key="skeleton_params.card_types_weights[_default]",
+                d=default_map_coerced,
+                total=total,
+            )
+        
         ctw["_default"] = default_norm
         # 2) For each other color row (in preferred order):
         #    - convert list→dict if needed
@@ -317,17 +368,76 @@ def _normalize_all_weights_with_diffs(config: dict, defaults: dict, total: float
                         f"skeleton_params.card_types_weights[{color_key}][{t!r}]: {v!r}"
                     )
 
-            # Merge over default baseline, fill missing types from default
-            merged = dict(default_norm)
-            for t in row_num.keys() & set(card_types):
-                merged[t] = row_num[t]
+            # Apply same smart partial logic as _default
+            user_provided_types = set(row_num.keys())
+            all_types = set(card_types)
+            missing_types = all_types - user_provided_types
+            
+            if missing_types:
+                # PARTIAL input: preserve user values, scale missing ones to fit remainder
+                user_sum = sum(row_num.values())
+                remaining = total - user_sum
+                
+                if remaining < 0:
+                    print(f"⚠️  User {color_key} values sum to {user_sum} > {total}, will normalize all values")
+                    # User exceeded total, fill missing from default and normalize everything
+                    merged = dict(default_norm)
+                    for t in row_num.keys() & set(card_types):
+                        merged[t] = row_num[t]
+                    # Will normalize below
+                    final_row = merged
+                    normalize_needed = True
+                else:
+                    # Fill missing types proportionally from default to use remaining percentage
+                    final_row = dict(row_num)  # Preserve user values exactly
+                    
+                    if remaining > 0:
+                        # Scale missing types from default to fit in remaining space
+                        missing_defaults = {t: default_norm[t] for t in missing_types}
+                        missing_sum = sum(missing_defaults.values())
+                        
+                        if missing_sum > 0:
+                            scale_factor = remaining / missing_sum
+                            for t in missing_types:
+                                final_row[t] = missing_defaults[t] * scale_factor
+                        else:
+                            # No defaults for missing types, set to 0
+                            for t in missing_types:
+                                final_row[t] = 0.0
+                    else:
+                        # No remaining space, set missing to 0
+                        for t in missing_types:
+                            final_row[t] = 0.0
+                            
+                    print(f"ℹ️  Preserved user {color_key} values, filled {len(missing_types)} missing types with {remaining:.1f}% remaining")
+                    normalize_needed = False
+            else:
+                # COMPLETE input: user provided all types, merge over default and normalize
+                merged = dict(default_norm)
+                for t in row_num.keys() & set(card_types):
+                    merged[t] = row_num[t]
+                final_row = merged
+                normalize_needed = True
+                print(f"ℹ️  User provided complete {color_key}, normalizing all values")
 
-            # Normalize the merged full row and write it back
-            ctw[color_key] = _normalize_dict_with_diffs(
-                key=f"skeleton_params.card_types_weights[{color_key}] (resolved over _default)",
-                d=merged,
-                total=total,
-            )
+            # Only normalize if needed
+            if normalize_needed:
+                ctw[color_key] = _normalize_dict_with_diffs(
+                    key=f"skeleton_params.card_types_weights[{color_key}] (resolved over _default)",
+                    d=final_row,
+                    total=total,
+                )
+            else:
+                # Don't normalize - we already have the right total
+                final_rounded = {k: round(v, 1) for k, v in final_row.items()}
+                current_sum = sum(final_rounded.values())
+                _print_smart_partial_result(
+                    key=f"skeleton_params.card_types_weights[{color_key}]",
+                    user_values=row_map,
+                    final_values=final_rounded,
+                    total=current_sum
+                )
+                ctw[color_key] = final_rounded
 
         # Rebuild dict in preferred order for nicer YAML output
         sp["card_types_weights"] = {k: ctw[k] for k in ordered_rows if k in ctw}
@@ -470,6 +580,43 @@ def _changed(a, b, eps: float = 1e-9) -> bool:
         return abs(float(a) - float(b)) > eps
     except Exception:
         return a != b
+
+def _print_smart_partial_result(
+    key: str,
+    user_values: dict,
+    final_values: dict,
+    *,
+    total: float = 100.0,
+):
+    """Print detailed breakdown of smart partial logic showing preserved vs filled values."""
+    print(f"\n✨ Smart partial logic applied to {key} (sum {total})")
+    
+    all_keys = set(user_values.keys()) | set(final_values.keys())
+    
+    # If the dict looks like colors → use WUBRG order
+    if all(k in CANONICAL_COLOR_ORDER for k in all_keys):
+        ordered = _ordered_color_keys(all_keys)
+    else:
+        ordered = sorted(all_keys)
+    
+    preserved_keys = []
+    filled_keys = []
+    
+    for k in ordered:
+        user_val = user_values.get(k, 0.0)
+        final_val = final_values.get(k, 0.0)
+        
+        if k in user_values and user_val > 0:
+            preserved_keys.append((k, final_val))
+            print(f"  • {k:>20}: {final_val:<8.1f} (preserved)")
+        elif final_val > 0:
+            filled_keys.append((k, final_val))
+            print(f"  • {k:>20}: {final_val:<8.1f} (filled)")
+    
+    # Summary
+    preserved_sum = sum(val for _, val in preserved_keys)
+    filled_sum = sum(val for _, val in filled_keys)
+    print(f"  Summary: {preserved_sum:.1f} preserved + {filled_sum:.1f} filled = {total}")
 
 def _derive_card_types(ctw: dict) -> list[str]:
     """

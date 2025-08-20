@@ -19,7 +19,6 @@ skeleton_params:
     blue:
       creature: 40.0
       instant: 30.0
-      sorcery: 30.0
   card_types:
   - creature
   - instant

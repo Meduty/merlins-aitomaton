@@ -1,0 +1,17 @@
+skeleton_params:
+  colors_weights:
+    white: 25.0
+    red: 75.0
+    # Missing: blue, black, green (25% to fill)
+  
+  card_types_weights:
+    _default:
+      creature: 50.0
+      instant: 30.0
+      # Missing all other types (20% to fill)
+    
+    white:
+      enchantment: 40.0
+      artifact: 25.0
+      land: 10.0
+      # Missing other types (25% to fill)
