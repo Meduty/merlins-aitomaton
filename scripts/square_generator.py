@@ -183,10 +183,6 @@ class APIParams:
         return cls(**kwargs)
 
 
-CANONICAL_CARD_TYPES = merlinAI_lib.CANONICAL_CARD_TYPES
-DEFAULT_TYPE_WEIGHTS = merlinAI_lib.DEFAULT_TYPE_WEIGHTS
-
-
 class skeletonParams:
     """
     Class to hold parameters for card skeleton generation.
@@ -194,6 +190,8 @@ class skeletonParams:
 
     def __init__(
         self,
+        canonical_card_types: Optional[list[str]] = None,
+        default_type_weights: Optional[dict[str, float]] = None,
         colors: Optional[list[str]] = None,
         colors_weights: Optional[dict[str, float] | list[float]] = None,
         mana_values: Optional[list[str]] = None,
@@ -216,6 +214,17 @@ class skeletonParams:
         power_level: float = 5,  # Power level of the card, 1–10
         rarity_to_skew: Optional[dict[str, int]] = None,  # rarity skew mapping
     ):
+        # Set up canonical card types and default weights from config
+        self.canonical_card_types = canonical_card_types or [
+            "creature", "artifact creature", "planeswalker", "instant", "sorcery",
+            "enchantment", "saga", "battle", "land", "basic land", "artifact", "kindred"
+        ]
+        self.default_type_weights = default_type_weights or {
+            "creature": 50, "artifact creature": 0, "planeswalker": 2, "instant": 12,
+            "sorcery": 12, "enchantment": 12, "saga": 0, "battle": 0, "land": 12,
+            "basic land": 0, "artifact": 0, "kindred": 0
+        }
+        
         self.colors = colors or ["white", "blue", "black", "red", "green", "colorless"]
 
         cw = colors_weights
@@ -257,12 +266,12 @@ class skeletonParams:
             "mythic": [8, 12],
         }
 
-        self.card_types = card_types or CANONICAL_CARD_TYPES
+        self.card_types = card_types or self.canonical_card_types
         self.card_types_weights = self._build_type_weights(
             card_types=self.card_types,
             weights_by_color=card_types_weights or {},
             colors=self.colors,
-            code_defaults=DEFAULT_TYPE_WEIGHTS,
+            code_defaults=self.default_type_weights,
         )
 
         self.rarities = rarities or ["common", "uncommon", "rare", "mythic"]

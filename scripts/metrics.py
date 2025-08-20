@@ -61,18 +61,15 @@ class GenerationMetrics:
     
     def get_average_time_per_card(self) -> float:
         """Calculate average time per card."""
-        with self._successful_lock, self._runtime_lock:
-            return self.total_runtime / self.successful if self.successful > 0 else 0.0
+        return self.total_runtime / self.successful if self.successful > 0 else 0.0
     
     def get_summary(self) -> Dict[str, Any]:
         """Get a summary of all metrics."""
-        with (self._color_lock, self._rarity_lock, 
-              self._successful_lock, self._runtime_lock):
-            return {
-                "colors": dict(self.colors),
-                "rarities": dict(self.rarities),
-                "successful": self.successful,
-                "total_runtime": self.total_runtime,
-                "average_time_per_card": self.get_average_time_per_card(),
-                "total_cards": len(self.all_cards)
-            }
+        return {
+            "colors": dict(self.colors),
+            "rarities": dict(self.rarities),
+            "successful": self.successful,
+            "total_runtime": self.total_runtime,
+            "average_time_per_card": self.get_average_time_per_card(),
+            "total_cards": len(self.all_cards)
+        }

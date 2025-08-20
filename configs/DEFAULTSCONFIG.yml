@@ -41,6 +41,32 @@ api_params:
 set_params: {}
 
 skeleton_params:
+  canonical_card_types:
+    - "creature"
+    - "artifact creature"
+    - "planeswalker"
+    - "instant"
+    - "sorcery"
+    - "enchantment"
+    - "saga"
+    - "battle"
+    - "land"
+    - "basic land"
+    - "artifact"
+    - "kindred"
+  default_type_weights:
+    creature: 50
+    artifact creature: 0
+    planeswalker: 2
+    instant: 12
+    sorcery: 12
+    enchantment: 12
+    saga: 0
+    battle: 0
+    land: 12
+    basic land: 0
+    artifact: 0
+    kindred: 0
   colors:
     - "white"
     - "blue"
