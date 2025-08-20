@@ -37,6 +37,8 @@ from copy import deepcopy
 from dotenv import load_dotenv
 
 import merlinAI_lib
+import config_manager
+from metrics import GenerationMetrics
 
 from typing import Any, Dict, Optional
 
@@ -44,12 +46,6 @@ from typing import Any, Dict, Optional
 load_dotenv()
 
 import os
-
-# If your app defines sleepy_time elsewhere, this keeps things safe.
-try:
-    sleepy_time  # type: ignore[name-defined]
-except NameError:
-    sleepy_time = 0
 
 # Logging setup
 logging.basicConfig(
@@ -66,8 +62,8 @@ class APIParams:
         self,
         api_key: str,
         auth_token: str,
-        userPrompt: Optional[Dict[str, Any]] = None,   # should be dict
-        setParams: Optional[Dict[str, Any]] = None,    # should be dict
+        userPrompt: Optional[Dict[str, Any]] = None,  # should be dict
+        setParams: Optional[Dict[str, Any]] = None,  # should be dict
         generate_image_prompt: bool = False,
         creative: bool = False,
         include_explanation: bool = False,
@@ -134,6 +130,7 @@ class APIParams:
         Produce a safe dict for logging/transport.
         Redacts the API key; omits empty payloads.
         """
+
         def redact(key: str) -> str:
             if not key:
                 return ""
@@ -155,7 +152,7 @@ class APIParams:
 
     # -------- mutations --------
 
-    def update_auth_token(self, new_auth_token: str) -> None:
+    def update_auth_token(self, new_auth_token: str, sleepy_time: float = 0) -> None:
         """
         Update the authorization token in the headers.
         """
@@ -172,15 +169,23 @@ class APIParams:
         Construct from a dict (e.g., YAML). Extra keys are ignored.
         """
         allowed = {
-            "api_key", "auth_token", "userPrompt", "setParams",
-            "generate_image_prompt", "creative", "include_explanation",
-            "image_model", "model",
+            "api_key",
+            "auth_token",
+            "userPrompt",
+            "setParams",
+            "generate_image_prompt",
+            "creative",
+            "include_explanation",
+            "image_model",
+            "model",
         }
         kwargs = {k: config[k] for k in config.keys() & allowed}
         return cls(**kwargs)
 
+
 CANONICAL_CARD_TYPES = merlinAI_lib.CANONICAL_CARD_TYPES
 DEFAULT_TYPE_WEIGHTS = merlinAI_lib.DEFAULT_TYPE_WEIGHTS
+
 
 class skeletonParams:
     """
@@ -209,17 +214,23 @@ class skeletonParams:
         mutation_chance_per_theme: int = 20,  # in %
         fixed_amount_themes: int = 1,  # if not zero, select fixed amount instead of random mutation
         power_level: float = 5,  # Power level of the card, 1–10
+        rarity_to_skew: Optional[dict[str, int]] = None,  # rarity skew mapping
     ):
         self.colors = colors or ["white", "blue", "black", "red", "green", "colorless"]
 
         cw = colors_weights
         default_cw = {c: 100.0 / len(self.colors) for c in self.colors}
         if isinstance(cw, list):
-            cw = {c: float(cw[i]) for i, c in enumerate(self.colors[:len(cw)])}
+            cw = {c: float(cw[i]) for i, c in enumerate(self.colors[: len(cw)])}
         cw = cw or {}
-        merged_cw = {**default_cw, **{k: float(v) for k, v in cw.items() if k in self.colors}}
+        merged_cw = {
+            **default_cw,
+            **{k: float(v) for k, v in cw.items() if k in self.colors},
+        }
         total = sum(merged_cw.values()) or 1.0
-        self.colors_weights_dict = {c: (v * 100.0 / total) for c, v in merged_cw.items()}
+        self.colors_weights_dict = {
+            c: (v * 100.0 / total) for c, v in merged_cw.items()
+        }
         self.colors_weights = [self.colors_weights_dict[c] for c in self.colors]
 
         self.mana_values = mana_values or ["0", "1", "2", "3", "4", "5", "6", "7", "8+"]
@@ -258,11 +269,16 @@ class skeletonParams:
         rw = rarities_weights
         default_rw = {r: 100.0 / len(self.rarities) for r in self.rarities}
         if isinstance(rw, list):
-            rw = {r: float(rw[i]) for i, r in enumerate(self.rarities[:len(rw)])}
+            rw = {r: float(rw[i]) for i, r in enumerate(self.rarities[: len(rw)])}
         rw = rw or {}
-        merged_rw = {**default_rw, **{k: float(v) for k, v in rw.items() if k in self.rarities}}
+        merged_rw = {
+            **default_rw,
+            **{k: float(v) for k, v in rw.items() if k in self.rarities},
+        }
         total_rw = sum(merged_rw.values()) or 1.0
-        self.rarities_weights_dict = {r: (v * 100.0 / total_rw) for r, v in merged_rw.items()}
+        self.rarities_weights_dict = {
+            r: (v * 100.0 / total_rw) for r, v in merged_rw.items()
+        }
         self.rarities_weights = [self.rarities_weights_dict[r] for r in self.rarities]
 
         self.function_tags = function_tags or {
@@ -280,6 +296,14 @@ class skeletonParams:
         self.mutation_chance_per_theme = mutation_chance_per_theme
         self.fixed_amount_themes = fixed_amount_themes
         self.power_level = power_level
+        
+        # Rarity to skew mapping with defaults
+        self.rarity_to_skew = rarity_to_skew or {
+            "common": -2,
+            "uncommon": -1,
+            "rare": 1,
+            "mythic": 2,
+        }
 
     @staticmethod
     def _normalize_row_to_sum(row, total=100.0):
@@ -314,7 +338,9 @@ class skeletonParams:
         # --- Warn if YAML contains unknown colors ---
         unknown_colors = set(weights_by_color.keys()) - {"_default"} - set(colors)
         if unknown_colors:
-            logging.warning(f"Unknown colors in card_types_weights ignored: {sorted(unknown_colors)}")
+            logging.warning(
+                f"Unknown colors in card_types_weights ignored: {sorted(unknown_colors)}"
+            )
 
         # 1) Build the baseline `_default` row map
         yaml_default = weights_by_color.get("_default", {})
@@ -322,7 +348,7 @@ class skeletonParams:
             # allow legacy list for _default too
             default_map = {
                 t: float(yaml_default[i])
-                for i, t in enumerate(card_types[:len(yaml_default)])
+                for i, t in enumerate(card_types[: len(yaml_default)])
             }
         elif isinstance(yaml_default, dict):
             default_map = {
@@ -338,13 +364,15 @@ class skeletonParams:
                 wmap = dict(default_map)
             elif isinstance(src, list):
                 wmap = dict(default_map)
-                for i, t in enumerate(card_types[:len(src)]):
+                for i, t in enumerate(card_types[: len(src)]):
                     wmap[t] = float(src[i])
             elif isinstance(src, dict):
                 wmap = dict(default_map)
                 unknown_types = set(src.keys()) - set(card_types)
                 if unknown_types:
-                    logging.warning(f"Unknown types ignored in row: {sorted(unknown_types)}")
+                    logging.warning(
+                        f"Unknown types ignored in row: {sorted(unknown_types)}"
+                    )
                 for t, w in src.items():
                     if t in wmap:
                         wmap[str(t)] = float(w)
@@ -360,6 +388,7 @@ class skeletonParams:
             result[color] = build_row_from_source(src)
 
         return result
+
 
 def login_mtgcg() -> str:
     """
@@ -391,19 +420,16 @@ def login_mtgcg() -> str:
         raise
 
 
-RARITY_TO_SKEW = {
-    "common":   -2,
-    "uncommon": -1,
-    "rare":      1,
-    "mythic":    2,
-}
-
 def bounded_value_with_rarity(
-    mean: float, low: float, high: float, *,
+    mean: float,
+    low: float,
+    high: float,
+    *,
     sd: float = 0.7,
     rarity: str | None = None,
-    rarity_skew: float = 0.35,   # 0..1 → how much rarity influences
+    rarity_skew: float = 0.35,  # 0..1 → how much rarity influences
     rng: np.random.Generator | None = None,
+    rarity_to_skew: dict[str, int] | None = None,
 ) -> float:
     """
     Convex-combine:
@@ -417,13 +443,23 @@ def bounded_value_with_rarity(
     if rng is None:
         rng = np.random.default_rng()
 
-    tn = merlinAI_lib.truncated_normal_random(mean, sd, low, high) #rng=rng ?
+    tn = merlinAI_lib.truncated_normal_random(mean, sd, low, high)  # rng=rng ?
     if rarity is None:
         return tn
 
-    skew = RARITY_TO_SKEW.get(str(rarity).lower(), 0)
-    be  = merlinAI_lib.beta_skewed_random(low, high, skew=skew, rng=rng)
+    # Use provided rarity_to_skew mapping or default
+    if rarity_to_skew is None:
+        rarity_to_skew = {
+            "common": -2,
+            "uncommon": -1,
+            "rare": 1,
+            "mythic": 2,
+        }
+    
+    skew = rarity_to_skew.get(str(rarity).lower(), 0)
+    be = merlinAI_lib.beta_skewed_random(low, high, skew=skew, rng=rng)
     return (1.0 - rarity_skew) * tn + rarity_skew * be  # convex combo stays in-bounds
+
 
 def chance_advantage(input_bleed, steigung=1) -> float:
     """
@@ -443,18 +479,24 @@ def chance_advantage(input_bleed, steigung=1) -> float:
 
 
 def card_skeleton_generator(
-    index, api_params: APIParams, skeletonParams: skeletonParams
+    index, api_params: APIParams, skeletonParams: skeletonParams, config: Dict[str, Any]
 ) -> APIParams:
     """
     Generates a card skeleton with fixed values and random attributes.
+    Config is passed as argument instead of using global variables.
     """
+    # Extract config values instead of using globals
+    sleepy_time = config["square_config"].get("sleepy_time", 0)
+    stdDePL = config["square_config"].get("standard_deviation_powerLevel", 0.7)
+    powSkew = config["square_config"].get("power_level_rarity_skew", 0.5)
 
     out_params = deepcopy(api_params)
 
-    card_skeleton = deepcopy(api_params.setParams)  # Copy set parameters for the skeleton
+    card_skeleton = deepcopy(
+        api_params.setParams
+    )  # Copy set parameters for the skeleton
     logging.info(f"Generating card skeleton for index {index}")
     time.sleep(sleepy_time)
-
 
     ############## Set dynamic values for each card
 
@@ -482,14 +524,24 @@ def card_skeleton_generator(
         basic_land_flag = True
     elif selected_types[0].lower() == "land":
         time.sleep(sleepy_time)
-        logging.info(f"[Card #{index+1}] Selected type is land, setting primary land flag.")
+        logging.info(
+            f"[Card #{index+1}] Selected type is land, setting primary land flag."
+        )
         primary_land_flag = True
-    elif selected_types[0].lower() == "sorcery" or selected_types[0].lower() == "instant":
-        logging.info(f"[Card #{index+1}] Selected type is {selected_types[0]}, setting spell flag.")
+    elif (
+        selected_types[0].lower() == "sorcery" or selected_types[0].lower() == "instant"
+    ):
+        logging.info(
+            f"[Card #{index+1}] Selected type is {selected_types[0]}, setting spell flag."
+        )
         spell_flag = True
 
     # Change types based on mutation chance
-    if not basic_land_flag and not primary_land_flag and merlinAI_lib.check_mutation(t_chance):
+    if (
+        not basic_land_flag
+        and not primary_land_flag
+        and merlinAI_lib.check_mutation(t_chance)
+    ):
         logging.info(f"[Card #{index+1}] Type mutation occurred.")
         time.sleep(sleepy_time)
         selected_types = [random.choice(t)]
@@ -501,7 +553,11 @@ def card_skeleton_generator(
     available_types = [typ for typ in t if typ not in selected_types]
 
     # Add additional types based on mutation chance
-    while not basic_land_flag and available_types and merlinAI_lib.check_mutation(t_chance):
+    while (
+        not basic_land_flag
+        and available_types
+        and merlinAI_lib.check_mutation(t_chance)
+    ):
         logging.debug(f"[Card #{index+1}] Type mutation occurred.")
         mutation = random.choice(available_types)
         selected_types.append(mutation)
@@ -523,7 +579,7 @@ def card_skeleton_generator(
         mana_values = skeletonParams.mana_values
         curve = skeletonParams.mana_curves.get(
             selected_colors[0],
-            skeletonParams.mana_curves.get("colorless", [1] * len(mana_values))
+            skeletonParams.mana_curves.get("colorless", [1] * len(mana_values)),
         )
         selected_mana_value = random.choices(mana_values, weights=curve, k=1)[0]
         logging.info(f"[Card #{index+1}] Selected mana value: {selected_mana_value}")
@@ -531,7 +587,11 @@ def card_skeleton_generator(
         card_skeleton["manaValue"] = selected_mana_value
 
     # Bleeding colors
-    c = [col for col in skeletonParams.colors if col not in selected_colors and col != "colorless"]
+    c = [
+        col
+        for col in skeletonParams.colors
+        if col not in selected_colors and col != "colorless"
+    ]
     color_bleed_factor = skeletonParams.color_bleed_factor
 
     if primary_land_flag:
@@ -561,7 +621,9 @@ def card_skeleton_generator(
         weights = [skeletonParams.colors_weights_dict[col] for col in c]
 
         logging.debug(f"[Card #{index+1}] Adding color bleed to {selected_colors}.")
-        logging.debug(f"[Card #{index+1}] Available colors for bleed: {c} with weights {weights}")
+        logging.debug(
+            f"[Card #{index+1}] Available colors for bleed: {c} with weights {weights}"
+        )
 
         bleed_color = random.choices(c, weights=weights, k=1)[0]
         selected_colors.append(bleed_color)
@@ -585,12 +647,14 @@ def card_skeleton_generator(
 
     # Legendary
     supertypes = []
-    if not (basic_land_flag and spell_flag) and merlinAI_lib.check_mutation(skeletonParams.mutation_factor):
+    if not (basic_land_flag and spell_flag) and merlinAI_lib.check_mutation(
+        skeletonParams.mutation_factor
+    ):
         supertypes.append("Legendary")
         logging.debug(f"[Card #{index+1}] Added legendary supertype.")
-    elif not ( basic_land_flag and spell_flag ) and skeletonParams.rarity_based_mutation:
+    elif not (basic_land_flag and spell_flag) and skeletonParams.rarity_based_mutation:
         a, b = skeletonParams.rarity_based_mutation[selected_rarity]
-        den = (a + b)
+        den = a + b
         legend_chance = (a / den * 100.0) if den > 0 else 0.0
         logging.debug(
             f"[Card #{index+1}] Legendary mutation chance: {legend_chance:.2f}"
@@ -618,7 +682,7 @@ def card_skeleton_generator(
     # Extra creative
 
     a, b = skeletonParams.rarity_based_mutation[selected_rarity]
-    den = (a + b)
+    den = a + b
     extra_creative_chance = (a / den * 100.0) if den > 0 else 0.0
     if merlinAI_lib.check_mutation(extra_creative_chance):
         out_params.creative = True
@@ -641,7 +705,7 @@ def card_skeleton_generator(
 
     logging.info(f"[Card #{index+1}] Selected function tags: {selected_tags}")
     time.sleep(sleepy_time)
-    
+
     otag_max = skeletonParams.tags_maximum
 
     if basic_land_flag:
@@ -652,7 +716,9 @@ def card_skeleton_generator(
         selected_tags.append("Simple or straightforward, no complexities")
 
     if otag_max is not None:
-        assert isinstance(otag_max, int) and otag_max >= 0, "tags_maximum must be a non-negative int."
+        assert (
+            isinstance(otag_max, int) and otag_max >= 0
+        ), "tags_maximum must be a non-negative int."
         logging.debug(f"[Card #{index+1}] Maximum function tags allowed: {otag_max}")
         if len(selected_tags) > otag_max:
             logging.info(
@@ -667,14 +733,18 @@ def card_skeleton_generator(
             f"[Card #{index+1}] Added function tags: {card_skeleton['function_tags']}"
         )
         time.sleep(sleepy_time)
-    
+
     if basic_land_flag:
-        card_skeleton["function_tags"] =  "Basic Land, SHOULD NOT HAVE ANY ABILITIES"
+        card_skeleton["function_tags"] = "Basic Land, SHOULD NOT HAVE ANY ABILITIES"
 
     # Card power level
     if skeletonParams.power_level is not None:
-        assert isinstance(skeletonParams.power_level, (int, float)), "Power level must be a number."
-        assert 1.0 <= float(skeletonParams.power_level) <= 10.0, "Power level must be between 1 and 10."
+        assert isinstance(
+            skeletonParams.power_level, (int, float)
+        ), "Power level must be a number."
+        assert (
+            1.0 <= float(skeletonParams.power_level) <= 10.0
+        ), "Power level must be between 1 and 10."
 
         powerLevel = skeletonParams.power_level
         powerLevel = bounded_value_with_rarity(
@@ -684,6 +754,7 @@ def card_skeleton_generator(
             sd=stdDePL,
             rarity=selected_rarity,
             rarity_skew=powSkew,  # Adjust this value as needed
+            rarity_to_skew=skeletonParams.rarity_to_skew,
         )
         powerLevel = round(powerLevel, 2)  # Round to 2 decimal places
         card_skeleton["powerLevel"] = f"{powerLevel} out of 10"
@@ -705,7 +776,9 @@ def card_skeleton_generator(
         if isinstance(amount, int) and amount > 0:
             logging.debug(f"[Card #{index+1}] Fixed amount of themes: {amount}")
             if amount > len(th):
-                logging.warning(f"[Card #{index+1}] Requested amount exceeds available themes, adjusting to {len(th)}")
+                logging.warning(
+                    f"[Card #{index+1}] Requested amount exceeds available themes, adjusting to {len(th)}"
+                )
                 amount = len(th)
             selected_themes = random.sample(th, amount)
             logging.info(f"[Card #{index+1}] Selected themes: {selected_themes}")
@@ -713,8 +786,12 @@ def card_skeleton_generator(
         else:
             for theme in th:
                 logging.debug(f"[Card #{index+1}] Checking theme: {theme}")
-                logging.debug(f"[Card #{index+1}] Theme weight: {skeletonParams.mutation_chance_per_theme}")
-                if merlinAI_lib.check_mutation(skeletonParams.mutation_chance_per_theme):
+                logging.debug(
+                    f"[Card #{index+1}] Theme weight: {skeletonParams.mutation_chance_per_theme}"
+                )
+                if merlinAI_lib.check_mutation(
+                    skeletonParams.mutation_chance_per_theme
+                ):
                     selected_themes.append(theme)
                     logging.debug(f"[Card #{index+1}] Added theme: {theme}")
 
@@ -735,8 +812,9 @@ def card_skeleton_generator(
     return out_params
 
 
-def generate_card(index, api_params: APIParams) -> dict:  # API parameters
-    global COLORS, RARITIES, SUCCESSFUL, TOTAL_RUNTIME
+def generate_card(index, api_params: APIParams, metrics: GenerationMetrics, config: Dict[str, Any]) -> dict:
+    """API parameters with metrics tracking and config passed as arguments."""
+    sleepy_time = config["square_config"].get("sleepy_time", 0)
 
     local_api_params = copy.copy(api_params)
 
@@ -833,24 +911,14 @@ def generate_card(index, api_params: APIParams) -> dict:  # API parameters
     color_identity = output_data["cards"][0].get("colorIdentity", "").lower()
     generated_rarity = output_data["cards"][0].get("rarity", "").lower()
 
-    with COLOR_lock:
-        if color_identity in COLORS.keys():
-            COLORS[color_identity] += 1
-        else:
-            COLORS[color_identity] = 1
-
-    with RARITY_lock:
-        if generated_rarity in RARITIES.keys():
-            RARITIES[generated_rarity] += 1
-        else:
-            RARITIES[generated_rarity] = 1
+    # Update metrics using the passed metrics object instead of global variables
+    metrics.update_color(color_identity)
+    metrics.update_rarity(generated_rarity)
 
     card_runtime = time.time() - card_start
-    with RUNTIME_lock:
-        TOTAL_RUNTIME += card_runtime
-
-    with SUCCESSFUL_lock:
-        SUCCESSFUL += 1
+    metrics.add_runtime(card_runtime)
+    metrics.increment_successful()
+    
     logging.info(
         f"[Card #{index+1}] Color: {color_identity.title()}, Rarity: {generated_rarity.title()}, Time: {card_runtime:.2f}s"
     )
@@ -863,16 +931,17 @@ def generate_card(index, api_params: APIParams) -> dict:  # API parameters
     return output_data
 
 
-def get_card_graceful(i, api_params: APIParams, retries=3, retry_delay=10) -> dict:
+def get_card_graceful(i, api_params: APIParams, skeleton_params: skeletonParams, 
+                     metrics: GenerationMetrics, config: Dict[str, Any], 
+                     retries=3, retry_delay=10) -> dict:
     """
     Wrapper to handle card generation with retries.
     """
+    sleepy_time = config["square_config"].get("sleepy_time", 0)
 
     logging.debug(
         f"[Card #{i+1}] User prompt: {api_params.userPrompt}, Creative: {api_params.creative}"
     )
-
-
 
     attempt = 1
     card = None
@@ -880,7 +949,7 @@ def get_card_graceful(i, api_params: APIParams, retries=3, retry_delay=10) -> di
         try:
 
             local_api_params = card_skeleton_generator(
-                i, api_params=api_params, skeletonParams=card_skeleton_params
+                i, api_params=api_params, skeletonParams=skeleton_params, config=config
             )
 
             logging.info(
@@ -888,15 +957,15 @@ def get_card_graceful(i, api_params: APIParams, retries=3, retry_delay=10) -> di
                 f"{json.dumps(local_api_params.params_out(), indent=2)}"
             )
             time.sleep(sleepy_time)
-            
-            card = generate_card(i, api_params=local_api_params)
+
+            card = generate_card(i, api_params=local_api_params, metrics=metrics, config=config)
             break
         except requests.exceptions.HTTPError as e:
             if e.response is not None and e.response.status_code == 401:
                 logging.error(f"[Card #{i+1}] Unauthorized (401). Attempting re-login.")
                 try:
                     new_auth_token = login_mtgcg()
-                    api_params.update_auth_token(new_auth_token)
+                    api_params.update_auth_token(new_auth_token, sleepy_time)
                 except Exception as login_err:
                     logging.error(f"[Card #{i+1}] Re-login failed: {login_err}")
                     break
@@ -924,54 +993,11 @@ def get_card_graceful(i, api_params: APIParams, retries=3, retry_delay=10) -> di
     return card
 
 
-################# Initialization #################
-
-config = yaml.safe_load(open("config.yml"))
-
-# Color & rarity counters
-COLORS = {}
-RARITIES = {}
-SUCCESSFUL = 0
-ALL_CARDS = []
-CARDS_lock = threading.Lock()
-SUCCESSFUL_lock = threading.Lock()
-COLOR_lock = threading.Lock()
-RARITY_lock = threading.Lock()
-
-# Runtime tracking
-TOTAL_RUNTIME = 0.0
-RUNTIME_lock = threading.Lock()
-
-# Config
-total_cards = config["square_config"].get("total_cards", 15)
-concurrency = config["square_config"].get("concurrency", 2)
-max_retries = config["http_config"].get("retries", 3)
-retry_delay = config["http_config"].get("retry_delay", 10)
-
-sleepy_time = config["square_config"].get("sleepy_time", 0)
-stdDePL = config["square_config"].get("standard_deviation_powerLevel", 0.7)
-powSkew = config["square_config"].get("power_level_rarity_skew", 0.5)
-
-# Load API credentials from environment variables
-API_KEY = os.getenv("API_KEY")
-AUTH_TOKEN = os.getenv("AUTH_TOKEN")
-
-BAR_FMT = (
-    "{desc}: {percentage:3.0f}%|{bar}| {n_fmt}/{total_fmt} "
-    "[Elapsed: {elapsed} | Remaining: {remaining} | Avg: {rate_fmt}]"
-)
-
-
-################# Card Generation Setup #################
-
-# Fixed values for card generation
-
-set_params = config.get("set_params", {})
-
 ################# Main Execution #################
 
 
-def card_worker(card_queue, pbar, api_params, max_retries, retry_delay, CARDS_lock):
+def card_worker(card_queue, pbar, api_params, skeleton_params, metrics, config, max_retries, retry_delay):
+    """Worker function for threaded card generation."""
     while True:
         try:
             i = card_queue.get_nowait()
@@ -980,23 +1006,47 @@ def card_worker(card_queue, pbar, api_params, max_retries, retry_delay, CARDS_lo
 
         try:
             card = get_card_graceful(
-                i, api_params=api_params, retries=max_retries, retry_delay=retry_delay
+                i, api_params=api_params, skeleton_params=skeleton_params,
+                metrics=metrics, config=config, retries=max_retries, retry_delay=retry_delay
             )
-            with CARDS_lock:
-                ALL_CARDS.append(card["cards"][0])
-            # If you track SUCCESSFUL, increment it under a lock here.
-            # with METRICS_lock: SUCCESSFUL += 1
+            metrics.add_card(card["cards"][0])
 
         except Exception as e:
             logging.error(f"[Card #{i+1}] failed: {e}")
         finally:
             card_queue.task_done()
             pbar.update(1)  # <- keeps the bar in sync
+            sleepy_time = config["square_config"].get("sleepy_time", 0)
             logging.info(f"[Card #{i+1}] task done.")
             time.sleep(sleepy_time)
 
 
 if __name__ == "__main__":
+    # Parse command line arguments and load configuration
+    args = config_manager.parse_args()
+    config = config_manager.load_config(args.config)
+    config = config_manager.apply_cli_overrides(config, args)
+    
+    # Extract configuration values
+    total_cards = config["square_config"]["total_cards"]
+    concurrency = config["square_config"]["concurrency"]
+    max_retries = config["http_config"]["retries"]
+    retry_delay = config["http_config"]["retry_delay"]
+    sleepy_time = config["square_config"]["sleepy_time"]
+    set_params = config.get("set_params", {})
+    
+    # Load API credentials from environment variables
+    API_KEY = os.getenv("API_KEY")
+    AUTH_TOKEN = os.getenv("AUTH_TOKEN")
+    
+    # Progress bar format
+    BAR_FMT = (
+        "{desc}: {percentage:3.0f}%|{bar}| {n_fmt}/{total_fmt} "
+        "[Elapsed: {elapsed} | Remaining: {remaining} | Avg: {rate_fmt}]"
+    )
+    
+    # Initialize metrics tracking
+    metrics = GenerationMetrics()
 
     card_skeleton_params = skeletonParams(**config["skeleton_params"])
     api_params = APIParams(
@@ -1011,7 +1061,7 @@ if __name__ == "__main__":
         time.sleep(sleepy_time)
         try:
             new_auth_token = login_mtgcg()
-            api_params.update_auth_token(new_auth_token)
+            api_params.update_auth_token(new_auth_token, sleepy_time)
         except Exception as e:
             logging.error(f"Login failed: {e}")
             raise
@@ -1032,7 +1082,8 @@ if __name__ == "__main__":
             total=total_cards,
             desc="Generating card information",
             unit="card",
-            bar_format=BAR_FMT) as pbar:
+            bar_format=BAR_FMT,
+        ) as pbar:
             for _ in range(min(concurrency, total_cards)):
                 t = threading.Thread(
                     target=card_worker,
@@ -1040,9 +1091,11 @@ if __name__ == "__main__":
                         card_queue,
                         pbar,
                         api_params,
+                        card_skeleton_params,
+                        metrics,
+                        config,
                         max_retries,
                         retry_delay,
-                        CARDS_lock,
                     ),
                     daemon=True,
                 )
@@ -1052,19 +1105,21 @@ if __name__ == "__main__":
             for t in threads:
                 t.join()
 
+    # Get metrics summary
+    summary = metrics.get_summary()
+
     # Final stats
     logging.info("=== Generation Complete ===")
     time.sleep(sleepy_time)
-    logging.info(f"Rarity Distribution: {RARITIES}")
+    logging.info(f"Rarity Distribution: {summary['rarities']}")
     time.sleep(sleepy_time)
-    logging.info(f"Color Distribution: {COLORS}")
+    logging.info(f"Color Distribution: {summary['colors']}")
     time.sleep(sleepy_time)
-    logging.info(f"Total Cards Generated: {SUCCESSFUL}/{total_cards}")
+    logging.info(f"Total Cards Generated: {summary['successful']}/{total_cards}")
     time.sleep(sleepy_time)
-    logging.info(f"Total Runtime: {TOTAL_RUNTIME:.2f}s")
+    logging.info(f"Total Runtime: {summary['total_runtime']:.2f}s")
     time.sleep(sleepy_time)
-    tpC = TOTAL_RUNTIME / SUCCESSFUL if SUCCESSFUL > 0 else 0
-    logging.info(f"Avg Time per Card: {tpC:.2f}s")
+    logging.info(f"Avg Time per Card: {summary['average_time_per_card']:.2f}s")
     time.sleep(sleepy_time)
     logging.info("=== End of Generation ===")
 
@@ -1073,7 +1128,7 @@ if __name__ == "__main__":
     outname = os.path.join(outdir, "generated_cards.json")
 
     with open(outname, "w") as f:
-        json.dump(ALL_CARDS, f, indent=2)
+        json.dump(metrics.all_cards, f, indent=2)
         logging.info(f"Generated cards saved to {outname}")
         time.sleep(sleepy_time)
     logging.info("All threads completed successfully.")

@@ -1,0 +1,114 @@
+# Default configuration for MTG Card Generator
+# This file contains all default values used by the application
+# User configs will override these values
+
+square_config:
+  total_cards: 15
+  concurrency: 2
+  sleepy_time: 0
+  standard_deviation_powerLevel: 0.7
+  power_level_rarity_skew: 0.5
+  output_dir: "output"
+
+http_config:
+  timeout: 60
+  retries: 3
+  retry_delay: 10
+
+mtgcg_mse_config:
+  image_method: "download"
+
+SD_config:
+  max_tag_weight: 2.5
+  forge_url_base: "http://127.0.0.1:7860"
+  sd_output_dir: "forge-out"
+  random_lora_weights: true
+  lora_weight_standard_deviation: 0.35
+  apply_lora_chance: 50
+  use_special_tags: true
+  varying_special_tags_weight: true
+  model_swap_chance: 66
+  randomise_negative_prompt: true
+  chance_no_negative_prompt: 50
+
+api_params:
+  generate_image_prompt: false
+  creative: false
+  include_explanation: false
+  image_model: "dall-e-3"
+  model: "gpt-41"
+
+set_params: {}
+
+skeleton_params:
+  colors:
+    - "white"
+    - "blue"
+    - "black"
+    - "red"
+    - "green"
+    - "colorless"
+  colors_weights:
+    white: 16.67
+    blue: 16.67
+    black: 16.67
+    red: 16.67
+    green: 16.67
+    colorless: 16.65
+  mana_values:
+    - "0"
+    - "1"
+    - "2"
+    - "3"
+    - "4"
+    - "5"
+    - "6"
+    - "7"
+    - "8+"
+  mana_curves:
+    white: [1, 8, 27, 23, 19, 14, 6, 1, 1]
+    blue: [1, 7, 25, 22, 20, 16, 7, 1, 1]
+    black: [1, 6, 27, 25, 18, 14, 5, 2, 2]
+    red: [1, 10, 28, 23, 18, 13, 5, 1, 1]
+    green: [1, 7, 22, 22, 20, 17, 6, 3, 2]
+    colorless: [3, 10, 25, 23, 19, 12, 5, 2, 1]
+    default: [4, 12, 22, 22, 18, 12, 6, 3, 1]
+  color_bleed_factor: 20
+  land_color_bleed_overlinear: 2
+  mutation_factor: 1
+  type_mutation_factor: 10
+  wildcard_mutation_factor: 5
+  wildcard_supertype: false
+  rarity_based_mutation:
+    common: [1, 12]
+    uncommon: [2, 12]
+    rare: [4, 12]
+    mythic: [8, 12]
+  rarities:
+    - "common"
+    - "uncommon"
+    - "rare"
+    - "mythic"
+  rarities_weights:
+    common: 25.0
+    uncommon: 25.0
+    rare: 25.0
+    mythic: 25.0
+  function_tags:
+    "ramp or mana fixing": 15
+    "draw or card advantage": 15
+    "removal or control": 10
+    "board wipe or mass removal": 5
+    "activated ability": 5
+    "Flying or other evasion": 5
+    "simple or straightforward": 10
+    "vanilla or no abilities": 5
+  tags_maximum: null
+  mutation_chance_per_theme: 20
+  fixed_amount_themes: 1
+  power_level: 5.0
+  rarity_to_skew:
+    common: -2
+    uncommon: -1
+    rare: 1
+    mythic: 2
