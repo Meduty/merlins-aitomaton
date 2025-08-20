@@ -1,9 +1,10 @@
 square_config:
-  total_cards: 60
+  total_cards: 4
   concurrency: 4
   sleepy_time: 0
   standard_deviation_powerLevel: 0.5
   power_level_rarity_skew: 0.4 # in [0,1] Adjust this value to skew the power level based on rarity 
+  output_dir: "output" # Directory to save generated cards
 http_config:
   timeout: 60
   retries: 3

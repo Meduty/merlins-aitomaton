@@ -419,7 +419,9 @@ def export_to_zip(output_text, cards, image_method="download", output_dir="out/m
 
 if __name__ == "__main__":
     with logging_redirect_tqdm():
-        with open("generated_cards.json", "r", encoding="utf-8") as f:
+        outdir = config["square_config"].get("output_dir", "output")
+        cardsjson = os.path.join(outdir, "generated_cards.json")
+        with open(cardsjson, "r", encoding="utf-8") as f:
             cards_data = json.load(f)
 
         openai_client = None

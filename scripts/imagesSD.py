@@ -447,8 +447,9 @@ if __name__ == "__main__":
 
     logging.info("Starting image generation from JSON...")
     time.sleep(sleepy_time)
-
-    with open("generated_cards.json", "r", encoding="utf-8") as f:
+    outdir = config["square_config"].get("output_dir", "output")
+    cardsjson = os.path.join(outdir, "generated_cards.json")
+    with open(cardsjson, "r", encoding="utf-8") as f:
         cards_data = json.load(f)
 
     try:

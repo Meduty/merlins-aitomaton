@@ -417,7 +417,7 @@ def bounded_value_with_rarity(
     if rng is None:
         rng = np.random.default_rng()
 
-    tn = merlinAI_lib.truncated_normal_random(mean, sd, low, high, rng=rng)
+    tn = merlinAI_lib.truncated_normal_random(mean, sd, low, high) #rng=rng ?
     if rarity is None:
         return tn
 
@@ -484,6 +484,9 @@ def card_skeleton_generator(
         time.sleep(sleepy_time)
         logging.info(f"[Card #{index+1}] Selected type is land, setting primary land flag.")
         primary_land_flag = True
+    elif selected_types[0].lower() == "sorcery" or selected_types[0].lower() == "instant":
+        logging.info(f"[Card #{index+1}] Selected type is {selected_types[0]}, setting spell flag.")
+        spell_flag = True
 
     # Change types based on mutation chance
     if not basic_land_flag and not primary_land_flag and merlinAI_lib.check_mutation(t_chance):
@@ -582,10 +585,10 @@ def card_skeleton_generator(
 
     # Legendary
     supertypes = []
-    if not basic_land_flag and merlinAI_lib.check_mutation(skeletonParams.mutation_factor):
+    if not (basic_land_flag and spell_flag) and merlinAI_lib.check_mutation(skeletonParams.mutation_factor):
         supertypes.append("Legendary")
         logging.debug(f"[Card #{index+1}] Added legendary supertype.")
-    elif not basic_land_flag and skeletonParams.rarity_based_mutation:
+    elif not ( basic_land_flag and spell_flag ) and skeletonParams.rarity_based_mutation:
         a, b = skeletonParams.rarity_based_mutation[selected_rarity]
         den = (a + b)
         legend_chance = (a / den * 100.0) if den > 0 else 0.0
@@ -644,7 +647,9 @@ def card_skeleton_generator(
     if basic_land_flag:
         logging.info(f"[Card #{index+1}] Basic land card, no function tags allowed.")
         time.sleep(sleepy_time)
-        otag_max = 0
+        otag_max = None
+    elif primary_land_flag:
+        selected_tags.append("Simple or straightforward, no complexities")
 
     if otag_max is not None:
         assert isinstance(otag_max, int) and otag_max >= 0, "tags_maximum must be a non-negative int."
@@ -665,7 +670,6 @@ def card_skeleton_generator(
     
     if basic_land_flag:
         card_skeleton["function_tags"] =  "Basic Land, SHOULD NOT HAVE ANY ABILITIES"
-
 
     # Card power level
     if skeletonParams.power_level is not None:
@@ -1064,9 +1068,13 @@ if __name__ == "__main__":
     time.sleep(sleepy_time)
     logging.info("=== End of Generation ===")
 
-    with open("generated_cards.json", "w") as f:
+    outdir = config["square_config"].get("output_dir", "output")
+    os.makedirs(outdir, exist_ok=True)
+    outname = os.path.join(outdir, "generated_cards.json")
+
+    with open(outname, "w") as f:
         json.dump(ALL_CARDS, f, indent=2)
-        logging.info("Generated cards saved to generated_cards.json")
+        logging.info(f"Generated cards saved to {outname}")
         time.sleep(sleepy_time)
     logging.info("All threads completed successfully.")
     time.sleep(sleepy_time)

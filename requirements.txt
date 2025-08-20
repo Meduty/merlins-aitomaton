@@ -1,0 +1,7 @@
+requests
+tqdm
+numpy
+pyyaml
+python-dotenv
+openai
+scipy

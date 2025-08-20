@@ -5,6 +5,7 @@ __pycache__/
 
 # Distribution / packaging
 downloads/
+output/
 
 # Environments
 .env
