@@ -536,7 +536,17 @@ def card_skeleton_generator(
     # Types
     t = skeleton_params.card_types.copy()
     card_types_weights = skeleton_params.card_types_weights[selected_colors[0]]
-    selected_types = random.choices(t, weights=card_types_weights, k=1)
+    
+    # Handle zero-weight scenario for selected color
+    total_weight = sum(w for w in card_types_weights if isinstance(w, (int, float)))
+    
+    if total_weight == 0:
+        # All type weights are zero for this color - set type to None
+        logging.info(f"[Card #{index+1}] Color '{selected_colors[0]}' has zero type weights, setting type to 'None'")
+        selected_types = ["None"]
+    else:
+        selected_types = random.choices(t, weights=card_types_weights, k=1)
+    
     logging.debug(f"[Card #{index+1}] Selected type: {selected_types[0]}")
 
     t_chance = skeleton_params.type_mutation_factor

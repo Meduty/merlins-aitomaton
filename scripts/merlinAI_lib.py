@@ -8,6 +8,8 @@ import random
 
 import yaml
 
+import logging
+
 from pathlib import Path
 
 _EPS = 1e-12
@@ -115,25 +117,40 @@ def check_and_normalize_config(config_path: str, save: bool = False, total: floa
         config = yaml.safe_load(f) or {}
 
     # Perform validation checks before normalization
-    print("🔍 Validating configuration...")
+    print("=" * 80)
+    print("🔍 CONFIGURATION VALIDATION & NORMALIZATION")
+    print("=" * 80)
+    
+    print("\n📋 Validating configuration...")
+    print("-" * 40)
     validation_issues = _validate_config_integrity(config, defaults)
     _print_validation_results(validation_issues)
     
     # Check if there are critical errors that should stop processing
     critical_errors = [issue for issue in validation_issues if "❌ ERROR:" in issue]
     if critical_errors:
-        print("\n🛑 Stopping due to critical errors. Please fix the errors above and try again.")
+        print("\n🛑 CRITICAL ERRORS DETECTED")
+        print("-" * 40)
+        print("Stopping due to critical errors. Please fix the errors above and try again.")
+        print("=" * 80)
         return None
 
-    print("\n📊 Normalizing weights...")
+    print("\n📊 WEIGHT NORMALIZATION")
+    print("-" * 40)
     fixed = _normalize_all_weights_with_diffs(config, defaults, total=total)
 
     if save:
         with open(path, "w") as f:
             yaml.safe_dump(fixed, f, sort_keys=False)
-        print(f"\n✅ Saved normalized config back to {path}")
+        print(f"\n✅ CONFIGURATION SAVED")
+        print("-" * 30)
+        print(f"Normalized config saved to {path}")
     else:
-        print("\nℹ️  Normalization complete (not saved). Use --save to overwrite the file.")
+        print(f"\n💾 CONFIGURATION NOT SAVED")
+        print("-" * 30)
+        print("Normalization complete. Use --save to overwrite the file.")
+    
+    print("=" * 80)
     return fixed
 
 
@@ -205,7 +222,9 @@ def _normalize_all_weights_with_diffs(config: dict, defaults: dict, total: float
     # Update the user config to have the complete card_types list
     if card_types and card_types != sp.get("card_types"):
         sp["card_types"] = list(card_types)
-        print("ℹ️  Updated 'skeleton_params.card_types' to use complete canonical list.")
+        print("ℹ️  CARD TYPES UPDATED")
+        print("   " + "─" * 40)
+        print("   Updated 'skeleton_params.card_types' to use complete canonical list.")
 
     # ---- colors_weights (dict preferred; list accepted) ----
     if "colors_weights" in sp:
@@ -335,6 +354,7 @@ def _normalize_all_weights_with_diffs(config: dict, defaults: dict, total: float
                 key="skeleton_params.card_types_weights[_default]",
                 user_values=user_default_raw,
                 final_values=default_norm,
+                default_values=default_type_weights,
                 total=current_sum
             )
         else:
@@ -407,6 +427,8 @@ def _normalize_all_weights_with_diffs(config: dict, defaults: dict, total: float
                 user_sum = sum(row_num.values())
                 remaining = total - user_sum
                 
+                logging.debug(f"Processing {color_key}: user_sum={user_sum}, remaining={remaining}, missing_types={missing_types}")
+                
                 if remaining < 0:
                     print(f"⚠️  User {color_key} values sum to {user_sum} > {total}, will normalize all values")
                     # User exceeded total, fill missing from default and normalize everything
@@ -425,16 +447,23 @@ def _normalize_all_weights_with_diffs(config: dict, defaults: dict, total: float
                         missing_defaults = {t: default_norm[t] for t in missing_types}
                         missing_sum = sum(missing_defaults.values())
                         
+                        logging.debug(f"  missing_defaults={missing_defaults}")
+                        logging.debug(f"  missing_sum={missing_sum}")
+                        
                         if missing_sum > 0:
                             scale_factor = remaining / missing_sum
+                            logging.debug(f"  scale_factor={scale_factor}")
                             for t in missing_types:
                                 final_row[t] = missing_defaults[t] * scale_factor
+                                logging.debug(f"    {t}: {missing_defaults[t]} * {scale_factor} = {final_row[t]}")
                         else:
                             # No defaults for missing types, set to 0
+                            logging.debug(f"  No defaults for missing types, setting to 0")
                             for t in missing_types:
                                 final_row[t] = 0.0
                     else:
                         # No remaining space, set missing to 0
+                        logging.debug(f"  No remaining space, setting missing to 0")
                         for t in missing_types:
                             final_row[t] = 0.0
                             
@@ -464,6 +493,7 @@ def _normalize_all_weights_with_diffs(config: dict, defaults: dict, total: float
                     key=f"skeleton_params.card_types_weights[{color_key}]",
                     user_values=row_map,
                     final_values=final_rounded,
+                    default_values=default_norm,
                     total=current_sum
                 )
                 ctw[color_key] = final_rounded
@@ -566,15 +596,18 @@ def _print_list_diff(
     *,
     total: float = 100.0,
 ):
-    print(f"\n🔄 Normalized {key} (sum {round(sum(before), 6)} → {total})")
+    print(f"\n� NORMALIZING: {key}")
+    print("   " + "─" * 50)
+    print(f"   Sum: {round(sum(before), 6)} → {total}")
     if labels and len(labels) == len(after):
         for name, b, a in zip(labels, before, after):
             if _changed(b, a):
-                print(f"  • {name:>15}: {b}  →  {a}")
+                print(f"   • {name:>15}: {b:>6.1f}  →  {a:>6.1f}")
     else:
         for i, (b, a) in enumerate(zip(before, after)):
             if _changed(b, a):
-                print(f"  • idx {i:>2}: {b}  →  {a}")
+                print(f"   • idx {i:>2}: {b:>6.1f}  →  {a:>6.1f}")
+                
 def _print_dict_diff(
     key: str,
     before: dict,
@@ -582,10 +615,10 @@ def _print_dict_diff(
     *,
     total: float = 100.0,
 ):
-    print(
-        f"\n🔄 Normalized {key} "
-        f"(sum {round(sum(v for v in before.values() if isinstance(v, (int, float))), 6)} → {total})"
-    )
+    before_sum = round(sum(v for v in before.values() if isinstance(v, (int, float))), 6)
+    print(f"\n📏 NORMALIZING: {key}")
+    print("   " + "─" * 50)
+    print(f"   Sum: {before_sum} → {total}")
     all_keys = set(before.keys()) | set(after.keys())
 
     # If the dict looks like colors → use WUBRG order
@@ -600,9 +633,9 @@ def _print_dict_diff(
         a = after.get(k, 0.0)
         if _changed(b, a):
             any_changed = True
-            print(f"  • {k:>20}: {b}  →  {a}")
+            print(f"   • {k:>20}: {b:>6.1f}  →  {a:>6.1f}")
     if not any_changed:
-        print("  • (no per-item changes)")
+        print("   • (no per-item changes)")
 
 def _changed(a, b, eps: float = 1e-9) -> bool:
     try:
@@ -615,12 +648,17 @@ def _print_smart_partial_result(
     user_values: dict,
     final_values: dict,
     *,
+    default_values: dict = None,
     total: float = 100.0,
 ):
-    """Print detailed breakdown of smart partial logic showing preserved vs filled values."""
-    print(f"\n✨ Smart partial logic applied to {key} (sum {total})")
+    """Print detailed breakdown showing: User Set → Defaults Applied → Final Value."""
+    print(f"\n🔄 SMART PARTIAL LOGIC: {key}")
+    print("   " + "─" * 60)
+    print(f"   Target sum: {total:.1f}")
     
     all_keys = set(user_values.keys()) | set(final_values.keys())
+    if default_values:
+        all_keys |= set(default_values.keys())
     
     # If the dict looks like colors → use WUBRG order
     if all(k in CANONICAL_COLOR_ORDER for k in all_keys):
@@ -632,20 +670,43 @@ def _print_smart_partial_result(
     filled_keys = []
     
     for k in ordered:
-        user_val = user_values.get(k, 0.0)
+        user_val = user_values.get(k, None)
+        default_val = default_values.get(k, 0.0) if default_values else 0.0
         final_val = final_values.get(k, 0.0)
         
-        if k in user_values and user_val > 0:
+        if final_val == 0:  # Skip zero values to reduce noise
+            continue
+            
+        if user_val is not None and user_val != 0:
             preserved_keys.append((k, final_val))
-            print(f"  • {k:>20}: {final_val:<8.1f} (preserved)")
+            if default_values:
+                print(f"   • {k:>20}: {user_val:>6.1f} (user) → {'-':>8} (unused) → {final_val:>6.1f} (preserved)")
+            else:
+                print(f"   • {k:>20}: {final_val:<8.1f} (preserved)")
         elif final_val > 0:
             filled_keys.append((k, final_val))
-            print(f"  • {k:>20}: {final_val:<8.1f} (filled)")
+            if default_values:
+                print(f"   • {k:>20}: {'-':>6} (user) → {default_val:>6.1f} (default) → {final_val:>6.1f} (filled)")
+            else:
+                print(f"   • {k:>20}: {final_val:<8.1f} (filled)")
+    
+    # Show zero values user explicitly set
+    for k in ordered:
+        user_val = user_values.get(k, None)
+        final_val = final_values.get(k, 0.0)
+        
+        if user_val == 0 and k in user_values:  # User explicitly set to 0
+            if default_values:
+                default_val = default_values.get(k, 0.0)
+                print(f"   • {k:>20}: {user_val:>6.1f} (user) → {'-':>8} (overridden) → {final_val:>6.1f} (zeroed)")
+            else:
+                print(f"   • {k:>20}: {final_val:<8.1f} (user set to 0)")
     
     # Summary
     preserved_sum = sum(val for _, val in preserved_keys)
     filled_sum = sum(val for _, val in filled_keys)
-    print(f"  Summary: {preserved_sum:.1f} preserved + {filled_sum:.1f} filled = {total}")
+    print(f"   " + "─" * 60)
+    print(f"   📊 Summary: {preserved_sum:.1f} preserved + {filled_sum:.1f} filled = {total:.1f}")
 
 def _derive_card_types(ctw: dict) -> list[str]:
     """
@@ -718,22 +779,47 @@ def _validate_config_integrity(config: dict, defaults: dict) -> list[str]:
             if "_default" not in ctw:
                 issues.append("⚠️  WARNING: Missing '_default' in card_types_weights, system may behave unexpectedly")
             
-            # Check for color-specific weights without _default
-            color_keys = [k for k in ctw.keys() if k in CANONICAL_COLOR_ORDER]
-            if color_keys and "_default" not in ctw:
-                issues.append("⚠️  WARNING: Color-specific weights defined without '_default' baseline")
-            
-            # Check for extremely low or high individual type weights
-            for key, weights in ctw.items():
-                if isinstance(weights, dict):
-                    for card_type, weight in weights.items():
-                        if isinstance(weight, (int, float)):
-                            if weight < 0:
-                                issues.append(f"❌ ERROR: Negative weight in {key}.{card_type}: {weight}")
-                            elif weight > 200:  # Suspiciously high
-                                issues.append(f"⚠️  WARNING: Very high weight in {key}.{card_type}: {weight}")
+                # Check for color-specific weights without _default
+                color_keys = [k for k in ctw.keys() if k in CANONICAL_COLOR_ORDER]
+                if color_keys and "_default" not in ctw:
+                    issues.append("⚠️  WARNING: Color-specific weights defined without '_default' baseline")
+                
+                # Check for extremely low or high individual type weights
+                for key, weights in ctw.items():
+                    if isinstance(weights, dict):
+                        total_weight = sum(v for v in weights.values() if isinstance(v, (int, float)))
+                        
+                        # Check for zero-sum rows - special handling for colors
+                        if total_weight == 0:
+                            if key in CANONICAL_COLOR_ORDER:
+                                # Zero weights for a color that could be selected as primary
+                                issues.append(f"⚠️  WARNING: card_types_weights[{key}] sums to 0 - this color cannot generate cards if selected as primary color. Consider: (1) removing {key} from colors_weights, (2) setting non-zero type weights, or (3) using {key} only for color bleed.")
+                            else:
+                                # Zero weights for _default or other section is more critical
+                                issues.append(f"❌ ERROR: card_types_weights[{key}] sums to 0 - this will cause generation failures")
+                        
+                        for card_type, weight in weights.items():
+                            if isinstance(weight, (int, float)):
+                                if weight < 0:
+                                    issues.append(f"❌ ERROR: Negative weight in {key}.{card_type}: {weight}")
+                                elif weight > 200:  # Suspiciously high
+                                    issues.append(f"⚠️  WARNING: Very high weight in {key}.{card_type}: {weight}")    # 4. Check for cross-reference issues: colors with weights but no viable types
+    if "colors_weights" in sp and "card_types_weights" in sp:
+        color_weights = sp["colors_weights"]
+        type_weights = sp["card_types_weights"]
+        
+        if isinstance(color_weights, dict) and isinstance(type_weights, dict):
+            for color, color_weight in color_weights.items():
+                if isinstance(color_weight, (int, float)) and color_weight > 0:
+                    # This color can be selected as primary color
+                    if color in type_weights:
+                        color_types = type_weights[color]
+                        if isinstance(color_types, dict):
+                            total_type_weight = sum(v for v in color_types.values() if isinstance(v, (int, float)))
+                            if total_type_weight == 0:
+                                issues.append(f"⚠️  WARNING: Color '{color}' has {color_weight}% selection weight but 0% type weights - cards will have type='None' if this color is selected")
     
-    # 4. Check for deprecated or suspicious keys
+    # 5. Check for deprecated or suspicious keys
     suspicious_keys = ["card_type", "color", "rarity"]  # Common typos
     for key in sp.keys():
         if key in suspicious_keys:
@@ -762,26 +848,29 @@ def _validate_config_integrity(config: dict, defaults: dict) -> list[str]:
 def _print_validation_results(issues: list[str]):
     """Print validation issues in a organized way."""
     if not issues:
-        print("✅ Configuration validation passed - no issues found!")
+        print("✅ No issues found - configuration is valid!")
         return
     
     errors = [issue for issue in issues if "❌ ERROR:" in issue]
     warnings = [issue for issue in issues if "⚠️  WARNING:" in issue]
     
     if errors:
-        print(f"\n❌ ERRORS FOUND ({len(errors)}):")
+        print(f"\n❌ ERRORS DETECTED ({len(errors)}):")
+        print("   " + "─" * 50)
         for error in errors:
-            print(f"  {error}")
+            print(f"   {error}")
     
     if warnings:
         print(f"\n⚠️  WARNINGS ({len(warnings)}):")
+        print("   " + "─" * 50)
         for warning in warnings:
-            print(f"  {warning}")
+            print(f"   {warning}")
     
+    # Summary
     if errors:
-        print("\n🚨 Configuration has ERRORS that should be fixed before use!")
+        print(f"\n🚨 VALIDATION RESULT: {len(errors)} error(s) found - must be fixed!")
     elif warnings:
-        print("\n💡 Configuration has warnings but should work correctly.")
+        print(f"\n💡 VALIDATION RESULT: {len(warnings)} warning(s) found - should work correctly.")
 
 # ---------- CLI entrypoint ----------
 if __name__ == "__main__":

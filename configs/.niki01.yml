@@ -1,7 +1,6 @@
 square_config:
-  total_cards: 15
+  total_cards: 60
   concurrency: 4
-  sleepy_time: 2
 set_params:
   set: "Null Revelation"
   themes:
@@ -15,18 +14,6 @@ set_params:
     - "Echoes of a world lost to time, where nothing remains but dust"
     - "Stillness"
     - "The last candle flickering in endless darkness"
-
-api_params:
-  generate_image_prompt: false
-  creative: false
-  include_explanation: false
-  image_model: "dall-e-2" # options: dall-e-2, dall-e-3, none
-  model: "gpt-41"
-
-
-mtgcg_mse_config:
-  image_method: "localSD" # options: none, localSD, download
-
 skeleton_params:
   power_level: 7.5 # Power level of the card, 1-10 or None
   wildcard_supertype: false
@@ -41,8 +28,9 @@ skeleton_params:
     _default:
       kindred: 0
     white:
-      land: 5
-      basic land: 5
+      creature: 33
+      enchantment: 10
+      kindred: 5
   function_tags:
     ramp or mana fixing: 15
     draw or card advantage: 5
@@ -57,10 +45,3 @@ skeleton_params:
     Flying or other evasion: 5
     simple or straightforward: 10
   tags_maximum: 2 # Default is null, which means no limit
-
-SD_config:
-  model_swap_chance: 100
-  special_tags:
-    Comic Hard Cell Shade: 
-      weight: 2.5
-      chance: 100

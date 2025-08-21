@@ -94,8 +94,10 @@ class MerlinAIOrchestrator:
         defaults_path = config_path.parent / "DEFAULTSCONFIG.yml"
         
         if not defaults_path.exists():
-            logging.warning(f"⚠️ DEFAULTSCONFIG.yml not found at: {defaults_path}, skipping advanced validation")
-            return
+            print(f"\n❌ CRITICAL ERROR: DEFAULTSCONFIG.yml not found at: {defaults_path}")
+            print("   This file is required for configuration validation and normalization.")
+            print("   Please ensure your config file is in the configs/ directory.")
+            raise FileNotFoundError(f"Required DEFAULTSCONFIG.yml not found at {defaults_path}")
         
         try:
             print("\n🔍 RUNNING FULL CONFIGURATION CHECK...")
@@ -103,7 +105,12 @@ class MerlinAIOrchestrator:
             
             # Run the full configuration check and normalize with save option
             # This will validate, normalize weights, and show detailed analysis
-            check_and_normalize_config(self.config_path, save=save)
+            result = check_and_normalize_config(self.config_path, save=save)
+            
+            if result is None:
+                print("\n❌ CRITICAL ERROR: Configuration validation failed!")
+                print("   Please fix the errors above and try again.")
+                raise ValueError("Configuration validation failed")
             
             print("="*60)
             if save:

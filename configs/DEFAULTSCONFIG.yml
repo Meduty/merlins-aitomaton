@@ -21,7 +21,7 @@ api_params:
   generate_image_prompt: false
   creative: false
   include_explanation: false
-  image_model: "dall-e-3"
+  image_model: "dall-e-3" # options: dall-e-2, dall-e-3, none
   model: "gpt-41"
 
 
@@ -103,10 +103,10 @@ skeleton_params:
     colorless: [3, 12, 25, 23, 19, 10, 5, 2, 1]
     default: [4, 12, 22, 22, 18, 12, 6, 3, 1]
   rarities_weights:
-    common: 636
-    uncommon: 273
-    rare: 78
-    mythic: 13
+    common: 63.6
+    uncommon: 27.3
+    rare: 7.8
+    mythic: 1.3
   function_tags:
     "ramp or mana fixing": 15
     "draw or card advantage": 15

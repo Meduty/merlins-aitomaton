@@ -1,0 +1,36 @@
+square_config:
+  total_cards: 3
+  zero_type_weight_handling: "fallback"
+
+set_params:
+  set: "Zero Weight Fallback Test"
+  themes: ["Testing fallback behavior"]
+
+skeleton_params:
+  colors: ["white", "blue", "red"]
+  colors_weights:
+    white: 33.33
+    blue: 33.33
+    red: 33.34
+  
+  card_types_weights:
+    _default:
+      creature: 50.0
+      instant: 25.0
+      sorcery: 25.0
+    
+    white:
+      creature: 60.0
+      instant: 20.0
+      sorcery: 20.0
+    
+    blue:
+      creature: 30.0
+      instant: 40.0
+      sorcery: 30.0
+    
+    # Red has all zeros - should fallback to _default
+    red:
+      creature: 0.0
+      instant: 0.0
+      sorcery: 0.0

@@ -1,0 +1,23 @@
+square_config:
+  total_cards: 3
+
+set_params:
+  set: "Zero Weight Test"
+  themes: ["Testing None type handling"]
+
+skeleton_params:
+  colors: ["red"]  # Only red to guarantee it gets selected
+  colors_weights:
+    red: 100.0
+  
+  card_types_weights:
+    _default:
+      creature: 50.0
+      instant: 25.0
+      sorcery: 25.0
+    
+    # Red has all zeros - should result in type="None"
+    red:
+      creature: 0.0
+      instant: 0.0
+      sorcery: 0.0
