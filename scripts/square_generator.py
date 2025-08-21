@@ -222,7 +222,6 @@ class SkeletonParams:
         rarity_based_mutation: Optional[dict[str, list[int]]] = None,
         card_types: Optional[list[str]] = None,
         card_types_weights: Optional[dict[str, dict[str, float] | list[float]]] = None,
-        rarities: Optional[list[str]] = None,
         rarities_weights: Optional[dict[str, float] | list[float]] = None,
         function_tags: Optional[dict[str, int]] = None,  # each in percent
         tags_maximum: Optional[int] = None,  # maximum number of function tags to apply
@@ -294,9 +293,16 @@ class SkeletonParams:
             code_defaults=self.default_type_weights,
         )
 
-        if rarities is None:
-            raise ValueError("rarities must be provided in configuration")
-        self.rarities = rarities
+        if rarities_weights is None:
+            raise ValueError("rarities_weights must be provided in configuration")
+        
+        # Derive rarities from rarities_weights keys to eliminate redundancy
+        if isinstance(rarities_weights, dict):
+            self.rarities = list(rarities_weights.keys())
+        else:
+            # If it's a list, we need default rarity names (fallback for old configs)
+            self.rarities = ["common", "uncommon", "rare", "mythic"][:len(rarities_weights)]
+        
         rw = rarities_weights
         default_rw = {r: 100.0 / len(self.rarities) for r in self.rarities}
         if isinstance(rw, list):

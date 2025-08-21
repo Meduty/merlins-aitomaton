@@ -102,11 +102,6 @@ skeleton_params:
     green: [1, 9, 22, 22, 20, 15, 6, 3, 2]
     colorless: [3, 12, 25, 23, 19, 10, 5, 2, 1]
     default: [4, 12, 22, 22, 18, 12, 6, 3, 1]
-  rarities:
-    - "common"
-    - "uncommon"
-    - "rare"
-    - "mythic"
   rarities_weights:
     common: 636
     uncommon: 273

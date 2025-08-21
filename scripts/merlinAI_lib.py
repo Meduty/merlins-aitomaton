@@ -163,11 +163,22 @@ def _normalize_all_weights_with_diffs(config: dict, defaults: dict, total: float
         including optional `_default` row
     Uses labels from:
       - skeleton_params.colors
-      - skeleton_params.rarities
+      - skeleton_params.rarities (derived from rarities_weights keys)
       - skeleton_params.card_types
     Uses fallback values from defaults config.
     """
-    sp = config.get("skeleton_params", {})
+    # Ensure skeleton_params exists and merge with defaults
+    if "skeleton_params" not in config:
+        config["skeleton_params"] = {}
+    
+    # Merge skeleton_params with defaults (user values take precedence)
+    default_sp = defaults.get("skeleton_params", {})
+    sp = config["skeleton_params"]
+    
+    # Merge missing keys from defaults
+    for key, value in default_sp.items():
+        if key not in sp:
+            sp[key] = value
     if not isinstance(sp, dict):
         print("⚠️  'skeleton_params' missing or not a dict; nothing to do.")
         return config
@@ -176,7 +187,16 @@ def _normalize_all_weights_with_diffs(config: dict, defaults: dict, total: float
     default_sp = defaults.get("skeleton_params", {})
     
     colors = sp.get("colors", default_sp.get("colors", []))
-    rarities = sp.get("rarities", default_sp.get("rarities", []))
+    
+    # Derive rarities from rarities_weights keys (eliminate redundancy)
+    # After merge, rarities_weights should always be available from defaults
+    rarities_weights = sp.get("rarities_weights", {})
+    if isinstance(rarities_weights, dict):
+        rarities = list(rarities_weights.keys())
+    else:
+        # This should not happen if DEFAULTSCONFIG.yml is properly structured
+        print("⚠️  rarities_weights not found or not a dict - configuration may be incomplete")
+        rarities = []
     
     # Always use canonical_card_types from defaults as the authoritative list
     # Don't derive from user's partial config as this loses missing types
