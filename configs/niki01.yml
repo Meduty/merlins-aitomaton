@@ -30,6 +30,7 @@ skeleton_params:
     white:
       creature: 33
       enchantment: 10
+      kindred: 5
   function_tags:
     ramp or mana fixing: 15
     draw or card advantage: 5

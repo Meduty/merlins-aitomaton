@@ -2,34 +2,45 @@ square_config:
   total_cards: 60
   concurrency: 4
 set_params:
-  set: "Monkeys in Space"
+  set: Monkeys in Space
   themes:
-    - "Space"
-    - "Monkeys"
-    - "Chaos"
-    - "Adventure"
-    - "Exploration"
-    - "Surrealism"
-    - "Absurdity"
-    - "Humor"
-    - "Intergalactic"
-    - "Futurism"
+  - Space
+  - Monkeys
+  - Chaos
+  - Adventure
+  - Exploration
+  - Surrealism
+  - Absurdity
+  - Humor
+  - Intergalactic
+  - Futurism
 skeleton_params:
-  power_level: 7.5 # Power level of the card, 1-10 or None
+  power_level: 7.5
   wildcard_supertype: false
-  fixed_amount_themes: 0 # if not zero, will select a fixed amount of themes from the available ones instead of mutating them randomly
-  mutation_chance_per_theme: 12.5 # Chance to mutate each theme, ignored if fixed_amount_themes is not zero
-  colors: ["green", "red", "colorless"]
+  fixed_amount_themes: 0
+  mutation_chance_per_theme: 12.5
+  colors:
+  - green
+  - red
+  - colorless
   colors_weights:
-    green: 55
-    red: 25
-    colorless: 10
+    red: 27.8
+    green: 61.1
+    colorless: 11.1
   card_types_weights:
     _default:
-      kindred: 0
-      creature: 45
-      land: 20
-      basic land: 20
+      creature: 45.0
+      land: 20.0
+      basic land: 20.0
+      kindred: 0.0
+      battle: 0.9
+      sorcery: 4.1
+      instant: 3.6
+      saga: 0.9
+      artifact creature: 0.5
+      planeswalker: 0.5
+      artifact: 0.9
+      enchantment: 3.6
   function_tags:
     ramp or mana fixing: 15
     draw or card advantage: 5
@@ -41,4 +52,17 @@ skeleton_params:
     activated ability: 5
     Flying or other evasion: 5
     simple or straightforward: 10
-  tags_maximum: 2 # Default is null, which means no limit
+  tags_maximum: 2
+  card_types:
+  - creature
+  - artifact creature
+  - planeswalker
+  - instant
+  - sorcery
+  - enchantment
+  - saga
+  - battle
+  - land
+  - basic land
+  - artifact
+  - kindred

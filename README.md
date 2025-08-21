@@ -20,18 +20,24 @@ python merlinAI.py --verbose
 # Use custom configuration
 python merlinAI.py my_config.yml
 
+# Check configuration without running any steps
+python merlinAI.py my_config.yml --check
+
 # Batch mode - run all steps automatically with clean progress bars
-python merlinAI.py --batch cards mse images
+python merlinAI.py --batch cards mse
 
 # Batch mode with full logging for debugging
-python merlinAI.py my_config.yml --batch cards mse images --verbose
+python merlinAI.py my_config.yml --batch cards mse --verbose
 
 # Run specific steps only
 python merlinAI.py --batch cards         # Only generate cards
-python merlinAI.py --batch mse images   # Only convert and generate images
+python merlinAI.py --batch mse           # Only convert to MSE (includes images)
 ```
 
-> **📋 Note**: For image generation, see the [Required Stable Diffusion Models](#4-required-stable-diffusion-models) section below for model setup.
+> **📋 Note**: Image generation is handled automatically by the MSE conversion step based on your `mtgcg_mse_config.image_method` setting. Options are:
+> - `"download"` - Download images from external API
+> - `"localSD"` - Generate with local Stable Diffusion
+> - `"none"` - No images (text-only cards)
 
 ### Progress Bar Modes
 
@@ -46,11 +52,8 @@ You can also run individual components:
 # 1. Generate cards (outputs to output/{config_name}/{config_name}_cards.json)
 python scripts/square_generator.py [config.yml]
 
-# 2. Convert to Magic Set Editor format (reads from config subdirectory)
+# 2. Convert to MSE + handle images (based on config image_method)
 python scripts/MTGCG_mse.py [config.yml]
-
-# 3. Generate images with Stable Diffusion
-python scripts/imagesSD.py [config.yml]
 ```
 
 ### Output Organization
@@ -69,6 +72,24 @@ output/
     ├── another_config_cards.json
     └── another_config-mse-out.mse-set
 ```
+
+### Configuration Validation
+
+Before running any generation steps, you can validate your configuration:
+
+```bash
+# Check configuration without running any steps
+python merlinAI.py configs/my_config.yml --check
+
+# This will show:
+# - Configuration validation results  
+# - Prerequisite checks (API keys, dependencies)
+# - Output directory structure
+# - Existing output files
+# - Detailed config summary
+```
+
+The `--check` flag is equivalent to running interactive mode and answering "no" to all generation steps - perfect for debugging configuration issues.
 
 ---
 

@@ -78,8 +78,7 @@ class MerlinAIOrchestrator:
             config = config_manager.load_config(self.config_path)
             logging.info(f"✅ Configuration loaded from {self.config_path}")
             
-            # Validate configuration integrity
-            self._validate_config(config)
+            # Basic validation will be done in check_mode with save option
             
             return config
         except FileNotFoundError:
@@ -89,8 +88,8 @@ class MerlinAIOrchestrator:
             logging.error(f"❌ Error loading config: {e}")
             sys.exit(1)
     
-    def _validate_config(self, config: Dict[str, Any]):
-        """Validate configuration using merlinAI_lib full check."""
+    def _run_config_validation(self, save: bool = False):
+        """Run full configuration validation using merlinAI_lib with optional save."""
         config_path = Path(self.config_path)
         defaults_path = config_path.parent / "DEFAULTSCONFIG.yml"
         
@@ -102,12 +101,15 @@ class MerlinAIOrchestrator:
             print("\n🔍 RUNNING FULL CONFIGURATION CHECK...")
             print("="*60)
             
-            # Run the full configuration check and normalize
+            # Run the full configuration check and normalize with save option
             # This will validate, normalize weights, and show detailed analysis
-            check_and_normalize_config(self.config_path, save=False)
+            check_and_normalize_config(self.config_path, save=save)
             
             print("="*60)
-            print("📋 Configuration check complete - proceeding with validated config")
+            if save:
+                print("💾 Configuration saved with normalized values")
+            else:
+                print("📋 Configuration check complete - use --save to write changes")
             print()  # Add spacing after validation results
                 
         except Exception as e:
@@ -139,6 +141,10 @@ class MerlinAIOrchestrator:
         print(f"🤖 AI Model: {api_params.get('model', 'N/A')}")
         print(f"🎨 Image Model: {api_params.get('image_model', 'N/A')}")
         print(f"💡 Generate Image Prompts: {api_params.get('generate_image_prompt', 'N/A')}")
+        
+        # MSE/Image settings
+        mse_config = self.config.get("mtgcg_mse_config", {})
+        print(f"🖼️ Image Method: {mse_config.get('image_method', 'N/A')}")
         
         # Set information
         set_params = self.config.get("set_params", {})
@@ -238,9 +244,10 @@ class MerlinAIOrchestrator:
             print(f"❌ Unexpected error during card generation: {e}")
             return False
     
-    def run_mse_conversion(self, method: str = "download") -> bool:
-        """Run the Magic Set Editor conversion step."""
-        print(f"\n📋 RUNNING MSE CONVERSION (method: {method})...")
+    def run_mse_conversion(self) -> bool:
+        """Run the Magic Set Editor conversion step (includes image handling)."""
+        current_image_method = self.config.get("mtgcg_mse_config", {}).get("image_method", "download")
+        print(f"\n📋 RUNNING MSE CONVERSION + IMAGES (method: {current_image_method})...")
         
         cmd = [sys.executable, str(self.scripts_dir / "MTGCG_mse.py"), self.config_path]
         
@@ -250,7 +257,7 @@ class MerlinAIOrchestrator:
             # Use streaming output so progress bars are visible
             result = subprocess.run(cmd, check=True, text=True, env=self._get_subprocess_env())
             
-            print("✅ MSE conversion completed successfully!")
+            print("✅ MSE conversion + image handling completed successfully!")
             return True
             
         except subprocess.CalledProcessError as e:
@@ -260,43 +267,13 @@ class MerlinAIOrchestrator:
             print(f"❌ Unexpected error during MSE conversion: {e}")
             return False
     
-    def run_image_generation(self) -> bool:
-        """Run the Stable Diffusion image generation step."""
-        print("\n🎨 RUNNING IMAGE GENERATION...")
-        
-        # Check if cards file exists in config subdirectory
-        output_dir = Path(self.config["square_config"]["output_dir"])
-        config_name = Path(self.config_path).stem
-        config_subdir = output_dir / config_name
-        cards_file = config_subdir / f"{config_name}_cards.json"
-        
-        if not cards_file.exists():
-            print(f"❌ Card data file not found: {cards_file}")
-            print("   Please run card generation first!")
-            return False
-        
-        cmd = [sys.executable, str(self.scripts_dir / "imagesSD.py"), self.config_path]
-        
-        try:
-            if self.verbose:
-                logging.info(f"Executing: {' '.join(cmd)}")
-            # Use streaming output so progress bars are visible
-            result = subprocess.run(cmd, check=True, text=True, env=self._get_subprocess_env())
-            
-            print("✅ Image generation completed successfully!")
-            return True
-            
-        except subprocess.CalledProcessError as e:
-            print(f"❌ Image generation failed with exit code {e.returncode}")
-            return False
-        except Exception as e:
-            print(f"❌ Unexpected error during image generation: {e}")
-            return False
-    
     def interactive_mode(self):
         """Run the orchestrator in interactive mode."""
         print("\n🚀 WELCOME TO MERLINAI - MTG CARD GENERATION ORCHESTRATOR")
         print("="*65)
+        
+        # Run config validation for interactive mode (no save)
+        self._run_config_validation(save=False)
         
         # Display configuration summary
         self.display_config_summary()
@@ -309,8 +286,8 @@ class MerlinAIOrchestrator:
         
         print("\n🎯 PIPELINE STEPS:")
         print("   1. Generate Cards (square_generator.py)")
-        print("   2. Convert to MSE (MTGCG_mse.py)")
-        print("   3. Generate Images (imagesSD.py)")
+        print("   2. Convert to MSE + Images (MTGCG_mse.py)")
+        print("      └─ Images handled via config 'image_method' setting")
         
         # Step 1: Card Generation
         print("\n" + "="*50)
@@ -349,23 +326,14 @@ class MerlinAIOrchestrator:
         else:
             print("⏭️ Skipping card generation...")
         
-        # Step 2: MSE Conversion
+        # Step 2: MSE Conversion + Images
         print("\n" + "="*50)
-        if self.ask_user_confirmation("📋 Convert cards to Magic Set Editor format?"):
+        current_image_method = self.config.get("mtgcg_mse_config", {}).get("image_method", "download")
+        if self.ask_user_confirmation(f"📋 Convert cards to MSE format + handle images (method: {current_image_method})?"):
             if not self.run_mse_conversion():
-                if not self.ask_user_confirmation("Continue with image generation despite MSE failure?", default=True):
-                    print("❌ Stopping pipeline due to MSE conversion failure.")
-                    return
+                print("❌ MSE conversion failed.")
         else:
             print("⏭️ Skipping MSE conversion...")
-        
-        # Step 3: Image Generation
-        print("\n" + "="*50)
-        if self.ask_user_confirmation("🎨 Generate Stable Diffusion images for cards?"):
-            if not self.run_image_generation():
-                print("❌ Image generation failed.")
-        else:
-            print("⏭️ Skipping image generation...")
         
         print("\n🎉 PIPELINE COMPLETE!")
         print("="*30)
@@ -415,6 +383,9 @@ class MerlinAIOrchestrator:
         """Run the orchestrator in batch mode with specified steps."""
         print(f"\n🤖 RUNNING BATCH MODE: {' -> '.join(steps)}")
         
+        # Run config validation for batch mode (no save)
+        self._run_config_validation(save=False)
+        
         success = True
         
         if "cards" in steps:
@@ -423,14 +394,65 @@ class MerlinAIOrchestrator:
         if "mse" in steps and success:
             success &= self.run_mse_conversion()
         
-        if "images" in steps and success:
-            success &= self.run_image_generation()
+        # Note: 'images' step is handled within MTGCG_mse.py based on config
+        if "images" in steps:
+            print("ℹ️  Images are handled automatically by the MSE conversion step")
+            print("   Configure 'mtgcg_mse_config.image_method' in your config file")
         
         if success:
             print("\n🎉 BATCH PROCESSING COMPLETE!")
         else:
             print("\n❌ BATCH PROCESSING FAILED!")
             sys.exit(1)
+
+    def check_mode(self, save: bool = False):
+        """Check configuration and display summary without running any steps."""
+        print("\n🔍 CONFIGURATION CHECK MODE")
+        print("="*50)
+        
+        # Run full configuration validation with optional save
+        self._run_config_validation(save=save)
+        
+        # Display configuration summary
+        self.display_config_summary()
+        
+        # Check prerequisites 
+        print("\n🔧 PREREQUISITE CHECK:")
+        prereq_ok = self.check_prerequisites()
+        
+        if prereq_ok:
+            print("✅ All prerequisites satisfied!")
+        else:
+            print("⚠️  Some prerequisites have issues (see above)")
+        
+        # Check output directory structure
+        print("\n📁 OUTPUT DIRECTORY STRUCTURE:")
+        output_dir = Path(self.config["square_config"]["output_dir"])
+        config_name = Path(self.config_path).stem
+        config_subdir = output_dir / config_name
+        
+        print(f"   Base output directory: {output_dir}")
+        print(f"   Config subdirectory: {config_subdir}")
+        print(f"   Cards file would be: {config_subdir / f'{config_name}_cards.json'}")
+        print(f"   MSE set file would be: {config_subdir / f'{config_name}-mse-out.mse-set'}")
+        
+        # Check if output files already exist
+        cards_file = config_subdir / f"{config_name}_cards.json"
+        mse_file = config_subdir / f"{config_name}-mse-out.mse-set"
+        
+        print("\n📊 EXISTING OUTPUT FILES:")
+        if cards_file.exists():
+            print(f"   ✅ Cards file exists: {cards_file}")
+        else:
+            print(f"   ❌ Cards file not found: {cards_file}")
+            
+        if mse_file.exists():
+            print(f"   ✅ MSE set file exists: {mse_file}")
+        else:
+            print(f"   ❌ MSE set file not found: {mse_file}")
+        
+        print(f"\n✅ Configuration check complete for: {self.config_path}")
+        print("   Use without --check to run the pipeline.")
 
 
 def main():
@@ -441,9 +463,11 @@ def main():
         epilog="""
 Examples:
   %(prog)s                                    # Interactive mode
-  %(prog)s --batch cards mse images          # Run all steps
+  %(prog)s --batch cards mse                 # Run all steps
   %(prog)s --batch cards                     # Only generate cards
-  %(prog)s my_config.yml --batch mse # Use custom config, run MSE only
+  %(prog)s my_config.yml --batch mse         # Use custom config, run MSE only
+  %(prog)s my_config.yml --check             # Check config without running
+  %(prog)s my_config.yml --check --save      # Check config and save normalized values
         """
     )
     
@@ -458,7 +482,7 @@ Examples:
         "--batch", 
         nargs="*",
         choices=["cards", "mse", "images"],
-        help="Run in batch mode with specified steps"
+        help="Run in batch mode with specified steps (images handled by mse step)"
     )
     
     parser.add_argument(
@@ -467,7 +491,23 @@ Examples:
         help="Enable verbose logging"
     )
     
+    parser.add_argument(
+        "--check",
+        action="store_true",
+        help="Check configuration and display summary without running any steps"
+    )
+    
+    parser.add_argument(
+        "--save",
+        action="store_true",
+        help="Save normalized configuration changes when using --check (overwrites config file)"
+    )
+    
     args = parser.parse_args()
+    
+    # Validate argument combinations
+    if args.save and not args.check:
+        parser.error("--save can only be used with --check")
     
     # Setup logging based on verbose flag
     setup_logging(verbose=args.verbose)
@@ -476,7 +516,9 @@ Examples:
     orchestrator = MerlinAIOrchestrator(args.config, verbose=args.verbose)
     
     # Run in appropriate mode
-    if args.batch is not None:
+    if args.check:
+        orchestrator.check_mode(save=args.save)
+    elif args.batch is not None:
         orchestrator.batch_mode(args.batch)
     else:
         orchestrator.interactive_mode()
