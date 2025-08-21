@@ -1078,6 +1078,10 @@ if __name__ == "__main__":
     config = config_manager.load_config(args.config)
     config = config_manager.apply_cli_overrides(config, args)
     
+    # Extract config filename for output naming
+    config_path = args.config
+    config_name = os.path.splitext(os.path.basename(config_path))[0]  # Remove extension
+    
     # Extract configuration values
     total_cards = config["square_config"]["total_cards"]
     concurrency = config["square_config"]["concurrency"]
@@ -1180,8 +1184,9 @@ if __name__ == "__main__":
     logging.info("=== End of Generation ===")
 
     outdir = config["square_config"]["output_dir"]
-    os.makedirs(outdir, exist_ok=True)
-    outname = os.path.join(outdir, "generated_cards.json")
+    config_outdir = os.path.join(outdir, config_name)
+    os.makedirs(config_outdir, exist_ok=True)
+    outname = os.path.join(config_outdir, f"{config_name}_cards.json")
 
     with open(outname, "w") as f:
         json.dump(metrics.all_cards, f, indent=2)

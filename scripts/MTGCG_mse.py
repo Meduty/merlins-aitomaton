@@ -186,7 +186,7 @@ def card_to_mse_block(index: int, card: dict, ai: OpenAI):
     colorIdentity = card.get("colorIdentity", "")
     rarity = card.get("rarity").lower()
     oracle = card.get("oracleText", "")
-    flavour = card.get("flavorText", "")
+    flavour = card.get("flavorText") or ""
     pt = (
         card.get("pt", "")
         .replace("Starting Loyalty: ", "")
@@ -442,16 +442,27 @@ def export_to_zip(output_text, cards, image_method="download", output_dir="outpu
                 file_path = os.path.join(root, file)
                 arcname = os.path.relpath(file_path, output_dir)
                 zipf.write(file_path, arcname=arcname)
+    
+    # Clean up the mse-out directory after successful zipping
+    try:
+        shutil.rmtree(output_dir)
+        logging.info(f"Cleaned up temporary directory: {output_dir}")
+    except Exception as e:
+        logging.warning(f"Failed to clean up temporary directory {output_dir}: {e}")
 
 
-def main_with_config(config_path=None):
+def main_with_config(config_path=None, config=None):
     """Main function that loads config and runs the MSE conversion."""
     global max_retries, retry_delay, timeout, image_method, model_swap_chance, sleepy_time, concurrency
     
     if config_path is None:
-        config_path = "configs/config.yml"
+        config_path = "configs/user.yml"
     
-    config = config_manager.load_config(config_path)
+    if config is None:
+        config = config_manager.load_config(config_path)
+    
+    # Extract config filename for input naming
+    config_name = os.path.splitext(os.path.basename(config_path))[0]
     
     # Extract config values (no fallbacks - values guaranteed by config validation)
     max_retries = config["http_config"]["retries"]
@@ -464,9 +475,18 @@ def main_with_config(config_path=None):
     
     with logging_redirect_tqdm():
         outdir = config["square_config"]["output_dir"]
-        cardsjson = os.path.join(outdir, "generated_cards.json")
+        config_outdir = os.path.join(outdir, config_name)
+        cardsjson = os.path.join(config_outdir, f"{config_name}_cards.json")
+        
+        if not os.path.exists(cardsjson):
+            logging.error(f"Cards file not found: {cardsjson}")
+            logging.error("Please run square_generator.py first to generate cards.")
+            return
+        
         with open(cardsjson, "r", encoding="utf-8") as f:
             cards_data = json.load(f)
+
+        logging.info(f"Loaded {len(cards_data)} cards from {cardsjson}")
 
         openai_client = None
 
@@ -474,7 +494,13 @@ def main_with_config(config_path=None):
         time.sleep(sleepy_time)
         mse_output = convert_cards(cards_data, ai=openai_client)
 
-        mse_outpath = os.path.join(outdir, "mse-out")
+        mse_outpath = os.path.join(config_outdir, "mse-out")
+        
+        # Clean up previous mse-out directory to prevent accumulation of old images
+        if os.path.exists(mse_outpath):
+            logging.info(f"Cleaning up previous mse-out directory: {mse_outpath}")
+            shutil.rmtree(mse_outpath)
+            time.sleep(sleepy_time)
 
         # Extract config name for file prefixing (remove path and extension)
         config_name = os.path.splitext(os.path.basename(config_path))[0]
@@ -492,7 +518,7 @@ def main_with_config(config_path=None):
         )
 
         # Calculate the zip filename for logging (same logic as in export_to_zip)
-        zip_filename = os.path.join(outdir, f"{config_name}-{os.path.basename(mse_outpath)}.mse-set")
+        zip_filename = os.path.join(config_outdir, f"{config_name}-{os.path.basename(mse_outpath)}.mse-set")
         logging.info(f"Packaged set into {zip_filename}")
         time.sleep(sleepy_time)
         logging.info("=== Conversion complete ===")
@@ -503,11 +529,16 @@ if __name__ == "__main__":
     import argparse
     
     parser = argparse.ArgumentParser(description="Convert MTG Card Generator JSON to MSE (Magic Set Editor) format")
-    parser.add_argument("config", nargs="?", default="configs/config.yml", 
-                       help="Path to configuration file (default: configs/config.yml)")
-    parser.add_argument("--output-dir", help="Override output directory") # is not used
+    parser.add_argument("config", nargs="?", default="configs/user.yml", 
+                       help="Path to configuration file (default: configs/user.yml)")
+    parser.add_argument("--output-dir", help="Override output directory")
     
     args = parser.parse_args()
     config_path = args.config
     
-    main_with_config(config_path)
+    # Load and apply overrides if needed
+    config = config_manager.load_config(config_path)
+    if args.output_dir:
+        config["square_config"]["output_dir"] = args.output_dir
+    
+    main_with_config(config_path, config)

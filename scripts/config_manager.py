@@ -75,10 +75,10 @@ def parse_args():
     """
     parser = argparse.ArgumentParser(description="MTG Card Generator")
     parser.add_argument(
-        "--config", 
-        "-c", 
-        type=str, 
-        help="Path to user configuration file (YAML)"
+        "config",
+        nargs="?",
+        default="configs/user.yml",
+        help="Path to user configuration file (YAML) (default: configs/user.yml)"
     )
     parser.add_argument(
         "--total-cards",

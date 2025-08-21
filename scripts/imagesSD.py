@@ -559,8 +559,8 @@ if __name__ == "__main__":
         import config_manager
     
     parser = argparse.ArgumentParser(description="Generate Stable Diffusion images for MTG cards")
-    parser.add_argument("config", nargs="?", default="configs/config.yml", 
-                       help="Path to configuration file (default: configs/config.yml)")
+    parser.add_argument("config", nargs="?", default="configs/user.yml", 
+                       help="Path to configuration file (default: configs/user.yml)")
     
     args = parser.parse_args()
     
@@ -570,12 +570,16 @@ if __name__ == "__main__":
         logging.error(f"Config file {args.config} not found")
         sys.exit(1)
 
+    # Extract config filename for input naming
+    config_name = os.path.splitext(os.path.basename(args.config))[0]
+
     # Config values will be extracted within generate_images_from_dict function
     logging.info("Starting image generation from JSON...")
     sleepy_time = config["SD_config"]["sleepy_time"]
     time.sleep(sleepy_time)
     outdir = config["square_config"]["output_dir"]
-    cardsjson = os.path.join(outdir, "generated_cards.json")
+    config_outdir = os.path.join(outdir, config_name)
+    cardsjson = os.path.join(config_outdir, f"{config_name}_cards.json")
     
     try:
         with open(cardsjson, "r", encoding="utf-8") as f:

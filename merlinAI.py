@@ -210,8 +210,8 @@ class MerlinAIOrchestrator:
         """Run the card generation step."""
         print("\n🎲 RUNNING CARD GENERATION...")
         
-        # Build command
-        cmd = [sys.executable, str(self.scripts_dir / "square_generator.py"), "--config", self.config_path]
+        # Build command - config is positional argument
+        cmd = [sys.executable, str(self.scripts_dir / "square_generator.py"), self.config_path]
         
         # Add CLI overrides
         for key, value in overrides.items():
@@ -264,9 +264,11 @@ class MerlinAIOrchestrator:
         """Run the Stable Diffusion image generation step."""
         print("\n🎨 RUNNING IMAGE GENERATION...")
         
-        # Check if generated_cards.json exists
+        # Check if cards file exists in config subdirectory
         output_dir = Path(self.config["square_config"]["output_dir"])
-        cards_file = output_dir / "generated_cards.json"
+        config_name = Path(self.config_path).stem
+        config_subdir = output_dir / config_name
+        cards_file = config_subdir / f"{config_name}_cards.json"
         
         if not cards_file.exists():
             print(f"❌ Card data file not found: {cards_file}")
@@ -441,15 +443,15 @@ Examples:
   %(prog)s                                    # Interactive mode
   %(prog)s --batch cards mse images          # Run all steps
   %(prog)s --batch cards                     # Only generate cards
-  %(prog)s --config my_config.yml --batch mse # Use custom config, run MSE only
+  %(prog)s my_config.yml --batch mse # Use custom config, run MSE only
         """
     )
     
     parser.add_argument(
         "config", 
         nargs="?", 
-        default="configs/config.yml",
-        help="Path to configuration file (default: configs/config.yml)"
+        default="configs/user.yml",
+        help="Path to configuration file (default: configs/user.yml)"
     )
     
     parser.add_argument(

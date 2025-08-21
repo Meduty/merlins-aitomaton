@@ -17,18 +17,18 @@ python merlinAI.py
 # Verbose mode - full debugging output  
 python merlinAI.py --verbose
 
+# Use custom configuration
+python merlinAI.py my_config.yml
+
 # Batch mode - run all steps automatically with clean progress bars
 python merlinAI.py --batch cards mse images
 
 # Batch mode with full logging for debugging
-python merlinAI.py --batch cards mse images --verbose
+python merlinAI.py my_config.yml --batch cards mse images --verbose
 
 # Run specific steps only
 python merlinAI.py --batch cards         # Only generate cards
 python merlinAI.py --batch mse images   # Only convert and generate images
-
-# Use custom configuration
-python merlinAI.py my_config.yml --batch cards mse
 ```
 
 > **📋 Note**: For image generation, see the [Required Stable Diffusion Models](#4-required-stable-diffusion-models) section below for model setup.
@@ -43,14 +43,31 @@ python merlinAI.py my_config.yml --batch cards mse
 You can also run individual components:
 
 ```bash
-# 1. Generate cards
-python scripts/square_generator.py --config configs/config.yml
+# 1. Generate cards (outputs to output/{config_name}/{config_name}_cards.json)
+python scripts/square_generator.py [config.yml]
 
-# 2. Convert to Magic Set Editor format
-python scripts/MTGCG_mse.py configs/config.yml
+# 2. Convert to Magic Set Editor format (reads from config subdirectory)
+python scripts/MTGCG_mse.py [config.yml]
 
 # 3. Generate images with Stable Diffusion
-python scripts/imagesSD.py configs/config.yml
+python scripts/imagesSD.py [config.yml]
+```
+
+### Output Organization
+
+Each configuration creates its own organized subdirectory:
+
+```
+output/
+├── user/                          # Default config outputs
+│   ├── user_cards.json           # Generated cards
+│   └── user-mse-out.mse-set      # MSE set file
+├── my_custom_config/              # Custom config outputs
+│   ├── my_custom_config_cards.json
+│   └── my_custom_config-mse-out.mse-set
+└── another_config/
+    ├── another_config_cards.json
+    └── another_config-mse-out.mse-set
 ```
 
 ---
@@ -75,10 +92,14 @@ python scripts/imagesSD.py configs/config.yml
 - **🔧 External Configuration Management:**  
   All parameters managed via YAML configuration files with strict validation, fast-failing error handling, and CLI overrides.
 
+- **📁 Organized Output Structure:**  
+  Each configuration generates outputs in its own subdirectory, preventing overwrites and keeping projects organized.
+
 - **⚡ Concurrent Processing:**  
   Multi-threaded generation with real-time progress tracking, thread-safe operations, and clean progress visualization.
 
 - **🛡️ Robust Error Handling:**  
+  Comprehensive error handling with automatic retries, authentication recovery, and detailed logging.  
   Comprehensive validation, graceful failure recovery, detailed logging (when verbose), and fast-failing configuration validation.
 
 ---
@@ -145,11 +166,33 @@ Generating card information: 100%|████████████| 4/4 [Ela
 
 MerlinAI uses a **strict configuration system** with **fast-failing validation**:
 
-- **📋 YAML Configuration**: All settings in `configs/config.yml`
+- **📋 YAML Configuration**: All settings in `configs/user.yml` (default) or custom config files
 - **🚫 No Global Variables**: Configuration passed as function parameters
 - **⚡ Fast Failing**: Missing or invalid config causes immediate errors
 - **✅ Type Validation**: All values validated for correct types and ranges
 - **🔄 Runtime Loading**: Configuration loaded at execution time from CLI arguments
+- **📁 Organized Outputs**: Each config creates its own output subdirectory
+
+### Configuration Files
+
+- **`configs/user.yml`**: Default configuration (rename from old `config.yml`)
+- **`configs/DEFAULTSCONFIG.yml`**: Base defaults (do not modify)
+- **Custom configs**: Create `configs/myname.yml` for project-specific settings
+
+### CLI Overrides
+
+All scripts support command-line overrides:
+
+```bash
+# Override output directory
+python scripts/square_generator.py --output-dir /tmp/my_cards
+
+# Override card count and concurrency
+python scripts/square_generator.py --total-cards 10 --concurrency 2
+
+# Use custom config with overrides
+python scripts/square_generator.py my_project.yml --total-cards 20
+```
 
 ---
 
