@@ -1,0 +1,20 @@
+square_config:
+  total_cards: 5  # Valid now
+  concurrency: 25  # Should trigger warning
+
+skeleton_params:
+  types_mode: normal
+  colors_weights:
+    white: 0
+    blue: 0
+    black: 0
+    red: 0  
+    green: 0
+    colorless: 0  # All zeros should trigger error
+  rarities_weights:
+    common: 0
+    uncommon: 0  # All zeros should trigger error
+  card_types_weights:
+    _default:
+      creature: 0
+      artifact: 0  # All zeros should trigger error

@@ -43,6 +43,7 @@ set_params:
     - "Legendary artifacts"
 
 skeleton_params:
+  types_mode: normal  # normal (play-ready) | square 
   canonical_card_types:
     - "creature"
     - "artifact creature"
@@ -58,9 +59,6 @@ skeleton_params:
     - "kindred"
   ### used for decks
   card_types_weights:
-    _squareDefaults: # doesnt do anything
-      basic land: 5
-      land: 5
     _default:
       creature: 30
       artifact creature: 1
@@ -74,6 +72,11 @@ skeleton_params:
       basic land: 18
       artifact: 2
       kindred: 1
+    _squareDefaults:
+      creature: 50  # Override: more creatures
+      land: 5      # Override: fewer lands  
+      basic land: 5 # Override: fewer basic lands
+      # Missing types will be filled from _default proportionally
     colorless:
       artifact: 70
       "artifact creature": 30

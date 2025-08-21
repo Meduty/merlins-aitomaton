@@ -28,6 +28,7 @@ mtgcg_mse_config:
   image_method: "localSD" # options: none, localSD, download
 
 skeleton_params:
+  types_mode: normal
   power_level: 7.5 # Power level of the card, 1-10 or None
   wildcard_supertype: false
   fixed_amount_themes: 0 # if not zero, will select a fixed amount of themes from the available ones instead of mutating them randomly

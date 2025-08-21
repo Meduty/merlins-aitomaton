@@ -116,28 +116,44 @@ def check_and_normalize_config(config_path: str, save: bool = False, total: floa
     with open(path, "r") as f:
         config = yaml.safe_load(f) or {}
 
-    # Perform validation checks before normalization
+    # Validate user config structure before merging with defaults
     print("=" * 80)
     print("🔍 CONFIGURATION VALIDATION & NORMALIZATION")
     print("=" * 80)
     
-    print("\n📋 Validating configuration...")
+    print("\n📋 Validating user configuration structure...")
+    print("-" * 40)
+    user_validation_issues = _validate_user_config_structure(config)
+    should_stop_early = _print_validation_results(user_validation_issues)
+    
+    if should_stop_early:
+        print("\n" + "=" * 80)
+        return None
+
+    # Simple validation check - just ensure basic structure is OK
+    print("\n📋 Validating merged configuration...")
     print("-" * 40)
     validation_issues = _validate_config_integrity(config, defaults)
-    _print_validation_results(validation_issues)
+    should_stop = _print_validation_results(validation_issues)
     
-    # Check if there are critical errors that should stop processing
-    critical_errors = [issue for issue in validation_issues if "❌ ERROR:" in issue]
-    if critical_errors:
-        print("\n🛑 CRITICAL ERRORS DETECTED")
-        print("-" * 40)
-        print("Stopping due to critical errors. Please fix the errors above and try again.")
-        print("=" * 80)
+    # Stop processing if critical errors were found
+    if should_stop:
+        print("\n" + "=" * 80)
         return None
 
     print("\n📊 WEIGHT NORMALIZATION")
     print("-" * 40)
     fixed = _normalize_all_weights_with_diffs(config, defaults, total=total)
+    
+    # Final validation after normalization to catch types_mode profile issues
+    print("\n📋 Final validation after normalization...")
+    print("-" * 40)
+    final_issues = _validate_final_config(fixed)
+    final_stop = _print_validation_results(final_issues)
+    
+    if final_stop:
+        print("\n" + "=" * 80)
+        return None
 
     if save:
         with open(path, "w") as f:
@@ -200,9 +216,6 @@ def _normalize_all_weights_with_diffs(config: dict, defaults: dict, total: float
         print("⚠️  'skeleton_params' missing or not a dict; nothing to do.")
         return config
 
-    # Get defaults for skeleton_params
-    default_sp = defaults.get("skeleton_params", {})
-    
     colors = sp.get("colors", default_sp.get("colors", []))
     
     # Derive rarities from rarities_weights keys (eliminate redundancy)
@@ -285,7 +298,76 @@ def _normalize_all_weights_with_diffs(config: dict, defaults: dict, total: float
         
         # Get default type weights from defaults config (now in card_types_weights._default)
         default_sp_ctw = default_sp.get("card_types_weights", {})
-        default_type_weights = default_sp_ctw.get("_default", {})
+        base_defaults = default_sp_ctw.get("_default", {})
+        
+        # Apply types_mode profile overlay if specified
+        types_mode = sp.get("types_mode", "normal")
+        if types_mode != "normal":
+            profile_key = f"_{types_mode}Defaults"
+            if profile_key in default_sp_ctw:
+                # Apply smart partial logic for profile overlay: base_defaults → profile overlay
+                profile_weights = default_sp_ctw[profile_key]
+                
+                # Coerce profile values to numeric
+                profile_numeric = {}
+                for t in card_types:
+                    if t in profile_weights:
+                        try:
+                            profile_numeric[t] = float(profile_weights[t])
+                        except Exception:
+                            print(f"⚠️  Skipping non-numeric profile value for type {t!r}: {profile_weights[t]!r}")
+                
+                # Apply smart partial logic for profile overlay
+                profile_provided_types = set(profile_numeric.keys())
+                all_types = set(card_types)
+                missing_types = all_types - profile_provided_types
+                
+                if missing_types:
+                    # PARTIAL profile: preserve profile values, scale missing ones from base
+                    profile_sum = sum(profile_numeric.values())
+                    remaining = total - profile_sum
+                    
+                    if remaining < 0:
+                        print(f"⚠️  Profile {types_mode} values sum to {profile_sum} > {total}, will normalize all values")
+                        # Profile exceeded total, fill missing from base and normalize everything
+                        default_type_weights = dict(base_defaults)  # Start with base
+                        for t in profile_numeric:
+                            default_type_weights[t] = profile_numeric[t]  # Overlay profile values
+                        # Will normalize below in user processing
+                    else:
+                        # Fill missing types proportionally from base to use remaining percentage
+                        missing_defaults = {t: base_defaults.get(t, 0.0) for t in missing_types}
+                        missing_sum = sum(missing_defaults.values())
+                        
+                        default_type_weights = dict(profile_numeric)  # Preserve profile values exactly
+                        
+                        if missing_sum > 0 and remaining > 0:
+                            # Scale missing types to fit in remaining space
+                            scale_factor = remaining / missing_sum
+                            for t in missing_types:
+                                default_type_weights[t] = missing_defaults[t] * scale_factor
+                        else:
+                            # No defaults or no remaining space, set missing to 0
+                            for t in missing_types:
+                                default_type_weights[t] = 0.0
+                    
+                    # Show detailed overlay process for partial profile
+                    _print_types_mode_overlay(types_mode, base_defaults, profile_numeric, default_type_weights, total)
+                else:
+                    # COMPLETE profile: normalize profile values
+                    default_type_weights = dict(base_defaults)  # Start with base
+                    for t in profile_numeric:
+                        default_type_weights[t] = profile_numeric[t]  # Overlay profile values
+                    
+                    # Show detailed overlay process for complete profile
+                    _print_types_mode_overlay(types_mode, base_defaults, profile_numeric, default_type_weights, total)
+                
+                print(f"ℹ️  Applied types_mode '{types_mode}' profile overlay using smart partial logic")
+            else:
+                print(f"⚠️  Unknown types_mode '{types_mode}' - no profile found, using normal defaults")
+                default_type_weights = base_defaults
+        else:
+            default_type_weights = base_defaults
 
         # 1) Build the baseline default_map with smart filling logic
         #    - If user provided ALL types: normalize their input directly
@@ -341,9 +423,11 @@ def _normalize_all_weights_with_diffs(config: dict, defaults: dict, total: float
                         
                 print(f"ℹ️  Preserved user _default values, filled {len(missing_types)} missing types with {remaining:.1f}% remaining")
         else:
-            # COMPLETE input: user provided all types, normalize their input
-            default_map_coerced = user_default_numeric
-            print(f"ℹ️  User provided complete _default, normalizing all values")
+            # COMPLETE input: user provided all types, layer over profile defaults
+            default_map_coerced = dict(default_type_weights)  # Start with base + profile
+            for t in user_default_numeric:
+                default_map_coerced[t] = user_default_numeric[t]  # Overlay user values
+            print(f"ℹ️  User provided complete _default, layering over profile defaults")
 
         # Only normalize if user exceeded total or provided complete input
         if missing_types and sum(default_map_coerced.values()) <= total + 0.001:  # Small tolerance for floating point
@@ -708,6 +792,41 @@ def _print_smart_partial_result(
     print(f"   " + "─" * 60)
     print(f"   📊 Summary: {preserved_sum:.1f} preserved + {filled_sum:.1f} filled = {total:.1f}")
 
+def _print_types_mode_overlay(types_mode: str, base_defaults: dict, profile_weights: dict, final_weights: dict, total: float = 100.0):
+    """
+    Display the types_mode profile overlay process showing how base defaults are overlaid with profile weights.
+    """
+    print(f"\n🔄 TYPES_MODE PROFILE OVERLAY: {types_mode}")
+    print("   " + "─" * 64)
+    print(f"   Base (_default) → Profile (_{types_mode}Defaults) → Result")
+    
+    # Get all types from any of the dicts
+    all_types = set(base_defaults.keys()) | set(profile_weights.keys()) | set(final_weights.keys())
+    
+    for card_type in sorted(all_types):
+        base_val = base_defaults.get(card_type, 0.0)
+        profile_val = profile_weights.get(card_type, None)
+        final_val = final_weights.get(card_type, 0.0)
+        
+        if profile_val is not None:
+            # Profile provided this type
+            print(f"   • {card_type:>18}: {base_val:>6.1f} (base) → {profile_val:>6.1f} (profile) → {final_val:>6.1f} (result)")
+        else:
+            # Type filled from base with scaling
+            if base_val > 0 and final_val != base_val:
+                print(f"   • {card_type:>18}: {base_val:>6.1f} (base) →      - (scaled)  → {final_val:>6.1f} (result)")
+            elif base_val > 0:
+                print(f"   • {card_type:>18}: {base_val:>6.1f} (base) →      - (kept)    → {final_val:>6.1f} (result)")
+            else:
+                print(f"   • {card_type:>18}: {base_val:>6.1f} (base) →      - (unused)  → {final_val:>6.1f} (result)")
+    
+    print("   " + "─" * 64)
+    base_sum = sum(base_defaults.values())
+    profile_sum = sum(v for v in profile_weights.values() if v is not None)
+    final_sum = sum(final_weights.values())
+    scaling_sum = final_sum - profile_sum
+    print(f"   📊 Summary: {base_sum:.1f} (base) → {profile_sum:.1f} (profile) + {scaling_sum:.1f} (scaled) = {final_sum:.1f}")
+
 def _derive_card_types(ctw: dict) -> list[str]:
     """
     Derive an ordered list of card types from a card_types_weights dict.
@@ -738,6 +857,108 @@ def _derive_card_types(ctw: dict) -> list[str]:
                 seen.add(k)
 
     return derived
+
+def _validate_final_config(config: dict) -> list[str]:
+    """
+    Final validation after normalization - catch issues that would break the actual system.
+    """
+    issues = []
+    
+    if "skeleton_params" not in config:
+        return issues
+    
+    sp = config["skeleton_params"]
+    
+    # Check for completely zero final weights after all processing (this would break generation)
+    if "card_types_weights" in sp:
+        ctw = sp["card_types_weights"]
+        if "_default" in ctw:
+            default_weights = ctw["_default"]
+            if isinstance(default_weights, dict):
+                total_weight = sum(v for v in default_weights.values() if isinstance(v, (int, float)) and v > 0)
+                if total_weight == 0:
+                    issues.append("❌ ERROR: Final _default card types sum to 0 - no cards can be generated. Check your configuration.")
+    
+    # Check for missing color weights
+    if "colors_weights" not in sp:
+        issues.append("❌ ERROR: Missing 'colors_weights' - cannot determine which colors to use")
+    elif isinstance(sp["colors_weights"], dict):
+        color_total = sum(v for v in sp["colors_weights"].values() if isinstance(v, (int, float)) and v > 0)
+        if color_total == 0:
+            issues.append("❌ ERROR: All color weights are 0 - no colors can be selected")
+    
+    # Check for missing rarity weights  
+    if "rarities_weights" not in sp:
+        issues.append("❌ ERROR: Missing 'rarities_weights' - cannot determine card rarities")
+    elif isinstance(sp["rarities_weights"], dict):
+        rarity_total = sum(v for v in sp["rarities_weights"].values() if isinstance(v, (int, float)) and v > 0)
+        if rarity_total == 0:
+            issues.append("❌ ERROR: All rarity weights are 0 - no rarities can be selected")
+    
+    return issues
+
+
+def _validate_user_config_structure(config: dict) -> list[str]:
+    """
+    Validate user configuration structure for critical issues before merging with defaults.
+    This catches problems that would be masked by the defaults.
+    """
+    issues = []
+    
+    # Check if skeleton_params exists at root level (correct structure)
+    if "skeleton_params" not in config:
+        issues.append("⚠️  WARNING: Missing 'skeleton_params' section - will use all defaults")
+        return issues
+    
+    skeleton_params = config["skeleton_params"]
+    if not isinstance(skeleton_params, dict):
+        issues.append("❌ ERROR: 'skeleton_params' must be a dictionary")
+        return issues
+    
+    # Check skeleton_params structure (at root level)
+    sp = skeleton_params
+    if not isinstance(sp, dict):
+        issues.append("❌ ERROR: 'skeleton_params' must be a dictionary")
+    else:
+        # Check types_mode validity - but only for basic structure, not specific modes
+        if "types_mode" in sp:
+            types_mode = sp["types_mode"]
+            if not isinstance(types_mode, str):
+                issues.append("❌ ERROR: 'types_mode' must be a string")
+            elif types_mode == "":
+                issues.append("❌ ERROR: 'types_mode' cannot be empty - use 'normal' for default behavior")
+    
+    # Check card_types_weights structure
+    if "card_types_weights" in skeleton_params:
+        ctw = skeleton_params["card_types_weights"]
+        if not isinstance(ctw, dict):
+            issues.append("❌ ERROR: 'card_types_weights' must be a dictionary")
+        else:
+            # Check for negative weights only - don't validate zero sums yet
+            if "_default" in ctw:
+                default_weights = ctw["_default"]
+                if isinstance(default_weights, dict):
+                    # Only check for negative weights - zero sums will be handled after merge
+                    for card_type, weight in default_weights.items():
+                        if isinstance(weight, (int, float)) and weight < 0:
+                            issues.append(f"❌ ERROR: Negative weight in _default.{card_type}: {weight}")
+                
+                elif not isinstance(default_weights, dict):
+                    issues.append("❌ ERROR: card_types_weights._default must be a dictionary")
+            
+            # Check profiles for structural issues
+            for key, weights in ctw.items():
+                if key.startswith('_') and key.endswith('Defaults'):
+                    if not isinstance(weights, dict):
+                        issues.append(f"❌ ERROR: Profile '{key}' must be a dictionary of card type weights")
+                    elif isinstance(weights, dict):
+                        # Check for negative weights in profiles
+                        for card_type, weight in weights.items():
+                            if isinstance(weight, (int, float)) and weight < 0:
+                                issues.append(f"❌ ERROR: Negative weight in {key}.{card_type}: {weight}")
+    
+    return issues
+
 
 def _validate_config_integrity(config: dict, defaults: dict) -> list[str]:
     """
@@ -779,31 +1000,45 @@ def _validate_config_integrity(config: dict, defaults: dict) -> list[str]:
             if "_default" not in ctw:
                 issues.append("⚠️  WARNING: Missing '_default' in card_types_weights, system may behave unexpectedly")
             
-                # Check for color-specific weights without _default
-                color_keys = [k for k in ctw.keys() if k in CANONICAL_COLOR_ORDER]
-                if color_keys and "_default" not in ctw:
-                    issues.append("⚠️  WARNING: Color-specific weights defined without '_default' baseline")
-                
-                # Check for extremely low or high individual type weights
-                for key, weights in ctw.items():
-                    if isinstance(weights, dict):
-                        total_weight = sum(v for v in weights.values() if isinstance(v, (int, float)))
-                        
-                        # Check for zero-sum rows - special handling for colors
-                        if total_weight == 0:
+            # Check for color-specific weights without _default
+            color_keys = [k for k in ctw.keys() if k in CANONICAL_COLOR_ORDER]
+            if color_keys and "_default" not in ctw:
+                issues.append("⚠️  WARNING: Color-specific weights defined without '_default' baseline")
+            
+            # Check for structural issues that break the three-layer system
+            for key, weights in ctw.items():
+                if key.startswith('_') and key.endswith('Defaults'):
+                    # This is a profile (like _squareDefaults)
+                    if not isinstance(weights, dict):
+                        issues.append(f"❌ ERROR: Profile '{key}' must be a dictionary of card type weights")
+                    elif len(weights) == 0:
+                        issues.append(f"⚠️  WARNING: Profile '{key}' is empty - will have no effect")
+            
+            # Validate individual card type weights
+            for key, weights in ctw.items():
+                if isinstance(weights, dict):
+                    total_weight = sum(v for v in weights.values() if isinstance(v, (int, float)))
+                    
+                    # Check for extremely low individual type weights
+                    for card_type, weight in weights.items():
+                        if isinstance(weight, (int, float)):
+                            if weight < 0:
+                                issues.append(f"❌ ERROR: Negative weight in {key}.{card_type}: {weight}")
+                            elif weight > 200:  # Suspiciously high
+                                issues.append(f"⚠️  WARNING: Very high weight in {key}.{card_type}: {weight}")
+                    
+                    # Only flag zero-sum if ALL provided weights are zero (suspicious)
+                    if len(weights) > 5:  # User provided many types
+                        non_zero_count = sum(1 for v in weights.values() if isinstance(v, (int, float)) and v > 0)
+                        if total_weight == 0 and non_zero_count == 0:
                             if key in CANONICAL_COLOR_ORDER:
                                 # Zero weights for a color that could be selected as primary
-                                issues.append(f"⚠️  WARNING: card_types_weights[{key}] sums to 0 - this color cannot generate cards if selected as primary color. Consider: (1) removing {key} from colors_weights, (2) setting non-zero type weights, or (3) using {key} only for color bleed.")
+                                issues.append(f"⚠️  WARNING: card_types_weights[{key}] has all zero weights - this color cannot generate cards if selected as primary color. Consider: (1) removing {key} from colors_weights, (2) setting non-zero type weights, or (3) using {key} only for color bleed.")
                             else:
-                                # Zero weights for _default or other section is more critical
-                                issues.append(f"❌ ERROR: card_types_weights[{key}] sums to 0 - this will cause generation failures")
-                        
-                        for card_type, weight in weights.items():
-                            if isinstance(weight, (int, float)):
-                                if weight < 0:
-                                    issues.append(f"❌ ERROR: Negative weight in {key}.{card_type}: {weight}")
-                                elif weight > 200:  # Suspiciously high
-                                    issues.append(f"⚠️  WARNING: Very high weight in {key}.{card_type}: {weight}")    # 4. Check for cross-reference issues: colors with weights but no viable types
+                                # Zero weights for _default or other section is more critical only if user provided extensive config
+                                issues.append(f"❌ ERROR: card_types_weights[{key}] has all zero weights - this will cause generation failures")
+    
+    # 4. Check for cross-reference issues: colors with weights but no viable types
     if "colors_weights" in sp and "card_types_weights" in sp:
         color_weights = sp["colors_weights"]
         type_weights = sp["card_types_weights"]
@@ -825,40 +1060,123 @@ def _validate_config_integrity(config: dict, defaults: dict) -> list[str]:
         if key in suspicious_keys:
             issues.append(f"⚠️  WARNING: Suspicious key '{key}' - did you mean '{key}s_weights'?")
     
-    # 5. Check generation parameters
-    if "generations" in sp:
-        gen = sp["generations"]
-        if isinstance(gen, (int, float)):
-            if gen <= 0:
-                issues.append("❌ ERROR: 'generations' must be positive")
-            elif gen > 1000:
-                issues.append("⚠️  WARNING: Very high generation count may take a long time")
+    # 6. Check types_mode validity against available profiles (validate dynamically)
+    types_mode = sp.get("types_mode", "normal")
+    if types_mode != "normal":
+        profile_key = f"_{types_mode}Defaults"
+        
+        # Check if profile exists in user config OR defaults config
+        profile_exists = False
+        
+        # Check user config
+        if "card_types_weights" in sp:
+            ctw = sp["card_types_weights"]
+            if isinstance(ctw, dict) and profile_key in ctw:
+                profile_exists = True
+        
+        # Check defaults config
+        if not profile_exists:
+            default_ctw = defaults.get("skeleton_params", {}).get("card_types_weights", {})
+            if isinstance(default_ctw, dict) and profile_key in default_ctw:
+                profile_exists = True
+        
+        if not profile_exists:
+            # Find available profiles to suggest - check both user config and defaults
+            all_profiles = set()
+            
+            # Check user-provided profiles
+            if "card_types_weights" in sp:
+                ctw = sp["card_types_weights"]
+                if isinstance(ctw, dict):
+                    user_profiles = [k[1:-8] for k in ctw.keys() if k.startswith('_') and k.endswith('Defaults')]
+                    all_profiles.update(user_profiles)
+            
+            # Check default profiles from DEFAULTSCONFIG
+            default_ctw = defaults.get("skeleton_params", {}).get("card_types_weights", {})
+            if isinstance(default_ctw, dict):
+                default_profiles = [k[1:-8] for k in default_ctw.keys() if k.startswith('_') and k.endswith('Defaults')]
+                all_profiles.update(default_profiles)
+            
+            available_profiles = sorted(list(all_profiles))
+            if available_profiles:
+                issues.append(f"❌ ERROR: types_mode '{types_mode}' references missing profile '{profile_key}'. Available modes: {available_profiles}")
+            else:
+                issues.append(f"❌ ERROR: types_mode '{types_mode}' references missing profile '{profile_key}'. Add '{profile_key}' to card_types_weights or use 'normal' mode")
     
-    # 6. Check thread safety
-    if "threads" in sp:
-        threads = sp["threads"]
-        if isinstance(threads, (int, float)):
-            if threads <= 0:
-                issues.append("❌ ERROR: 'threads' must be positive")
-            elif threads > 20:
-                issues.append("⚠️  WARNING: Very high thread count may cause performance issues")
+    # 7. Check for potential profile conflicts
+    if "card_types_weights" in sp:
+        ctw = sp["card_types_weights"]
+        types_mode = sp.get("types_mode", "normal")
+        
+        # Warn about potential conflicts between user overrides and profile logic
+        if types_mode != "normal" and "_default" in ctw:
+            user_default = ctw["_default"]
+            if isinstance(user_default, dict) and len(user_default) > 8:
+                # User provided extensive _default override - might conflict with profile
+                issues.append(f"ℹ️  INFO: Extensive _default override with types_mode '{types_mode}'. The profile will be applied after your _default, which may override some of your settings. Consider using a color-specific override instead.")
+    
+    # 8. Check generation parameters - use correct config parameter names
+    square_config = config.get("square_config", {})
+    if "total_cards" in square_config:
+        total_cards = square_config["total_cards"]
+        if isinstance(total_cards, (int, float)):
+            if total_cards <= 0:
+                issues.append("❌ ERROR: 'total_cards' must be positive")
+            elif total_cards > 1000:
+                issues.append("⚠️  WARNING: Very high card count may take a long time to generate")
+    
+    # 9. Check concurrency parameters
+    if "concurrency" in square_config:
+        concurrency = square_config["concurrency"]
+        if isinstance(concurrency, (int, float)):
+            if concurrency <= 0:
+                issues.append("❌ ERROR: 'concurrency' must be positive")
+            elif concurrency > 20:
+                issues.append("⚠️  WARNING: Very high concurrency may cause performance issues")
     
     return issues
 
 def _print_validation_results(issues: list[str]):
-    """Print validation issues in a organized way."""
+    """
+    Print validation issues and determine if execution should stop.
+    Returns True if there are critical errors that should stop execution.
+    """
     if not issues:
         print("✅ No issues found - configuration is valid!")
-        return
+        return False
     
     errors = [issue for issue in issues if "❌ ERROR:" in issue]
     warnings = [issue for issue in issues if "⚠️  WARNING:" in issue]
+    info_messages = [issue for issue in issues if "ℹ️  INFO:" in issue]
     
     if errors:
-        print(f"\n❌ ERRORS DETECTED ({len(errors)}):")
-        print("   " + "─" * 50)
+        print(f"\n❌ CRITICAL ERRORS DETECTED ({len(errors)}):")
+        print("   " + "─" * 60)
         for error in errors:
             print(f"   {error}")
+        
+        print(f"\n🛠️  HOW TO FIX CRITICAL ERRORS:")
+        print("   " + "─" * 30)
+        
+        for error in errors:
+            if "types_mode" in error and "references missing profile" in error:
+                print("   • Missing Profile Error:")
+                print("     - Check your types_mode value in skeleton_params")
+                print("     - For 'square' mode, ensure '_squareDefaults' exists in card_types_weights")
+                print("     - For custom modes, create '_<mode>Defaults' profile")
+                print()
+            elif "Invalid types_mode" in error:
+                print("   • Invalid types_mode:")
+                print("     - Use 'normal' for standard play-ready generation")
+                print("     - Use 'square' for cube-optimized generation")
+                print("     - Check for typos in your types_mode value")
+                print()
+            elif "sums to 0" in error and "_default" in error:
+                print("   • Zero-sum Card Types:")
+                print("     - _default profile cannot have all zero weights")
+                print("     - Provide at least some positive card type weights")
+                print("     - Partial overrides are OK - missing types will be filled automatically")
+                print()
     
     if warnings:
         print(f"\n⚠️  WARNINGS ({len(warnings)}):")
@@ -866,11 +1184,23 @@ def _print_validation_results(issues: list[str]):
         for warning in warnings:
             print(f"   {warning}")
     
-    # Summary
+    if info_messages:
+        print(f"\nℹ️  INFORMATION ({len(info_messages)}):")
+        print("   " + "─" * 50)
+        for info in info_messages:
+            print(f"   {info}")
+    
+    # Summary and decision
     if errors:
-        print(f"\n🚨 VALIDATION RESULT: {len(errors)} error(s) found - must be fixed!")
+        print(f"\n🚨 VALIDATION FAILED: {len(errors)} critical error(s) must be fixed before proceeding!")
+        print("   Configuration processing has been STOPPED.")
+        return True
     elif warnings:
-        print(f"\n💡 VALIDATION RESULT: {len(warnings)} warning(s) found - should work correctly.")
+        print(f"\n💡 VALIDATION PASSED: {len(warnings)} warning(s) found - continuing with processing.")
+        return False
+    else:
+        print(f"\n✅ VALIDATION PASSED: Configuration is clean!")
+        return False
 
 # ---------- CLI entrypoint ----------
 if __name__ == "__main__":

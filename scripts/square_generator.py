@@ -229,6 +229,7 @@ class SkeletonParams:
         fixed_amount_themes: int = 1,  # if not zero, select fixed amount instead of random mutation
         power_level: float = 5,  # Power level of the card, 1–10
         rarity_to_skew: Optional[dict[str, int]] = None,  # rarity skew mapping
+        types_mode: str = "normal",  # Types distribution mode (normal, square, pack, deck)
     ):
         # Set up canonical card types and default weights from config - NO FALLBACKS
         if canonical_card_types is None:
@@ -247,6 +248,7 @@ class SkeletonParams:
         self.canonical_card_types = canonical_card_types
         self.default_type_weights = default_type_weights
         self.colors = colors
+        self.types_mode = types_mode
 
         cw = colors_weights
         default_cw = {c: 100.0 / len(self.colors) for c in self.colors}
