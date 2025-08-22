@@ -21,6 +21,7 @@ import logging
 import threading
 import random
 from queue import Queue, Empty
+from typing import Dict, Any
 
 import numpy as np
 
@@ -237,13 +238,25 @@ class SkeletonParams:
         if colors is None:
             raise ValueError("colors must be provided in configuration")
         
-        # Extract default type weights from card_types_weights._default
-        if card_types_weights is None or "_default" not in card_types_weights:
-            raise ValueError("card_types_weights._default must be provided in configuration")
-        
-        default_type_weights = card_types_weights["_default"]
-        if not isinstance(default_type_weights, dict):
-            raise ValueError("card_types_weights._default must be a dictionary")
+        # Derive a synthetic default_type_weights (average over all colors) since _default removed
+        if card_types_weights is None or not isinstance(card_types_weights, dict) or not card_types_weights:
+            raise ValueError("card_types_weights must provide per-color maps")
+        # Use first color as template and average if multiple
+        aggregate: dict[str, float] = {}
+        count = 0
+        for c, row in card_types_weights.items():
+            if c not in (colors or []):
+                continue
+            if isinstance(row, dict):
+                for k, v in row.items():
+                    try:
+                        aggregate[k] = aggregate.get(k, 0.0) + float(v)
+                    except Exception:
+                        continue
+                count += 1
+        if count == 0:
+            raise ValueError("No valid per-color type weight rows found")
+        default_type_weights = {k: v / count for k, v in aggregate.items()}
         
         self.canonical_card_types = canonical_card_types
         self.default_type_weights = default_type_weights
@@ -365,7 +378,9 @@ class SkeletonParams:
         """
 
         # --- Warn if YAML contains unknown colors ---
-        unknown_colors = set(weights_by_color.keys()) - {"_default"} - set(colors)
+        # Filter out profile keys (starting with _) and actual colors
+        profile_keys = {k for k in weights_by_color.keys() if k.startswith("_")}
+        unknown_colors = set(weights_by_color.keys()) - profile_keys - set(colors)
         if unknown_colors:
             logging.warning(
                 f"Unknown colors in card_types_weights ignored: {sorted(unknown_colors)}"
@@ -537,6 +552,9 @@ def card_skeleton_generator(
 
     # Types
     t = skeleton_params.card_types.copy()
+    logging.debug(f"[Card #{index+1}] Available types: {t}")
+    logging.debug(f"[Card #{index+1}] Default type weights: {skeleton_params.default_type_weights}")
+    logging.debug(f"[Card #{index+1}] Type weights for colors '{skeleton_params.card_types_weights}")
     card_types_weights = skeleton_params.card_types_weights[selected_colors[0]]
     
     # Handle zero-weight scenario for selected color
@@ -1090,16 +1108,17 @@ def card_worker(card_queue, pbar, api_params, skeleton_params, metrics, config, 
             time.sleep(sleepy_time)
 
 
-if __name__ == "__main__":
-    # Parse command line arguments and load configuration
-    args = config_manager.parse_args()
-    config = config_manager.load_config(args.config)
-    config = config_manager.apply_cli_overrides(config, args)
+def generate_cards(config: Dict[str, Any], config_name: str) -> Dict[str, Any]:
+    """
+    Generate cards using the provided normalized configuration.
     
-    # Extract config filename for output naming
-    config_path = args.config
-    config_name = os.path.splitext(os.path.basename(config_path))[0]  # Remove extension
-    
+    Args:
+        config: Normalized configuration dictionary
+        config_name: Name for output files (e.g., 'merlinSquare01')
+        
+    Returns:
+        Dict containing generation metrics and results
+    """
     # Extract configuration values
     total_cards = config["square_config"]["total_cards"]
     concurrency = config["square_config"]["concurrency"]
@@ -1124,7 +1143,21 @@ if __name__ == "__main__":
     # Create a lock for thread-safe auth token updates
     auth_lock = threading.Lock()
 
-    card_skeleton_params = SkeletonParams(**config["skeleton_params"])
+    # Filter skeleton_params to remove new schema keys that aren't part of SkeletonParams constructor
+    # Keep: card_types_weights (processed final weights for constructor)
+    # Remove: card_types_color_weights (raw user input), card_types_color_defaults (baseline data)
+    skeleton_params_full = config["skeleton_params"].copy()
+
+    # Enforce presence of normalized weights (produced by orchestrator validation)
+    if "card_types_weights" not in skeleton_params_full:
+        raise ValueError(
+            "Missing 'card_types_weights' in skeleton_params. Run via merlinAI orchestrator to normalize your config first."
+        )
+
+    skeleton_params_filtered = {k: v for k, v in skeleton_params_full.items()
+                                if k not in ['card_types_color_defaults', 'card_types_color_weights']}
+    
+    card_skeleton_params = SkeletonParams(**skeleton_params_filtered)
     api_params = APIParams(
         api_key=API_KEY,
         auth_token=AUTH_TOKEN,
@@ -1212,3 +1245,22 @@ if __name__ == "__main__":
         time.sleep(sleepy_time)
     logging.info("All threads completed successfully.")
     time.sleep(sleepy_time)
+    
+    return {
+        "metrics": summary,
+        "cards": metrics.all_cards,
+        "output_file": outname
+    }
+
+
+if __name__ == "__main__":
+    import sys  # local import to avoid unused in library use
+    if os.environ.get("ALLOW_DIRECT_GENERATION") != "1":
+        print("❌ Direct execution of square_generator.py is disabled. Use 'python merlinAI.py' to run the pipeline.")
+        print("   (Set ALLOW_DIRECT_GENERATION=1 to override for development only.)")
+        sys.exit(1)
+    args = config_manager.parse_args()
+    cfg = config_manager.load_config(args.config)
+    cfg = config_manager.apply_cli_overrides(cfg, args)
+    cfg_name = os.path.splitext(os.path.basename(args.config))[0]
+    generate_cards(cfg, cfg_name)

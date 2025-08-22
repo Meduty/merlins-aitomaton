@@ -88,85 +88,100 @@ def check_mutation(mutation_chance) -> bool:
 
 # ========= CLI: Check & Normalize Config =========
 
-def check_and_normalize_config(config_path: str, save: bool = False, total: float = 100.0):
-    """
-    User-facing CLI helper to check + normalize weights in a config.yaml.
+def check_and_normalize_config(config_path: str, save: bool = False, total: float = 100.0, *, verbose: bool = True):
+    """Enhanced normalization/validation with raw + merged phases and silent mode.
 
-    - Loads DEFAULTSCONFIG.yml first for fallback values
-    - Normalizes colors_weights (dict or list), rarities_weights (dict or list),
-      and card_types_weights rows (dict or list) to sum `total`.
-    - If lists are provided where dicts are preferred, converts them to dicts using labels.
-    - Prints detailed diffs (before -> after).
-    - Optionally saves the normalized config back to file.
+    Args:
+        config_path: path to user config
+        save: write normalized file
+        total: target sum (usually 100)
+        verbose: if False, suppress prints and just return normalized structure or None on error
     """
     path = Path(config_path)
     if not path.exists():
-        print(f"❌ Config file not found: {path}")
-        return
-
-    # Load defaults first
+        if verbose:
+            print(f"❌ Config file not found: {path}")
+        return None
     defaults_path = path.parent / "DEFAULTSCONFIG.yml"
     if not defaults_path.exists():
-        print(f"❌ DEFAULTSCONFIG.yml not found at: {defaults_path}")
-        return
-        
-    with open(defaults_path, "r") as f:
-        defaults = yaml.safe_load(f) or {}
-
-    with open(path, "r") as f:
-        config = yaml.safe_load(f) or {}
-
-    # Validate user config structure before merging with defaults
-    print("=" * 80)
-    print("🔍 CONFIGURATION VALIDATION & NORMALIZATION")
-    print("=" * 80)
-    
-    print("\n📋 Validating user configuration structure...")
-    print("-" * 40)
-    user_validation_issues = _validate_user_config_structure(config)
-    should_stop_early = _print_validation_results(user_validation_issues)
-    
-    if should_stop_early:
-        print("\n" + "=" * 80)
+        if verbose:
+            print(f"❌ DEFAULTSCONFIG.yml not found at: {defaults_path}")
         return None
 
-    # Simple validation check - just ensure basic structure is OK
-    print("\n📋 Validating merged configuration...")
-    print("-" * 40)
-    validation_issues = _validate_config_integrity(config, defaults)
-    should_stop = _print_validation_results(validation_issues)
-    
-    # Stop processing if critical errors were found
-    if should_stop:
-        print("\n" + "=" * 80)
+    # Load raw user (pre-merge) for raw-specific validation
+    try:
+        with open(path, 'r') as uf:
+            raw_user = yaml.safe_load(uf) or {}
+    except Exception:
+        raw_user = {}
+
+    import config_manager
+    config = config_manager.load_config(str(path))  # merged
+    with open(defaults_path, 'r') as df:
+        defaults = yaml.safe_load(df) or {}
+
+    # Raw validation (omission awareness)
+    raw_issues = _validate_raw_user_config_structure(raw_user)
+    if verbose:
+        print("=" * 80)
+        print("🔍 CONFIGURATION VALIDATION & NORMALIZATION")
+        print("=" * 80)
+        print("\n📋 Validating user configuration structure (raw before merge)...")
+        print("-" * 40)
+        _print_validation_results(raw_issues)
+
+    # Merged validation (structure)
+    if verbose:
+        print("\n📋 Validating user configuration structure...")
+        print("-" * 40)
+    merged_structure_issues = _validate_user_config_structure(config)
+    stop_early = _print_validation_results(merged_structure_issues) if verbose else any("❌" in x for x in merged_structure_issues)
+    if stop_early:
+        if verbose:
+            print("\n" + "=" * 80)
         return None
 
-    print("\n📊 WEIGHT NORMALIZATION")
-    print("-" * 40)
-    fixed = _normalize_all_weights_with_diffs(config, defaults, total=total)
-    
-    # Final validation after normalization to catch types_mode profile issues
-    print("\n📋 Final validation after normalization...")
-    print("-" * 40)
+    # Integrity validation
+    if verbose:
+        print("\n📋 Validating merged configuration...")
+        print("-" * 40)
+    integrity_issues = _validate_config_integrity(config, defaults)
+    stop = _print_validation_results(integrity_issues) if verbose else any("❌" in x for x in integrity_issues)
+    if stop:
+        if verbose:
+            print("\n" + "=" * 80)
+        return None
+
+    if verbose:
+        print("\n📊 WEIGHT NORMALIZATION")
+        print("-" * 40)
+    fixed = _normalize_all_weights_with_diffs(config, defaults, total=total, verbose=verbose)
+
+    # Final validation
+    if verbose:
+        print("\n📋 Final validation after normalization...")
+        print("-" * 40)
     final_issues = _validate_final_config(fixed)
-    final_stop = _print_validation_results(final_issues)
-    
+    final_stop = _print_validation_results(final_issues) if verbose else any("❌" in x for x in final_issues)
     if final_stop:
-        print("\n" + "=" * 80)
+        if verbose:
+            print("\n" + "=" * 80)
         return None
 
     if save:
-        with open(path, "w") as f:
-            yaml.safe_dump(fixed, f, sort_keys=False)
-        print(f"\n✅ CONFIGURATION SAVED")
-        print("-" * 30)
-        print(f"Normalized config saved to {path}")
+        with open(path, 'w') as outf:
+            yaml.safe_dump(fixed, outf, sort_keys=False)
+        if verbose:
+            print("\n✅ CONFIGURATION SAVED")
+            print("-" * 30)
+            print(f"Normalized config saved to {path}")
     else:
-        print(f"\n💾 CONFIGURATION NOT SAVED")
-        print("-" * 30)
-        print("Normalization complete. Use --save to overwrite the file.")
-    
-    print("=" * 80)
+        if verbose:
+            print("\n💾 CONFIGURATION NOT SAVED")
+            print("-" * 30)
+            print("Normalization complete. Use --save to overwrite the file.")
+    if verbose:
+        print("=" * 80)
     return fixed
 
 
@@ -187,7 +202,7 @@ def _reorder_color_dict(d: dict) -> dict:
         ordered[k] = d[k]
     return ordered
 
-def _normalize_all_weights_with_diffs(config: dict, defaults: dict, total: float = 100.0) -> dict:
+def _normalize_all_weights_with_diffs(config: dict, defaults: dict, total: float = 100.0, *, verbose: bool = True) -> dict:
     """
     Walk through config and normalize known weight sections:
       - skeleton_params.colors_weights   (dict preferred; list accepted)
@@ -235,9 +250,10 @@ def _normalize_all_weights_with_diffs(config: dict, defaults: dict, total: float
     # Update the user config to have the complete card_types list
     if card_types and card_types != sp.get("card_types"):
         sp["card_types"] = list(card_types)
-        print("ℹ️  CARD TYPES UPDATED")
-        print("   " + "─" * 40)
-        print("   Updated 'skeleton_params.card_types' to use complete canonical list.")
+        if verbose:
+            print("ℹ️  CARD TYPES UPDATED")
+            print("   " + "─" * 40)
+            print("   Updated 'skeleton_params.card_types' to use complete canonical list.")
 
     # ---- colors_weights (dict preferred; list accepted) ----
     if "colors_weights" in sp:
@@ -249,7 +265,8 @@ def _normalize_all_weights_with_diffs(config: dict, defaults: dict, total: float
                     key="skeleton_params.colors_weights", lst=cw, labels=None, total=total
                 )
             else:
-                print("ℹ️  Converting colors_weights list -> dict using 'colors' labels.")
+                if verbose:
+                    print("ℹ️  Converting colors_weights list -> dict using 'colors' labels.")
                 labeled = _list_to_labeled_dict(cw, colors)
                 sp["colors_weights"] = _normalize_dict_with_diffs(
                     key="skeleton_params.colors_weights", d=labeled, total=total
@@ -276,7 +293,8 @@ def _normalize_all_weights_with_diffs(config: dict, defaults: dict, total: float
                     key="skeleton_params.rarities_weights", lst=rw, labels=None, total=total
                 )
             else:
-                print("ℹ️  Converting rarities_weights list -> dict using 'rarities' labels.")
+                if verbose:
+                    print("ℹ️  Converting rarities_weights list -> dict using 'rarities' labels.")
                 labeled = _list_to_labeled_dict(rw, rarities)
                 sp["rarities_weights"] = _normalize_dict_with_diffs(
                     key="skeleton_params.rarities_weights", d=labeled, total=total
@@ -291,305 +309,257 @@ def _normalize_all_weights_with_diffs(config: dict, defaults: dict, total: float
         else:
             print("ℹ️  skeleton_params.rarities_weights is neither list nor dict; skipping.")
 
-    # ---- card_types_weights (dict of rows; list rows accepted) ----
-    # ---- card_types_weights (resolve against _default, then normalize) ----
-    if "card_types_weights" in sp and isinstance(sp["card_types_weights"], dict):
-        ctw: dict = sp["card_types_weights"]
+    # ---- NEW SCHEMA: card_types_color_defaults + user_overlays ----
+    # Build per-color type weight maps from baselines (mode-specific) then apply overlays
+    color_defaults_root = sp.get("card_types_color_defaults") or default_sp.get("card_types_color_defaults")
+    if not color_defaults_root:
+        print("❌ Missing 'card_types_color_defaults' in skeleton_params.")
+        return config
+    types_mode = sp.get("types_mode", "normal")
+    if types_mode not in color_defaults_root:
+        print(f"❌ Mode '{types_mode}' not found under card_types_color_defaults.")
+        return config
+    mode_defaults = color_defaults_root[types_mode]
+    # Validate presence of all colors
+    missing_colors = [c for c in colors if c not in mode_defaults]
+    if missing_colors:
+        print(f"❌ Mode '{types_mode}' missing color baselines: {missing_colors}")
+        return config
+    # New overlay mechanism: user supplies skeleton_params.card_types_color_weights with per-color partial overrides.
+    user_color_overrides = sp.get("card_types_color_weights", {})
+    if user_color_overrides and not isinstance(user_color_overrides, dict):
+        print("⚠️  Ignoring non-dict card_types_color_weights (expected mapping of colors → type weights)")
+        user_color_overrides = {}
+    # Support special '_all' key for global type overrides across every color
+    global_all_overrides = {}
+    if "_all" in user_color_overrides:
+        if isinstance(user_color_overrides["_all"], dict):
+            global_all_overrides = user_color_overrides["_all"]
+        else:
+            print("⚠️  Ignoring non-dict _all in card_types_color_weights")
+        # remove to avoid treating as color name
+        user_color_overrides = {k: v for k, v in user_color_overrides.items() if k != "_all"}
+    
+    # Analyze and report user's configuration intent
+    if verbose:
+        print(f"\n🎯 USER CONFIGURATION ANALYSIS (mode: {types_mode})")
+        print("─" * 60)
+    
+    if global_all_overrides:
+        global_keys = sorted(global_all_overrides.keys())
+        print(f"🌐 Global overrides (_all) detected for: {', '.join(global_keys)}")
+        for k, v in sorted(global_all_overrides.items()):
+            print(f"   • {k}: {v} (applies to ALL colors)")
+    else:
+        if verbose:
+            print("🌐 No global overrides (_all) found")
+    
+    if user_color_overrides:
+        print(f"🎨 Per-color overrides detected:")
+        for color in sorted(user_color_overrides.keys()):
+            if color in colors and isinstance(user_color_overrides[color], dict):
+                override_keys = sorted(user_color_overrides[color].keys())
+                print(f"   • {color}: {', '.join(override_keys)}")
+                for k, v in sorted(user_color_overrides[color].items()):
+                    print(f"     - {k}: {v}")
+    else:
+        if verbose:
+            print("🎨 No per-color overrides found")
+    
+    if verbose:
+        print(f"📊 Using baseline weights from mode '{types_mode}' and applying overlays...")
+        print("─" * 60)
         
-        # Get default type weights from defaults config (now in card_types_weights._default)
-        default_sp_ctw = default_sp.get("card_types_weights", {})
-        base_defaults = default_sp_ctw.get("_default", {})
-        
-        # Apply types_mode profile overlay if specified
-        types_mode = sp.get("types_mode", "normal")
-        if types_mode != "normal":
-            profile_key = f"_{types_mode}Defaults"
-            if profile_key in default_sp_ctw:
-                # Apply smart partial logic for profile overlay: base_defaults → profile overlay
-                profile_weights = default_sp_ctw[profile_key]
-                
-                # Coerce profile values to numeric
-                profile_numeric = {}
-                for t in card_types:
-                    if t in profile_weights:
-                        try:
-                            profile_numeric[t] = float(profile_weights[t])
-                        except Exception:
-                            print(f"⚠️  Skipping non-numeric profile value for type {t!r}: {profile_weights[t]!r}")
-                
-                # Apply smart partial logic for profile overlay
-                profile_provided_types = set(profile_numeric.keys())
-                all_types = set(card_types)
-                missing_types = all_types - profile_provided_types
-                
-                if missing_types:
-                    # PARTIAL profile: preserve profile values, scale missing ones from base
-                    profile_sum = sum(profile_numeric.values())
-                    remaining = total - profile_sum
-                    
-                    if remaining < 0:
-                        print(f"⚠️  Profile {types_mode} values sum to {profile_sum} > {total}, will normalize all values")
-                        # Profile exceeded total, fill missing from base and normalize everything
-                        default_type_weights = dict(base_defaults)  # Start with base
-                        for t in profile_numeric:
-                            default_type_weights[t] = profile_numeric[t]  # Overlay profile values
-                        # Will normalize below in user processing
-                    else:
-                        # Fill missing types proportionally from base to use remaining percentage
-                        missing_defaults = {t: base_defaults.get(t, 0.0) for t in missing_types}
-                        missing_sum = sum(missing_defaults.values())
-                        
-                        default_type_weights = dict(profile_numeric)  # Preserve profile values exactly
-                        
-                        if missing_sum > 0 and remaining > 0:
-                            # Scale missing types to fit in remaining space
-                            scale_factor = remaining / missing_sum
-                            for t in missing_types:
-                                default_type_weights[t] = missing_defaults[t] * scale_factor
-                        else:
-                            # No defaults or no remaining space, set missing to 0
-                            for t in missing_types:
-                                default_type_weights[t] = 0.0
-                    
-                    # Show detailed overlay process for partial profile
-                    _print_types_mode_overlay(types_mode, base_defaults, profile_numeric, default_type_weights, total)
+    # Prepare final structure similar to old card_types_weights
+    final_weights: dict[str, dict[str, float]] = {}
+    if verbose:
+        print("\n📊 BUILDING TYPE WEIGHTS FROM BASELINES")
+    for color in colors:
+        baseline = dict(mode_defaults[color])
+        # Normalize baseline if it does not sum to total
+        b_sum = sum(float(v) for v in baseline.values())
+        if b_sum <= 0:
+            print(f"⚠️  Baseline for {color} sums to {b_sum}. Using uniform distribution.")
+            baseline = {t: total / len(card_types) for t in card_types}
+            b_sum = total
+        # Scale baseline to total exactly
+        scale = total / b_sum
+        for k in list(baseline.keys()):
+            if k not in card_types:
+                if STRICT:
+                    baseline.pop(k)
                 else:
-                    # COMPLETE profile: normalize profile values
-                    default_type_weights = dict(base_defaults)  # Start with base
-                    for t in profile_numeric:
-                        default_type_weights[t] = profile_numeric[t]  # Overlay profile values
-                    
-                    # Show detailed overlay process for complete profile
-                    _print_types_mode_overlay(types_mode, base_defaults, profile_numeric, default_type_weights, total)
-                
-                print(f"ℹ️  Applied types_mode '{types_mode}' profile overlay using smart partial logic")
-            else:
-                print(f"⚠️  Unknown types_mode '{types_mode}' - no profile found, using normal defaults")
-                default_type_weights = base_defaults
-        else:
-            default_type_weights = base_defaults
-
-        # 1) Build the baseline default_map with smart filling logic
-        #    - If user provided ALL types: normalize their input directly
-        #    - If user provided PARTIAL types: preserve user values, scale missing ones to fit remainder
-        if isinstance(ctw.get("_default"), list):
-            user_default_raw = _list_to_labeled_dict(ctw["_default"], card_types)
-        elif isinstance(ctw.get("_default"), dict):
-            user_default_raw = dict(ctw["_default"])
-        else:
-            user_default_raw = {}
-
-        # Coerce user values to numeric
-        user_default_numeric = {}
-        for t in card_types:
-            if t in user_default_raw:
+                    print(f"⚠️  {color} baseline has unknown type '{k}', keeping (STRICT off)")
+        baseline = {k: float(baseline.get(k, 0.0)) * scale for k in card_types}
+        row = dict(baseline)
+        provenance_steps: list[str] = ["baseline"]
+        applied_all_keys = []
+        if global_all_overrides:
+            for k, v in global_all_overrides.items():
+                if k not in card_types:
+                    if STRICT:
+                        continue
                 try:
-                    user_default_numeric[t] = float(user_default_raw[t])
+                    row[k] = float(v)
+                    applied_all_keys.append(k)
                 except Exception:
-                    print(f"⚠️  Skipping non-numeric user value for type {t!r}: {user_default_raw[t]!r}")
-
-        # Check if user provided all types or just partial
-        user_provided_types = set(user_default_numeric.keys())
-        all_types = set(card_types)
-        missing_types = all_types - user_provided_types
-        
-        if missing_types:
-            # PARTIAL input: preserve user values, scale missing ones to fit remainder
-            user_sum = sum(user_default_numeric.values())
-            remaining = total - user_sum
-            
-            if remaining < 0:
-                print(f"⚠️  User _default values sum to {user_sum} > {total}, will normalize all values")
-                # User exceeded total, normalize everything
-                default_map_coerced = user_default_numeric
-                for t in missing_types:
-                    default_map_coerced[t] = 0.0
-            else:
-                # Fill missing types proportionally from defaults to use remaining percentage
-                missing_defaults = {t: default_type_weights.get(t, 0.0) for t in missing_types}
-                missing_sum = sum(missing_defaults.values())
-                
-                default_map_coerced = dict(user_default_numeric)  # Preserve user values exactly
-                
-                if missing_sum > 0 and remaining > 0:
-                    # Scale missing types to fit in remaining space
-                    scale_factor = remaining / missing_sum
-                    for t in missing_types:
-                        default_map_coerced[t] = missing_defaults[t] * scale_factor
+                    print(f"⚠️  _all: non-numeric override {k}={v!r} skipped")
+            if applied_all_keys:
+                provenance_steps.append(f"_all({len(applied_all_keys)})")
+        overrides = user_color_overrides.get(color, {}) if color in user_color_overrides else {}
+        if overrides and not isinstance(overrides, dict):
+            print(f"⚠️  Ignoring non-dict override for color {color}")
+            overrides = {}
+        # Apply overrides (absolute replacement of those type weights)
+        applied_keys = []
+        for k, v in overrides.items():
+            if k not in card_types:
+                if STRICT:
+                    print(f"⚠️  {color}: dropping unknown type '{k}' in override")
                 else:
-                    # No defaults or no remaining space, set missing to 0
-                    for t in missing_types:
-                        default_map_coerced[t] = 0.0
-                        
-                print(f"ℹ️  Preserved user _default values, filled {len(missing_types)} missing types with {remaining:.1f}% remaining")
-        else:
-            # COMPLETE input: user provided all types, layer over profile defaults
-            default_map_coerced = dict(default_type_weights)  # Start with base + profile
-            for t in user_default_numeric:
-                default_map_coerced[t] = user_default_numeric[t]  # Overlay user values
-            print(f"ℹ️  User provided complete _default, layering over profile defaults")
-
-        # Only normalize if user exceeded total or provided complete input
-        if missing_types and sum(default_map_coerced.values()) <= total + 0.001:  # Small tolerance for floating point
-            # Don't normalize - we already have the right total
-            default_norm = {k: round(v, 1) for k, v in default_map_coerced.items()}
-            current_sum = sum(default_norm.values())
-            _print_smart_partial_result(
-                key="skeleton_params.card_types_weights[_default]",
-                user_values=user_default_raw,
-                final_values=default_norm,
-                default_values=default_type_weights,
-                total=current_sum
-            )
-        else:
-            # Normalize (either complete user input or user exceeded total)
-            default_norm = _normalize_dict_with_diffs(
-                key="skeleton_params.card_types_weights[_default]",
-                d=default_map_coerced,
-                total=total,
-            )
-        
-        ctw["_default"] = default_norm
-        # 2) For each other color row (in preferred order):
-        #    - convert list→dict if needed
-        #    - keep only declared card_types (or drop unknowns if STRICT)
-        #    - merge over normalized default (fill missing)
-        #    - normalize the merged row
-
-        # Build preferred row order: _default, WUBRG(+colorless), then others
-        ordered_rows = ["_default"]
-        ordered_rows += [c for c in CANONICAL_COLOR_ORDER if c in ctw]
-        seen = set(ordered_rows)
-        ordered_rows += sorted([k for k in ctw.keys() if k not in seen])
-
-        # Process in that order (skipping _default here; it's done above)
-        for color_key in ordered_rows:
-            if color_key == "_default":
+                    print(f"⚠️  {color}: unknown type '{k}' kept (STRICT off)")
                 continue
-            row = ctw.get(color_key)
-            if row is None:
-                continue
-            if not isinstance(row, (list, dict)):
-                print(f"ℹ️  Skip non-weight entry: skeleton_params.card_types_weights[{color_key}]")
-                continue
-
-            # Convert list → labeled dict if needed
-            if isinstance(row, list):
-                print(f"ℹ️  Converting {color_key} row list -> dict using 'card_types' labels.")
-                row_map = _list_to_labeled_dict(row, card_types)
+            try:
+                row[k] = float(v)
+                applied_keys.append(k)
+            except Exception:
+                print(f"⚠️  {color}: non-numeric override {k}={v!r} skipped")
+        if applied_keys:
+            provenance_steps.append(f"color({len(applied_keys)})")
+        # Adjust remaining to keep total 100: proportionally scale non-overridden types
+        new_sum = sum(row.values())
+        if abs(new_sum - total) > 1e-6:
+            # Identify adjustable pool (non-overridden)
+            adjustable = [k for k in card_types if k not in applied_keys and k not in applied_all_keys]
+            current_adjustable_sum = sum(row[k] for k in adjustable)
+            if current_adjustable_sum <= 0:
+                # Nothing adjustable; just normalize entire row
+                row = _normalize_dict_with_diffs(
+                    key=f"skeleton_params.card_types_color_weights[{color}]", d=row, total=total
+                )
+                final_weights[color] = row
+                provenance_steps.append("normalize(all)")
+                if verbose:
+                    print(f"🔧 {color}: {' → '.join(provenance_steps)} → sum=100.0")
             else:
-                row_map = dict(row)
-
-            # Handle unknown type keys according to STRICT policy (but allow all in _default)
-            row_map = _handle_unknown_keys(
-                row_map,
-                set(card_types) if card_types else None,
-                f"skeleton_params.card_types_weights[{color_key}]",
-                noun="types",
-            )
-
-            # Coerce numerics; ignore non-numerics with a warning
-            row_num: dict[str, float] = {}
-            for t, v in row_map.items():
-                if t not in card_types:
-                    continue
-                try:
-                    row_num[t] = float(v)
-                except Exception:
-                    print(
-                        f"⚠️  Skipping non-numeric value for "
-                        f"skeleton_params.card_types_weights[{color_key}][{t!r}]: {v!r}"
+                # Compute factor so that overridden values remain fixed
+                remaining_target = total - sum(row[k] for k in applied_keys + applied_all_keys)
+                if remaining_target < 0:
+                    # Overridden values alone exceed total -> normalize overridden + others
+                    row = _normalize_dict_with_diffs(
+                        key=f"skeleton_params.card_types_color_weights[{color}] (exceeded)", d=row, total=total
                     )
-
-            # Apply same smart partial logic as _default
-            user_provided_types = set(row_num.keys())
-            all_types = set(card_types)
-            missing_types = all_types - user_provided_types
-            
-            if missing_types:
-                # PARTIAL input: preserve user values, scale missing ones to fit remainder
-                user_sum = sum(row_num.values())
-                remaining = total - user_sum
-                
-                logging.debug(f"Processing {color_key}: user_sum={user_sum}, remaining={remaining}, missing_types={missing_types}")
-                
-                if remaining < 0:
-                    print(f"⚠️  User {color_key} values sum to {user_sum} > {total}, will normalize all values")
-                    # User exceeded total, fill missing from default and normalize everything
-                    merged = dict(default_norm)
-                    for t in row_num.keys() & set(card_types):
-                        merged[t] = row_num[t]
-                    # Will normalize below
-                    final_row = merged
-                    normalize_needed = True
+                    final_weights[color] = row
+                    provenance_steps.append("normalize(exceeded)")
+                    if verbose:
+                        print(f"⚠️  {color}: {' → '.join(provenance_steps)} → sum=100.0 (exceeded)")
                 else:
-                    # Fill missing types proportionally from default to use remaining percentage
-                    final_row = dict(row_num)  # Preserve user values exactly
-                    
-                    if remaining > 0:
-                        # Scale missing types from default to fit in remaining space
-                        missing_defaults = {t: default_norm[t] for t in missing_types}
-                        missing_sum = sum(missing_defaults.values())
-                        
-                        logging.debug(f"  missing_defaults={missing_defaults}")
-                        logging.debug(f"  missing_sum={missing_sum}")
-                        
-                        if missing_sum > 0:
-                            scale_factor = remaining / missing_sum
-                            logging.debug(f"  scale_factor={scale_factor}")
-                            for t in missing_types:
-                                final_row[t] = missing_defaults[t] * scale_factor
-                                logging.debug(f"    {t}: {missing_defaults[t]} * {scale_factor} = {final_row[t]}")
-                        else:
-                            # No defaults for missing types, set to 0
-                            logging.debug(f"  No defaults for missing types, setting to 0")
-                            for t in missing_types:
-                                final_row[t] = 0.0
-                    else:
-                        # No remaining space, set missing to 0
-                        logging.debug(f"  No remaining space, setting missing to 0")
-                        for t in missing_types:
-                            final_row[t] = 0.0
-                            
-                    print(f"ℹ️  Preserved user {color_key} values, filled {len(missing_types)} missing types with {remaining:.1f}% remaining")
-                    normalize_needed = False
-            else:
-                # COMPLETE input: user provided all types, merge over default and normalize
-                merged = dict(default_norm)
-                for t in row_num.keys() & set(card_types):
-                    merged[t] = row_num[t]
-                final_row = merged
-                normalize_needed = True
-                print(f"ℹ️  User provided complete {color_key}, normalizing all values")
+                    scale_factor = remaining_target / current_adjustable_sum if current_adjustable_sum > 0 else 0.0
+                    for k in adjustable:
+                        row[k] = row[k] * scale_factor
+                    # Final rounding (no further normalization to preserve fixed overrides)
+                    rounded = {k: round(v, 1) for k, v in row.items()}
+                    adjust_sum = sum(rounded.values())
+                    # Minor correction for rounding drift
+                    drift = total - adjust_sum
+                    if abs(drift) >= 0.1:
+                        # Apply drift to largest adjustable bucket (first by order)
+                        tgt = None
+                        for k in adjustable:
+                            if tgt is None or rounded[k] > rounded[tgt]:
+                                tgt = k
+                        if tgt:
+                            rounded[tgt] = round(rounded[tgt] + drift, 1)
+                    final_weights[color] = rounded
+                    if scale_factor != 0:
+                        provenance_steps.append(f"scale({scale_factor:.3f})")
+                    exact_sum = sum(rounded.values())
+                    if abs(exact_sum - total) > 1e-6:
+                        residual = round(total - exact_sum, 10)
+                        if adjustable:
+                            largest = max(adjustable, key=lambda k: rounded[k])
+                            rounded[largest] = round(rounded[largest] + residual, 1)
+                    if verbose:
+                        print(f"🔧 {color}: {' → '.join(provenance_steps)} → sum={sum(rounded.values()):.1f}")
 
-            # Only normalize if needed
-            if normalize_needed:
-                ctw[color_key] = _normalize_dict_with_diffs(
-                    key=f"skeleton_params.card_types_weights[{color_key}] (resolved over _default)",
-                    d=final_row,
-                    total=total,
-                )
-            else:
-                # Don't normalize - we already have the right total
-                final_rounded = {k: round(v, 1) for k, v in final_row.items()}
-                current_sum = sum(final_rounded.values())
-                _print_smart_partial_result(
-                    key=f"skeleton_params.card_types_weights[{color_key}]",
-                    user_values=row_map,
-                    final_values=final_rounded,
-                    default_values=default_norm,
-                    total=current_sum
-                )
-                ctw[color_key] = final_rounded
+        else:
+            rounded = {k: round(v, 1) for k, v in row.items()}
+            final_weights[color] = rounded
+            r_sum = sum(rounded.values())
+            if abs(r_sum - total) > 1e-6:
+                residual = round(total - r_sum, 10)
+                largest_key = max(rounded, key=lambda k: rounded[k])
+                rounded[largest_key] = round(rounded[largest_key] + residual, 1)
+            if verbose:
+                print(f"🔧 {color}: {' → '.join(provenance_steps)} (unchanged) → sum={sum(rounded.values()):.1f}")
 
-        # Rebuild dict in preferred order for nicer YAML output
-        sp["card_types_weights"] = {k: ctw[k] for k in ordered_rows if k in ctw}
+    # Store back in legacy key for runtime compatibility
+    sp["card_types_weights"] = final_weights
 
+    # Display final type weights as a pretty table
+    if verbose:
+        _print_type_weights_table(final_weights, card_types)
 
     return config
 
 
 # ---------- helpers ----------
+
+def _print_type_weights_table(final_weights: dict, card_types: list[str]) -> None:
+    """Print a pretty table showing final type weights with colors as rows and types as columns."""
+    if not final_weights or not card_types:
+        return
+    
+    print("\n📊 FINAL TYPE WEIGHTS TABLE")
+    print("─" * 120)
+    
+    # Get all colors in consistent order
+    colors = list(final_weights.keys())
+    if CANONICAL_COLOR_ORDER:
+        # Sort colors by canonical order if available
+        color_order = []
+        for canonical_color in CANONICAL_COLOR_ORDER:
+            if canonical_color in colors:
+                color_order.append(canonical_color)
+        # Add any remaining colors not in canonical order
+        for color in colors:
+            if color not in color_order:
+                color_order.append(color)
+        colors = color_order
+    
+    # Calculate column widths
+    color_col_width = max(len(c) for c in colors) + 1 if colors else 8
+    type_col_width = 9  # Width for weight values
+    
+    # Print header with types as columns
+    header = f"{'COLOR':<{color_col_width}}"
+    for card_type in card_types:
+        header += f"{card_type[:8]:>{type_col_width}}"  # Truncate long type names
+    header += f"{'TOTAL':>{type_col_width}}"
+    print(header)
+    print("─" * len(header))
+    
+    # Print each color row
+    for color in colors:
+        row = f"{color:<{color_col_width}}"
+        color_total = 0.0
+        for card_type in card_types:
+            weight = final_weights[color].get(card_type, 0.0)
+            row += f"{weight:>{type_col_width-1}.1f} "
+            color_total += weight
+        
+        # Add total and warning if not exactly 100
+        total_str = f"{color_total:.1f}"
+        if abs(color_total - 100.0) > 0.1:
+            total_str += "⚠️"
+        row += f"{total_str:>{type_col_width}}"
+        print(row)
+    
+    print("─" * len(header))
+    print("\n� This table shows the final type distribution that will be used for card generation.")
+    print("   Colors with totals ≠ 100.0 are marked with ⚠️")
+
+
 def _handle_unknown_keys(d: dict, allowed: set | None, where: str, noun: str = "keys") -> dict:
     """
     If `allowed` is None → return `d` unchanged and do not warn.
@@ -960,6 +930,24 @@ def _validate_user_config_structure(config: dict) -> list[str]:
     return issues
 
 
+def _validate_raw_user_config_structure(raw: dict) -> list[str]:
+    """Pre-merge raw user config validation (to detect omissions)."""
+    issues: list[str] = []
+    if not raw:
+        issues.append("ℹ️  INFO: Empty user config (defaults only)")
+        return issues
+    sp = raw.get("skeleton_params")
+    if sp is None:
+        issues.append("⚠️  WARNING: Missing 'skeleton_params' in user config (defaults will supply it)")
+        return issues
+    if not isinstance(sp, dict):
+        issues.append("❌ ERROR: 'skeleton_params' must be a dict in user config")
+        return issues
+    if 'types_mode' not in sp:
+        issues.append("ℹ️  INFO: 'types_mode' not specified; default 'normal' assumed")
+    return issues
+
+
 def _validate_config_integrity(config: dict, defaults: dict) -> list[str]:
     """
     Perform additional validation checks on the configuration.
@@ -986,11 +974,24 @@ def _validate_config_integrity(config: dict, defaults: dict) -> list[str]:
                 if max_weight / min_weight > 20:  # More than 20:1 ratio
                     issues.append(f"⚠️  WARNING: Extremely unbalanced color weights (max {max_weight}, min {min_weight})")
     
-    # 2. Check for missing critical sections
-    critical_sections = ["colors_weights", "card_types_weights"]
-    for section in critical_sections:
-        if section not in sp:
-            issues.append(f"⚠️  WARNING: Missing '{section}' section, will use defaults")
+    # 2. Check for missing critical sections / deprecated schemas
+    # colors_weights still required
+    if "colors_weights" not in sp:
+        issues.append("⚠️  WARNING: Missing 'colors_weights' section, will use defaults")
+
+    # Legacy vs new type weight schema handling:
+    # New schema: card_types_color_defaults (in defaults) + optional card_types_color_weights (user overrides)
+    # Legacy schema: card_types_weights provided directly by user
+    has_legacy_types = "card_types_weights" in sp
+    # Detect explicit user overrides in new schema
+    has_new_overrides = "card_types_color_weights" in sp
+
+    if has_legacy_types:
+        # Deprecation warning only if user supplied (defaults no longer include this key pre-normalization)
+        issues.append("⚠️  WARNING: Detected deprecated 'card_types_weights' schema; please migrate to 'card_types_color_defaults' + 'card_types_color_weights'.")
+    elif not has_new_overrides:
+        # Neither legacy nor new override layer supplied → using pure mode baselines
+        issues.append("⚠️  WARNING: No type weight overrides supplied (neither legacy 'card_types_weights' nor new 'card_types_color_weights'); using mode baseline defaults.")
     
     # 3. Check card_types_weights structure
     if "card_types_weights" in sp:
@@ -1065,43 +1066,40 @@ def _validate_config_integrity(config: dict, defaults: dict) -> list[str]:
     if types_mode != "normal":
         profile_key = f"_{types_mode}Defaults"
         
-        # Check if profile exists in user config OR defaults config
-        profile_exists = False
-        
-        # Check user config
-        if "card_types_weights" in sp:
-            ctw = sp["card_types_weights"]
-            if isinstance(ctw, dict) and profile_key in ctw:
-                profile_exists = True
-        
-        # Check defaults config
-        if not profile_exists:
-            default_ctw = defaults.get("skeleton_params", {}).get("card_types_weights", {})
-            if isinstance(default_ctw, dict) and profile_key in default_ctw:
-                profile_exists = True
-        
-        if not profile_exists:
-            # Find available profiles to suggest - check both user config and defaults
-            all_profiles = set()
-            
-            # Check user-provided profiles
+        # New schema support: if card_types_color_defaults contains this types_mode, treat as valid and skip legacy profile check
+        color_defaults_root = sp.get("card_types_color_defaults") or defaults.get("skeleton_params", {}).get("card_types_color_defaults")
+        if color_defaults_root and isinstance(color_defaults_root, dict) and types_mode in color_defaults_root:
+            profile_exists = True  # implicit via new schema
+        else:
+            # Legacy profile based validation
+            profile_exists = False
+            # Check user config
             if "card_types_weights" in sp:
                 ctw = sp["card_types_weights"]
-                if isinstance(ctw, dict):
-                    user_profiles = [k[1:-8] for k in ctw.keys() if k.startswith('_') and k.endswith('Defaults')]
-                    all_profiles.update(user_profiles)
-            
-            # Check default profiles from DEFAULTSCONFIG
-            default_ctw = defaults.get("skeleton_params", {}).get("card_types_weights", {})
-            if isinstance(default_ctw, dict):
-                default_profiles = [k[1:-8] for k in default_ctw.keys() if k.startswith('_') and k.endswith('Defaults')]
-                all_profiles.update(default_profiles)
-            
-            available_profiles = sorted(list(all_profiles))
-            if available_profiles:
-                issues.append(f"❌ ERROR: types_mode '{types_mode}' references missing profile '{profile_key}'. Available modes: {available_profiles}")
-            else:
-                issues.append(f"❌ ERROR: types_mode '{types_mode}' references missing profile '{profile_key}'. Add '{profile_key}' to card_types_weights or use 'normal' mode")
+                if isinstance(ctw, dict) and profile_key in ctw:
+                    profile_exists = True
+            # Check defaults config
+            if not profile_exists:
+                default_ctw = defaults.get("skeleton_params", {}).get("card_types_weights", {})
+                if isinstance(default_ctw, dict) and profile_key in default_ctw:
+                    profile_exists = True
+            if not profile_exists:
+                # Find available profiles to suggest - check both user config and defaults
+                all_profiles = set()
+                if "card_types_weights" in sp:
+                    ctw = sp["card_types_weights"]
+                    if isinstance(ctw, dict):
+                        user_profiles = [k[1:-8] for k in ctw.keys() if k.startswith('_') and k.endswith('Defaults')]
+                        all_profiles.update(user_profiles)
+                default_ctw = defaults.get("skeleton_params", {}).get("card_types_weights", {})
+                if isinstance(default_ctw, dict):
+                    default_profiles = [k[1:-8] for k in default_ctw.keys() if k.startswith('_') and k.endswith('Defaults')]
+                    all_profiles.update(default_profiles)
+                available_profiles = sorted(list(all_profiles))
+                if available_profiles:
+                    issues.append(f"❌ ERROR: types_mode '{types_mode}' references missing profile '{profile_key}'. Available modes: {available_profiles}")
+                else:
+                    issues.append(f"❌ ERROR: types_mode '{types_mode}' references missing profile '{profile_key}'. Add '{profile_key}' to card_types_weights or use 'normal' mode")
     
     # 7. Check for potential profile conflicts
     if "card_types_weights" in sp:

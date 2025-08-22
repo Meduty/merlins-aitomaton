@@ -21,6 +21,7 @@ import yaml
 import logging
 import argparse
 import subprocess
+import atexit
 from pathlib import Path
 from typing import Dict, Any, Optional
 
@@ -31,14 +32,10 @@ load_dotenv()
 # Add scripts directory to path for imports
 sys.path.append(os.path.join(os.path.dirname(__file__), 'scripts'))
 
-try:
-    import config_manager  # type: ignore
-    from metrics import GenerationMetrics  # type: ignore
-    from merlinAI_lib import check_and_normalize_config  # type: ignore
-except ImportError as e:
-    print(f"Error importing required modules: {e}")
-    print("Make sure you're running from the project root directory")
-    sys.exit(1)
+import config_manager  # type: ignore
+from scripts.metrics import GenerationMetrics  # type: ignore
+from scripts.merlinAI_lib import check_and_normalize_config  # type: ignore
+
 
 # Setup logging (will be configured based on verbose flag)
 def setup_logging(verbose: bool = False):
@@ -63,30 +60,157 @@ def setup_logging(verbose: bool = False):
 
 class MerlinAIOrchestrator:
     """Main orchestrator class for the MTG card generation pipeline."""
-    
-    def __init__(self, config_path: str, verbose: bool = False):
-        """Initialize orchestrator with configuration."""
-        self.config_path = config_path
-        self.verbose = verbose
-        self.config = self._load_config()
+
+    def __init__(self, config_path: str | None, verbose: bool = False):
+        """Initialize orchestrator with configuration.
+
+        Auto-resolution if config missing:
+          - Scan configs/ for *.yml (exclude DEFAULTSCONFIG.yml)
+          - None found → defaults only
+          - One found → use it
+          - Many found: prompt (interactive) or pick first / env override
+        """
         self.project_root = Path(__file__).parent
+        self.configs_dir = self.project_root / 'configs'
+        self.verbose = verbose
+        self.config_path: Optional[str] = self._resolve_config_path(config_path)
+        self.defaults_only = self.config_path is None
+        self._ephemeral_config: Optional[Path] = None
+        if self.defaults_only:
+            # Create ephemeral config file used only for normalization then cleaned up
+            self.config_path = self._create_ephemeral_defaults_config()
+            self._ephemeral_config = Path(self.config_path)
+            atexit.register(self._cleanup_ephemeral_config)
+        self.config = self._load_config()
         self.scripts_dir = self.project_root / "scripts"
-        
+
+    def _resolve_config_path(self, requested: str | None) -> str | None:
+        """Resolve which config file to use or return None for defaults-only."""
+        # If explicit path provided and exists -> use it
+        if requested and Path(requested).exists():
+            return requested
+        # List candidate user configs
+        candidates = []
+        if self.configs_dir.exists():
+            candidates = [
+                str(p) for p in sorted(self.configs_dir.glob('*.yml'))
+                if p.name != 'DEFAULTSCONFIG.yml' and not p.name.startswith('__')
+            ]
+        # Environment override
+        env_choice = os.getenv('MERLIN_DEFAULT_CONFIG')
+        if env_choice:
+            env_path = Path(env_choice)
+            if not env_path.is_file():  # allow bare filename inside configs
+                maybe = self.configs_dir / env_choice
+                if maybe.is_file():
+                    env_path = maybe
+            if env_path.is_file():
+                return str(env_path)
+        # Decision tree
+        if not candidates:
+            # No user configs present -> defaults only
+            return None
+        if len(candidates) == 1:
+            return candidates[0]
+        # Multiple candidates
+        interactive = sys.stdin.isatty() and os.getenv('MERLIN_NONINTERACTIVE','0') not in ('1','true','TRUE')
+        if not interactive:
+            return candidates[0]  # deterministic
+        # Prompt user
+        print("\nAvailable configuration files:")
+        for idx, path in enumerate(candidates, 1):
+            print(f"  {idx}. {Path(path).name}")
+        while True:
+            choice = input(f"Select config [1-{len(candidates)}] or ENTER for 1 (defaults-only type 'd'): ").strip()
+            if choice.lower() == 'd':
+                return None
+            if choice == '':
+                return candidates[0]
+            if choice.isdigit():
+                i = int(choice)
+                if 1 <= i <= len(candidates):
+                    return candidates[i-1]
+            print("Invalid selection, try again.")
+
+    def _create_ephemeral_defaults_config(self) -> str:
+        """Create a minimal ephemeral config file to drive normalization using defaults only."""
+        tmp = self.configs_dir / '__defaults_autoload.yml'
+        self.configs_dir.mkdir(parents=True, exist_ok=True)
+        content = [
+            '# Auto-generated minimal config for defaults-only mode',
+            'skeleton_params:',
+            '  types_mode: normal',
+        ]
+        tmp.write_text('\n'.join(content), encoding='utf-8')
+        return str(tmp)
+
+    def _cleanup_ephemeral_config(self):
+        """Remove ephemeral defaults-only config file (best-effort)."""
+        try:
+            if self._ephemeral_config and self._ephemeral_config.exists():
+                self._ephemeral_config.unlink()
+        except Exception:
+            # Silently ignore cleanup issues
+            pass
+
     def _load_config(self) -> Dict[str, Any]:
         """Load and validate configuration."""
         try:
-            config = config_manager.load_config(self.config_path)
+            # First do basic config loading
+            # If defaults-only flag triggered earlier, pass None to loader to get defaults, but we will still run normalization using ephemeral file
+            config = config_manager.load_config(self.config_path if not self.defaults_only else None)
             logging.info(f"✅ Configuration loaded from {self.config_path}")
             
-            # Basic validation will be done in check_mode with save option
+            # Apply normalization to ensure runtime uses same normalized weights as validation
+            config_path = Path(self.config_path)
+            defaults_path = config_path.parent / "DEFAULTSCONFIG.yml"
+            
+            if defaults_path.exists():
+                # Get normalized config (same as validation but without printing)
+                normalized_config = self._validate_config()
+                if normalized_config is not None:
+                    logging.info("✅ Configuration normalized for runtime use")
+                    return normalized_config
+                else:
+                    logging.warning("⚠️ Configuration normalization failed, using basic config")
+            else:
+                logging.warning(f"⚠️ DEFAULTSCONFIG.yml not found at: {defaults_path}")
+                logging.warning("⚠️ Using basic config loading without normalization")
             
             return config
         except FileNotFoundError:
+            if self.defaults_only:
+                logging.warning("⚠️ Running with defaults only (no user config file found).")
+                return config_manager.load_config(None)
             logging.error(f"❌ Config file not found: {self.config_path}")
             sys.exit(1)
         except Exception as e:
             logging.error(f"❌ Error loading config: {e}")
             sys.exit(1)
+    
+    def _validate_config(self) -> Dict[str, Any] | None:
+        """Run configuration validation and normalization quietly for runtime use."""
+        config_path = Path(self.config_path)
+        defaults_path = config_path.parent / "DEFAULTSCONFIG.yml"
+        
+        if not defaults_path.exists():
+            return None
+        
+        try:
+            # Use check_and_normalize_config but capture output instead of printing
+            # Temporarily redirect stdout to suppress print statements
+            import io
+            import contextlib
+            
+            f = io.StringIO()
+            with contextlib.redirect_stdout(f):
+                result = check_and_normalize_config(self.config_path, save=False)
+            
+            return result
+                
+        except Exception as e:
+            logging.error(f"❌ Configuration validation failed: {e}")
+            return None
     
     def _run_config_validation(self, save: bool = False):
         """Run full configuration validation using merlinAI_lib with optional save."""
@@ -220,35 +344,42 @@ class MerlinAIOrchestrator:
         return response in ['y', 'yes', 'true', '1']
     
     def run_square_generator(self, **overrides) -> bool:
-        """Run the card generation step."""
+        """Run the card generation step using the normalized config."""
         print("\n🎲 RUNNING CARD GENERATION...")
         
-        # Build command - config is positional argument
-        cmd = [sys.executable, str(self.scripts_dir / "square_generator.py"), self.config_path]
-        
-        # Add CLI overrides
-        for key, value in overrides.items():
-            if key == "total_cards":
-                cmd.extend(["--total-cards", str(value)])
-            elif key == "concurrency":
-                cmd.extend(["--concurrency", str(value)])
-            elif key == "image_model":
-                cmd.extend(["--image-model", str(value)])
-        
         try:
-            if self.verbose:
-                logging.info(f"Executing: {' '.join(cmd)}")
-            # Use streaming output so progress bars are visible
-            result = subprocess.run(cmd, check=True, text=True, env=self._get_subprocess_env())
+            # Import the generation function
+            from scripts.square_generator import generate_cards
+            
+            # Use the normalized config that's already loaded
+            config = self.config.copy()
+            
+            # Apply CLI overrides to the config
+            for key, value in overrides.items():
+                if key == "total_cards":
+                    config["square_config"]["total_cards"] = value
+                elif key == "concurrency":
+                    config["square_config"]["concurrency"] = value
+                elif key == "image_model":
+                    config["api_params"]["image_model"] = str(value)
+            
+            # Extract config name from the config path
+            config_name = Path(self.config_path).stem
+            
+            # Call the generation function directly with normalized config
+            os.environ['MERLIN_ORCHESTRATED'] = '1'
+            result = generate_cards(config, config_name)
             
             print("✅ Card generation completed successfully!")
+            if self.verbose:
+                logging.info(f"Generated {result['metrics']['successful']} cards")
+                logging.info(f"Output saved to: {result['output_file']}")
             return True
             
-        except subprocess.CalledProcessError as e:
-            print(f"❌ Card generation failed with exit code {e.returncode}")
-            return False
         except Exception as e:
-            print(f"❌ Unexpected error during card generation: {e}")
+            print(f"❌ Card generation failed: {e}")
+            if self.verbose:
+                logging.exception("Full error details:")
             return False
     
     def run_mse_conversion(self) -> bool:
@@ -256,13 +387,14 @@ class MerlinAIOrchestrator:
         current_image_method = self.config.get("mtgcg_mse_config", {}).get("image_method", "download")
         print(f"\n📋 RUNNING MSE CONVERSION + IMAGES (method: {current_image_method})...")
         
-        cmd = [sys.executable, str(self.scripts_dir / "MTGCG_mse.py"), self.config_path]
-        
         try:
+            # Import and call MTGCG_mse function directly with orchestrator-processed config
+            from scripts.MTGCG_mse import main_with_config
             if self.verbose:
-                logging.info(f"Executing: {' '.join(cmd)}")
-            # Use streaming output so progress bars are visible
-            result = subprocess.run(cmd, check=True, text=True, env=self._get_subprocess_env())
+                logging.info(f"Running MSE conversion with processed config")
+            
+            # Pass the already processed config directly
+            main_with_config(self.config_path, self.config)
             
             print("✅ MSE conversion + image handling completed successfully!")
             return True
@@ -481,8 +613,11 @@ Examples:
     parser.add_argument(
         "config", 
         nargs="?", 
-        default="configs/user.yml",
-        help="Path to configuration file (default: configs/user.yml)"
+        default=None,
+        help="Path to configuration file. If omitted: auto-select or defaults-only."
+    )
+    parser.add_argument(
+        "--list-configs", action="store_true", help="List available configs and exit"
     )
     
     parser.add_argument(
@@ -520,6 +655,20 @@ Examples:
     setup_logging(verbose=args.verbose)
     
     # Initialize orchestrator
+    if args.list_configs:
+        configs_dir = Path(__file__).parent / 'configs'
+        if configs_dir.exists():
+            files = [p for p in configs_dir.glob('*.yml')
+                     if p.name != 'DEFAULTSCONFIG.yml' and not p.name.startswith('__')]
+            if not files:
+                print("(no user config files found)")
+            else:
+                for f in sorted(files):
+                    print(f.name)
+        else:
+            print("configs/ directory not found")
+        return
+
     orchestrator = MerlinAIOrchestrator(args.config, verbose=args.verbose)
     
     # Run in appropriate mode

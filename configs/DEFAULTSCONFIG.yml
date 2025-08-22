@@ -43,7 +43,7 @@ set_params:
     - "Legendary artifacts"
 
 skeleton_params:
-  types_mode: normal  # normal (play-ready) | square 
+  types_mode: normal  # normal | play
   canonical_card_types:
     - "creature"
     - "artifact creature"
@@ -57,29 +57,175 @@ skeleton_params:
     - "basic land"
     - "artifact"
     - "kindred"
-  ### used for decks
-  card_types_weights:
-    _default:
-      creature: 30
-      artifact creature: 1
-      planeswalker: 1
-      instant: 8
-      sorcery: 9
-      enchantment: 8
-      saga: 2
-      battle: 2
-      land: 18
-      basic land: 18
-      artifact: 2
-      kindred: 1
-    _squareDefaults:
-      creature: 50  # Override: more creatures
-      land: 5      # Override: fewer lands  
-      basic land: 5 # Override: fewer basic lands
-      # Missing types will be filled from _default proportionally
-    colorless:
-      artifact: 70
-      "artifact creature": 30
+  ### Color baselines per mode (NEW SCHEMA: no legacy _default)
+  card_types_color_defaults:
+      normal:
+        white:
+          # Slight bump to creature share to top of white's typical range; instant trimmed.
+          creature: 51
+          artifact creature: 1  # counted inside effective creature share
+          planeswalker: 1
+          instant: 9
+          sorcery: 9
+          enchantment: 14
+          saga: 3
+          battle: 1
+          land: 5
+          basic land: 4
+          artifact: 1
+          kindred: 1
+        blue:
+          # Lower creature share; shift weight into instants/sorceries; slight enchantment trim.
+          creature: 40
+          artifact creature: 1
+          planeswalker: 1
+          instant: 18
+          sorcery: 15
+          enchantment: 6
+          saga: 2
+          battle: 2
+          land: 5
+          basic land: 4
+          artifact: 4
+          kindred: 2
+        black:
+          creature: 48
+          artifact creature: 1
+          planeswalker: 1
+          instant: 10
+          sorcery: 13
+          enchantment: 8
+          saga: 2
+          battle: 2
+          land: 5
+          basic land: 4
+          artifact: 3
+          kindred: 3
+        red:
+          # Shift a little from creatures into burn (instants/sorceries).
+          creature: 45
+          artifact creature: 1
+          planeswalker: 1
+          instant: 14
+          sorcery: 17
+          enchantment: 4
+          saga: 2
+          battle: 2
+          land: 5
+          basic land: 4
+          artifact: 3
+          kindred: 2
+        green:
+          creature: 55
+          artifact creature: 1
+          planeswalker: 1
+          instant: 6
+          sorcery: 9
+          enchantment: 11
+          saga: 2
+          battle: 2
+          land: 5
+          basic land: 4
+          artifact: 2
+          kindred: 2
+        colorless:
+          # Moderate artifact saturation; spread a little into other minor types & lands.
+          creature: 4
+          artifact creature: 24
+          planeswalker: 1
+          instant: 1
+          sorcery: 1
+          enchantment: 1
+          saga: 2
+          battle: 2
+          land: 9
+          basic land: 1   # ensure >0; took 1 from artifact below
+          artifact: 53
+          kindred: 1
+      play:
+        # PLAY mode: tuned to approximate a 40-card Limited deck heuristic inside a monocolor slice.
+        # Approx targets: Lands ~40%, Creatures (incl artifact creature) ~30–42 depending on color, remainder spells.
+        white:
+          creature: 36.5
+          artifact creature: 1
+          planeswalker: 0.4
+          instant: 8.5
+          sorcery: 6.6
+          enchantment: 5
+          saga: 0.6
+          battle: 0.4
+          land: 24
+          basic land: 16
+          artifact: 0.6
+          kindred: 0.4
+        blue:
+          creature: 31
+          artifact creature: 1
+          planeswalker: 0.5
+          instant: 13.5
+          sorcery: 9
+          enchantment: 3
+          saga: 0.5
+          battle: 0.5
+          land: 24
+          basic land: 16
+          artifact: 0.5
+          kindred: 0.5
+        black:
+          creature: 37
+          artifact creature: 1
+          planeswalker: 0.4
+          instant: 9
+          sorcery: 9
+          enchantment: 2
+          saga: 0.6
+          battle: 0.6
+          land: 23
+          basic land: 16
+          artifact: 0.7
+          kindred: 0.7
+        red:
+          creature: 35
+          artifact creature: 1
+          planeswalker: 0.4
+          instant: 12
+          sorcery: 10
+          enchantment: 1
+          saga: 0.4
+          battle: 0.4
+          land: 23
+          basic land: 16
+          artifact: 0.4
+          kindred: 0.4
+        green:
+          creature: 41
+          artifact creature: 1
+          planeswalker: 0.4
+          instant: 5
+          sorcery: 6
+          enchantment: 5
+          saga: 0.6
+          battle: 0.6
+          land: 23
+          basic land: 16
+          artifact: 0.7
+          kindred: 0.7
+        colorless:
+          # Colorless in deck context: small share; lands + utility artifacts.
+          creature: 2
+          artifact creature: 10
+          planeswalker: 0.3
+          instant: 2.5
+          sorcery: 2.5
+          enchantment: 1.5
+          saga: 1.2
+          battle: 0.8
+          land: 24
+          basic land: 16
+          artifact: 33
+          kindred: 6.2
+  # User overlays (applied AFTER selecting per-mode baselines). Optional.
+  # _default applies to ALL colors; per-color keys override after that.
   colors:
     - "white"
     - "blue"
@@ -87,6 +233,14 @@ skeleton_params:
     - "red"
     - "green"
     - "colorless"
+  colors_weights:
+    white: 16.67
+    blue: 16.67
+    black: 16.67
+    red: 16.67
+    green: 16.67
+    colorless: 16.65
+  color_bleed_factor: 20
   mana_values:
     - "0"
     - "1"
@@ -124,14 +278,6 @@ skeleton_params:
     uncommon: -1
     rare: 1
     mythic: 2
-  colors_weights:
-    white: 16.67
-    blue: 16.67
-    black: 16.67
-    red: 16.67
-    green: 16.67
-    colorless: 16.65
-  color_bleed_factor: 20
   land_color_bleed_overlinear: 2
   legend_mutation_factor: 1
   rarity_based_mutation:
