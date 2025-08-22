@@ -67,7 +67,7 @@ def setup_logging():
             force=True
         )
 
-setup_logging()
+# Don't call setup_logging() at import time - let it be called when needed
 
 
 class APIParams:
@@ -1119,6 +1119,9 @@ def generate_cards(config: Dict[str, Any], config_name: str) -> Dict[str, Any]:
     Returns:
         Dict containing generation metrics and results
     """
+    # Setup logging based on orchestrator's verbose setting
+    setup_logging()
+    
     # Extract configuration values
     total_cards = config["square_config"]["total_cards"]
     concurrency = config["square_config"]["concurrency"]

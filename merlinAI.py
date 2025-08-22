@@ -348,6 +348,10 @@ class MerlinAIOrchestrator:
         print("\n🎲 RUNNING CARD GENERATION...")
         
         try:
+            # Set environment variable BEFORE importing to control logging
+            os.environ['MERLIN_VERBOSE'] = "1" if self.verbose else "0"
+            os.environ['MERLIN_ORCHESTRATED'] = '1'
+            
             # Import the generation function
             from scripts.square_generator import generate_cards
             
@@ -367,7 +371,6 @@ class MerlinAIOrchestrator:
             config_name = Path(self.config_path).stem
             
             # Call the generation function directly with normalized config
-            os.environ['MERLIN_ORCHESTRATED'] = '1'
             result = generate_cards(config, config_name)
             
             print("✅ Card generation completed successfully!")

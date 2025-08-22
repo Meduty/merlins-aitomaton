@@ -52,7 +52,7 @@ def setup_logging():
             force=True
         )
 
-setup_logging()
+# Don't call setup_logging() at import time - let it be called when needed
 
 # NOTE: Configuration now passed as parameters instead of global loading
 # Global constants only
