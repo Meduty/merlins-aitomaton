@@ -366,7 +366,17 @@ class MerlinAIOrchestrator:
                     config["square_config"]["concurrency"] = value
                 elif key == "image_model":
                     config["api_params"]["image_model"] = str(value)
+
+            pack_builder = config["pack_builder"]
             
+            if pack_builder["enabled"]:
+                total = 0
+                pack = pack_builder["pack"]
+                for slot in pack:
+                    total += slot["count"]
+                config["square_config"]["total_cards"] = total
+                print(f"\n ⚠️ Pack builder enabled: generating {total} cards as per pack configuration")
+
             # Extract config name from the config path
             config_name = Path(self.config_path).stem
             
@@ -485,41 +495,57 @@ class MerlinAIOrchestrator:
         
     def show_results(self):
         """Display results summary after completion."""
-        output_dir = Path(self.config["square_config"]["output_dir"])
-        print(f"📁 Check your results in: {output_dir.absolute()}")
-        
-        # Extract config name for finding the MSE set file
-        config_name = os.path.splitext(os.path.basename(self.config_path))[0]
-        
-        results = []
-        if (output_dir / "generated_cards.json").exists():
-            results.append("✅ generated_cards.json - Card data")
-        
-        # Look for MSE set file with config name prefix
-        mse_set_file = output_dir / f"{config_name}-mse-out.mse-set"
-        if mse_set_file.exists():
-            results.append(f"✅ {config_name}-mse-out.mse-set - MSE set file")
-        elif (output_dir / "mse-out.mse-set").exists():  # Fallback for old naming
-            results.append("✅ mse-out.mse-set - MSE set file")
-            
-        if (output_dir / "mse-out").exists() and list((output_dir / "mse-out").glob("*.png")):
-            png_count = len(list((output_dir / "mse-out").glob("*.png")))
-            results.append(f"✅ mse-out/ - {png_count} card images")
-        if (output_dir / "forge_out").exists():
-            results.append("✅ forge_out/ - Forge format files")
-        
-        if results:
-            print("📊 Generated files:")
-            for result in results:
-                print(f"   {result}")
+        output_dir = Path(self.config["square_config"]["output_dir"])  # Base output directory
+        config_name = Path(self.config_path).stem
+        config_outdir = output_dir / config_name  # New schema: per-config subdirectory
+
+        print(f"📁 Base output dir : {output_dir.absolute()}")
+        print(f"📁 Config output dir: {config_outdir.absolute()} (new schema)")
+
+        cards_file_new = config_outdir / f"{config_name}_cards.json"
+        mse_set_file_new = config_outdir / f"{config_name}-mse-out.mse-set"
+
+        # Legacy fallback paths (pre schema change)
+        legacy_cards_file = output_dir / "generated_cards.json"
+        legacy_mse_file = output_dir / "mse-out.mse-set"
+
+        results: list[str] = []
+
+        if cards_file_new.exists():
+            results.append(f"✅ {cards_file_new.relative_to(output_dir)} - Card data")
+        elif legacy_cards_file.exists():
+            results.append("✅ generated_cards.json - Card data (legacy location)")
         else:
-            print("⚠️  No output files detected")
-        
-        # Show the appropriate MSE file path
-        if mse_set_file.exists():
-            print(f"\n💡 To view your cards, open {mse_set_file} in Magic Set Editor")
-        elif (output_dir / "mse-out.mse-set").exists():
-            print(f"\n💡 To view your cards, open {output_dir / 'mse-out.mse-set'} in Magic Set Editor")
+            results.append("❌ Card data file not found")
+
+        if mse_set_file_new.exists():
+            results.append(f"✅ {mse_set_file_new.relative_to(output_dir)} - MSE set file")
+        elif legacy_mse_file.exists():
+            results.append("✅ mse-out.mse-set - MSE set file (legacy location)")
+        else:
+            results.append("❌ MSE set file not found")
+
+        # The temporary mse-out directory is removed after zipping in new schema, so we don't list PNGs there anymore.
+        # If future image pipelines produce a persistent image directory, detection can be added here.
+
+        # Attempt to detect Forge output (may be placed under config subdir or base)
+        forge_candidates = [config_outdir / "forge_out", output_dir / "forge_out"]
+        for candidate in forge_candidates:
+            if candidate.exists():
+                results.append(f"✅ {candidate.relative_to(output_dir)} - Forge format files")
+                break
+
+        print("\n📊 Generated files:")
+        for r in results:
+            print(f"   {r}")
+
+        # Helpful next-step hint
+        if mse_set_file_new.exists():
+            print(f"\n💡 To view your cards, open {mse_set_file_new} in Magic Set Editor")
+        elif legacy_mse_file.exists():
+            print(f"\n💡 To view your cards, open {legacy_mse_file} in Magic Set Editor (legacy path)")
+        else:
+            print("\nℹ️  Run the MSE conversion step to create a .mse-set archive.")
     
     def batch_mode(self, steps: list):
         """Run the orchestrator in batch mode with specified steps."""

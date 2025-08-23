@@ -230,7 +230,9 @@ class SkeletonParams:
         fixed_amount_themes: int = 1,  # if not zero, select fixed amount instead of random mutation
         power_level: float = 5,  # Power level of the card, 1–10
         rarity_to_skew: Optional[dict[str, int]] = None,  # rarity skew mapping
-        types_mode: str = "normal",  # Types distribution mode (normal, square, pack, deck)
+        standard_deviation_powerLevel: float = 0.5,  # Standard deviation for power level
+        power_level_rarity_skew: float = 0.5,  # Rarity skew for power level
+        types_mode: str = "normal",  # Types distribution mode
     ):
         # Set up canonical card types and default weights from config - NO FALLBACKS
         if canonical_card_types is None:
@@ -341,7 +343,9 @@ class SkeletonParams:
         self.mutation_chance_per_theme = mutation_chance_per_theme
         self.fixed_amount_themes = fixed_amount_themes
         self.power_level = power_level
-        
+        self.standard_deviation_powerLevel = standard_deviation_powerLevel
+        self.power_level_rarity_skew = power_level_rarity_skew
+
         # Rarity to skew mapping with defaults
         if rarity_to_skew is None:
             raise ValueError("rarity_to_skew must be provided in configuration")
@@ -521,18 +525,33 @@ def chance_advantage(input_bleed, steigung=1) -> float:
 
     return res
 
+def build_pack(pack_cfg: list[dict]) -> list:
+    """
+    Builds a booster pack configuration based on the provided settings.
+    """
+    pack = list()
+    
+    for slot in pack_cfg:
+        count = slot.pop("count")
+        for card in range(count):
+            pre_defined_keys = { k: v for k, v in slot.items() }
+            pack.append(pre_defined_keys)
+
+    return pack
+
 
 def card_skeleton_generator(
-    index, api_params: APIParams, skeleton_params: SkeletonParams, config: Dict[str, Any]
+    index, api_params: APIParams, skeleton_params: SkeletonParams, predefined_keys: Optional[dict], config: Dict[str, Any]
 ) -> APIParams:
     """
     Generates a card skeleton with fixed values and random attributes.
     Config is passed as argument instead of using global variables.
     """
+
     # Extract config values instead of using globals
     sleepy_time = config["square_config"]["sleepy_time"]
-    stdDePL = config["square_config"]["standard_deviation_powerLevel"]
-    powSkew = config["square_config"]["power_level_rarity_skew"]
+    stdDePL = skeleton_params.standard_deviation_powerLevel
+    powSkew = skeleton_params.power_level_rarity_skew
 
     out_params = deepcopy(api_params)
 
@@ -551,21 +570,31 @@ def card_skeleton_generator(
     logging.debug(f"[Card #{index+1}] Selected base color identity: {selected_colors}")
 
     # Types
+    
     t = skeleton_params.card_types.copy()
-    logging.debug(f"[Card #{index+1}] Available types: {t}")
-    logging.debug(f"[Card #{index+1}] Default type weights: {skeleton_params.default_type_weights}")
-    logging.debug(f"[Card #{index+1}] Type weights for colors '{skeleton_params.card_types_weights}")
-    card_types_weights = skeleton_params.card_types_weights[selected_colors[0]]
-    
-    # Handle zero-weight scenario for selected color
-    total_weight = sum(w for w in card_types_weights if isinstance(w, (int, float)))
-    
-    if total_weight == 0:
-        # All type weights are zero for this color - set type to None
-        logging.info(f"[Card #{index+1}] Color '{selected_colors[0]}' has zero type weights, setting type to 'None'")
-        selected_types = ["None"]
+    if "type" in predefined_keys and isinstance(predefined_keys["type"], str):
+        selected_types = [predefined_keys["type"]]
+    elif "type" in predefined_keys and isinstance(predefined_keys["type"], dict):
+        selected_types = random.choices(
+            list(predefined_keys["type"].keys()),
+            weights=list(predefined_keys["type"].values()),
+            k=1
+        )
     else:
-        selected_types = random.choices(t, weights=card_types_weights, k=1)
+        logging.debug(f"[Card #{index+1}] Available types: {t}")
+        logging.debug(f"[Card #{index+1}] Default type weights: {skeleton_params.default_type_weights}")
+        logging.debug(f"[Card #{index+1}] Type weights for colors '{skeleton_params.card_types_weights}")
+        card_types_weights = skeleton_params.card_types_weights[selected_colors[0]]
+        
+        # Handle zero-weight scenario for selected color
+        total_weight = sum(w for w in card_types_weights if isinstance(w, (int, float)))
+        
+        if total_weight == 0:
+            # All type weights are zero for this color - set type to None
+            logging.info(f"[Card #{index+1}] Color '{selected_colors[0]}' has zero type weights, setting type to 'None'")
+            selected_types = ["None"]
+        else:
+            selected_types = random.choices(t, weights=card_types_weights, k=1)
     
     logging.debug(f"[Card #{index+1}] Selected type: {selected_types[0]}")
 
@@ -696,9 +725,19 @@ def card_skeleton_generator(
     card_skeleton["colorIdentity"] = ", ".join(selected_colors)
 
     # Rarity
-    rarities = skeleton_params.rarities
-    rarity_weights = skeleton_params.rarities_weights
-    selected_rarity = random.choices(rarities, weights=rarity_weights, k=1)[0]
+    if "rarity" in predefined_keys and isinstance(predefined_keys["rarity"], str):
+        selected_rarity = predefined_keys["rarity"]
+    elif "rarity" in predefined_keys and isinstance(predefined_keys["rarity"], dict):
+        selected_rarity = random.choices(
+            list(predefined_keys["rarity"].keys()),
+            weights=list(predefined_keys["rarity"].values()),
+            k=1
+        )[0]
+    else:
+        rarities = skeleton_params.rarities
+        rarity_weights = skeleton_params.rarities_weights
+        selected_rarity = random.choices(rarities, weights=rarity_weights, k=1)[0]
+    
     logging.info(f"[Card #{index+1}] Selected rarity: {selected_rarity}")
     time.sleep(sleepy_time)
     card_skeleton["rarity"] = selected_rarity
@@ -747,7 +786,11 @@ def card_skeleton_generator(
         time.sleep(sleepy_time)
 
     # function tags
-    function_tags = skeleton_params.function_tags
+    if "function_tags" in predefined_keys:
+        function_tags = predefined_keys["function_tags"]
+    else:
+        function_tags = skeleton_params.function_tags
+    
     selected_tags = []
     logging.debug(
         f"[Card #{index+1}] Checking for function tags. Available tags: {function_tags}"
@@ -1010,7 +1053,7 @@ def generate_card(index, api_params: APIParams, metrics: GenerationMetrics, conf
     return output_data
 
 
-def get_card_graceful(i, api_params: APIParams, skeleton_params: SkeletonParams, 
+def get_card_graceful(i, api_params: APIParams, skeleton_params: SkeletonParams, predefined_keys: Optional[dict],
                      metrics: GenerationMetrics, config: Dict[str, Any], 
                      retries=3, retry_delay=10, auth_lock=None) -> dict:
     """
@@ -1028,7 +1071,7 @@ def get_card_graceful(i, api_params: APIParams, skeleton_params: SkeletonParams,
         try:
 
             local_api_params = card_skeleton_generator(
-                i, api_params=api_params, skeleton_params=skeleton_params, config=config
+                i, api_params=api_params, skeleton_params=skeleton_params, predefined_keys=predefined_keys, config=config
             )
 
             logging.info(
@@ -1082,7 +1125,7 @@ def get_card_graceful(i, api_params: APIParams, skeleton_params: SkeletonParams,
 ################# Main Execution #################
 
 
-def card_worker(card_queue, pbar, api_params, skeleton_params, metrics, config, max_retries, retry_delay, auth_lock):
+def card_worker(card_queue, pbar, api_params, skeleton_params, metrics, config, max_retries, retry_delay, auth_lock, pack):
     """Worker function for threaded card generation."""
     while True:
         try:
@@ -1091,8 +1134,13 @@ def card_worker(card_queue, pbar, api_params, skeleton_params, metrics, config, 
             break
 
         try:
+            predefined_keys = None
+            if pack is not None:
+                logging.info(f"[Card #{i+1}] Using predefined pack data.")
+                time.sleep(config["square_config"]["sleepy_time"])
+                predefined_keys = pack[i]
             card = get_card_graceful(
-                i, api_params=api_params, skeleton_params=skeleton_params,
+                i, api_params=api_params, skeleton_params=skeleton_params, predefined_keys=predefined_keys,
                 metrics=metrics, config=config, retries=max_retries, retry_delay=retry_delay,
                 auth_lock=auth_lock
             )
@@ -1160,7 +1208,19 @@ def generate_cards(config: Dict[str, Any], config_name: str) -> Dict[str, Any]:
     skeleton_params_filtered = {k: v for k, v in skeleton_params_full.items()
                                 if k not in ['card_types_color_defaults', 'card_types_color_weights']}
     
+    pack_builder = config["pack_builder"]
+
+    pack = None
+    if pack_builder["enabled"]:
+        pack_cfg = pack_builder["pack"]
+        pack = build_pack(pack_cfg=pack_cfg)
+        logging.info(f"Booster pack configuration enabled with {len(pack)} cards.")
+        time.sleep(sleepy_time)
+        logging.info(f"Booster pack contents: {pack}")
+        time.sleep(sleepy_time)
+
     card_skeleton_params = SkeletonParams(**skeleton_params_filtered)
+
     api_params = APIParams(
         api_key=API_KEY,
         auth_token=AUTH_TOKEN,
@@ -1210,6 +1270,7 @@ def generate_cards(config: Dict[str, Any], config_name: str) -> Dict[str, Any]:
                         max_retries,
                         retry_delay,
                         auth_lock,
+                        pack,
                     ),
                     daemon=False,
                 )

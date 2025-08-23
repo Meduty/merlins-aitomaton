@@ -3,11 +3,9 @@
 # User configs will override these values
 
 square_config:
-  total_cards: 60
+  total_cards: 60 # Overridden if pack_builder is enabled
   concurrency: 4
   sleepy_time: 0.5
-  standard_deviation_powerLevel: 0.5
-  power_level_rarity_skew: 0.5
   output_dir: "output"
   
 
@@ -41,6 +39,44 @@ set_params:
     - "Divine intervention"
     - "Dark secrets"
     - "Legendary artifacts"
+
+pack_builder:
+  enabled: false
+  pack: [
+    {
+      "rarity": "common",
+      "count": 7
+    },
+    {
+      "rarity": "uncommon",
+      "count": 3
+    },
+    {
+      "rarity": {
+        "rare": 6,
+        "mythic": 1
+      },
+      "count": 1
+    },
+    {
+      "count": 2
+    },
+    {
+      "type": "basic land",
+      "count": 1
+    },
+    {
+      "type": "Non-playable",
+      "function_tags": {
+        "Fun card": 33,
+        "Non-playable": 33,
+        "Unplayable": 33,
+        "Player Aid": 33,
+        "Token": 33
+      },
+      "count": 1
+    }
+  ]
 
 skeleton_params:
   types_mode: normal  # normal | play
@@ -273,11 +309,6 @@ skeleton_params:
     "Flying or other evasion": 5
     "simple or straightforward": 10
     "vanilla or no abilities": 5
-  rarity_to_skew:
-    common: -2
-    uncommon: -1
-    rare: 1
-    mythic: 2
   land_color_bleed_overlinear: 2
   legend_mutation_factor: 1
   rarity_based_mutation:
@@ -292,7 +323,13 @@ skeleton_params:
   mutation_chance_per_theme: 20
   fixed_amount_themes: 2
   power_level: 7.5
-
+  standard_deviation_powerLevel: 0.5
+  power_level_rarity_skew: 0.5
+  rarity_to_skew:
+    common: -2
+    uncommon: -1
+    rare: 1
+    mythic: 2
 
 SD_config:
   max_tag_weight: 2.5

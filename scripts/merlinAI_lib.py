@@ -132,7 +132,7 @@ def check_and_normalize_config(config_path: str, save: bool = False, total: floa
 
     # Merged validation (structure)
     if verbose:
-        print("\n📋 Validating user configuration structure...")
+        print("\n📋 Validating merged configuration structure...")
         print("-" * 40)
     merged_structure_issues = _validate_user_config_structure(config)
     stop_early = _print_validation_results(merged_structure_issues) if verbose else any("❌" in x for x in merged_structure_issues)
@@ -215,12 +215,24 @@ def _normalize_all_weights_with_diffs(config: dict, defaults: dict, total: float
       - skeleton_params.card_types
     Uses fallback values from defaults config.
     """
+
+    total_cards = config["square_config"]["total_cards"]
+
+    if config["pack_builder"]["enabled"]:
+        countsum = 0
+        for slot in config["pack_builder"]["pack"]:
+            countsum += slot["count"]
+        if countsum != total_cards:
+            print(f"⚠️  WARNING: Updating total_cards from {total_cards} to {countsum} based on pack_builder counts.\n")
+            total_cards = countsum
+            config["square_config"]["total_cards"] = total_cards
+
     # Ensure skeleton_params exists and merge with defaults
     if "skeleton_params" not in config:
         config["skeleton_params"] = {}
     
     # Merge skeleton_params with defaults (user values take precedence)
-    default_sp = defaults.get("skeleton_params", {})
+    default_sp = defaults["skeleton_params"]
     sp = config["skeleton_params"]
     
     # Merge missing keys from defaults
@@ -961,7 +973,7 @@ def _validate_config_integrity(config: dict, defaults: dict) -> list[str]:
         return issues
     
     sp = config["skeleton_params"]
-    default_sp = defaults.get("skeleton_params", {})
+    default_sp = defaults["skeleton_params"]
     
     # 1. Check for extremely unbalanced color weights
     if "colors_weights" in sp:
@@ -1060,47 +1072,7 @@ def _validate_config_integrity(config: dict, defaults: dict) -> list[str]:
     for key in sp.keys():
         if key in suspicious_keys:
             issues.append(f"⚠️  WARNING: Suspicious key '{key}' - did you mean '{key}s_weights'?")
-    
-    # 6. Check types_mode validity against available profiles (validate dynamically)
-    types_mode = sp.get("types_mode", "normal")
-    if types_mode != "normal":
-        profile_key = f"_{types_mode}Defaults"
-        
-        # New schema support: if card_types_color_defaults contains this types_mode, treat as valid and skip legacy profile check
-        color_defaults_root = sp.get("card_types_color_defaults") or defaults.get("skeleton_params", {}).get("card_types_color_defaults")
-        if color_defaults_root and isinstance(color_defaults_root, dict) and types_mode in color_defaults_root:
-            profile_exists = True  # implicit via new schema
-        else:
-            # Legacy profile based validation
-            profile_exists = False
-            # Check user config
-            if "card_types_weights" in sp:
-                ctw = sp["card_types_weights"]
-                if isinstance(ctw, dict) and profile_key in ctw:
-                    profile_exists = True
-            # Check defaults config
-            if not profile_exists:
-                default_ctw = defaults.get("skeleton_params", {}).get("card_types_weights", {})
-                if isinstance(default_ctw, dict) and profile_key in default_ctw:
-                    profile_exists = True
-            if not profile_exists:
-                # Find available profiles to suggest - check both user config and defaults
-                all_profiles = set()
-                if "card_types_weights" in sp:
-                    ctw = sp["card_types_weights"]
-                    if isinstance(ctw, dict):
-                        user_profiles = [k[1:-8] for k in ctw.keys() if k.startswith('_') and k.endswith('Defaults')]
-                        all_profiles.update(user_profiles)
-                default_ctw = defaults.get("skeleton_params", {}).get("card_types_weights", {})
-                if isinstance(default_ctw, dict):
-                    default_profiles = [k[1:-8] for k in default_ctw.keys() if k.startswith('_') and k.endswith('Defaults')]
-                    all_profiles.update(default_profiles)
-                available_profiles = sorted(list(all_profiles))
-                if available_profiles:
-                    issues.append(f"❌ ERROR: types_mode '{types_mode}' references missing profile '{profile_key}'. Available modes: {available_profiles}")
-                else:
-                    issues.append(f"❌ ERROR: types_mode '{types_mode}' references missing profile '{profile_key}'. Add '{profile_key}' to card_types_weights or use 'normal' mode")
-    
+
     # 7. Check for potential profile conflicts
     if "card_types_weights" in sp:
         ctw = sp["card_types_weights"]
@@ -1122,7 +1094,13 @@ def _validate_config_integrity(config: dict, defaults: dict) -> list[str]:
                 issues.append("❌ ERROR: 'total_cards' must be positive")
             elif total_cards > 1000:
                 issues.append("⚠️  WARNING: Very high card count may take a long time to generate")
-    
+        if config["pack_builder"]["enabled"]:
+            countsum = 0
+            for slot in config["pack_builder"]["pack"]:
+                countsum += slot["count"]
+            if countsum != total_cards:
+                issues.append(f"⚠️  WARNING: Pack builder counts sum ({countsum}) does not match total_cards ({total_cards}) Using pack_builder countsum as total_cards.")
+
     # 9. Check concurrency parameters
     if "concurrency" in square_config:
         concurrency = square_config["concurrency"]
@@ -1131,7 +1109,7 @@ def _validate_config_integrity(config: dict, defaults: dict) -> list[str]:
                 issues.append("❌ ERROR: 'concurrency' must be positive")
             elif concurrency > 20:
                 issues.append("⚠️  WARNING: Very high concurrency may cause performance issues")
-    
+
     return issues
 
 def _print_validation_results(issues: list[str]):

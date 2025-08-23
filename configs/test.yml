@@ -1,0 +1,8 @@
+
+skeleton_params:
+  power_level: 10
+  standard_deviation_powerLevel: 0.5
+  power_level_rarity_skew: 0.2
+
+pack_builder:
+  enabled: true
