@@ -1,6 +1,6 @@
 # MerlinAI 🎯
 
-**MerlinAI** is a comprehensive AI-powered Magic: The Gathering (MTG) card generation and utility suite. It generates custom MTG cards using AI models with externalized configuration, exports sets compatible with Magic Set Editor (MSE), and supports image generation via Stable Diffusion. The system features a complete orchestrator with clean progress bars and verbose debugging modes.
+**MerlinAI** is a comprehensive AI-powered Magic: The Gathering (MTG) card generation and utility suite. It generates custom MTG cards using AI models with externalized configuration, exports sets compatible with Magic Set Editor (MSE), and supports image generation via Stable Diffusion. The system features a complete orchestrator with clean progress bars, verbose debugging modes, and a pack builder system for creating realistic booster packs.
 
 ---
 
@@ -103,6 +103,9 @@ The `--check` flag is equivalent to running interactive mode and answering "no" 
 
 - **🤖 AI-Powered Card Generation:**  
   Creates MTG cards using OpenAI GPT models via MTG Card Generator API, with configurable parameters for colors, rarities, types, and themes.
+
+- **📦 Pack Builder System:**  
+  Generate realistic booster packs with customizable slot definitions, weighted rarity distribution, type constraints, and special function tags for tokens, player aids, and non-playable cards.
 
 - **🎨 Advanced Image Generation:**  
   Supports Stable Diffusion (local), external API downloads, with Lora weights, custom prompts, and model swapping.
@@ -515,6 +518,15 @@ api_params:
   image_model: "dall-e-3"    # Image generation model
   generate_image_prompt: false
 
+pack_builder:
+  enabled: false             # Enable structured pack generation
+  pack: [                    # Define booster pack slots
+    {"rarity": "common", "count": 7},
+    {"rarity": "uncommon", "count": 3},
+    {"rarity": {"rare": 6, "mythic": 1}, "count": 1},
+    {"type": "basic land", "count": 1}
+  ]
+
 skeleton_params:
   colors: ["white", "blue", "black", "red", "green", "colorless"]
   rarities: ["common", "uncommon", "rare", "mythic"]
@@ -536,6 +548,60 @@ python scripts/square_generator.py --config config.yml \
   --output-dir custom_output \
   --image-model none
 ```
+
+### Pack Builder Configuration
+
+The pack builder system allows you to generate structured booster packs instead of random card collections:
+
+```yaml
+pack_builder:
+  enabled: true              # Enable pack mode
+  pack: [                    # Define pack slots
+    {
+      "rarity": "common",    # Fixed rarity
+      "count": 7
+    },
+    {
+      "rarity": "uncommon",
+      "count": 3  
+    },
+    {
+      "rarity": {            # Weighted rarity selection
+        "rare": 6,           # 6/7 chance for rare
+        "mythic": 1          # 1/7 chance for mythic
+      },
+      "count": 1
+    },
+    {
+      "count": 2             # No constraints (random)
+    },
+    {
+      "type": "basic land",  # Fixed type
+      "count": 1
+    },
+    {
+      "type": "Non-playable", # Special function cards
+      "function_tags": {
+        "Fun card": 33,
+        "Token": 33,
+        "Player Aid": 33
+      },
+      "count": 1
+    }
+  ]
+```
+
+**Pack Builder Features:**
+- **Automatic Count Override**: When enabled, `total_cards` is automatically set to match pack slot counts
+- **Flexible Constraints**: Each slot can specify `rarity`, `type`, `function_tags`, or leave unconstrained
+- **Weighted Selection**: Use dictionaries for probabilistic choices (e.g., rare vs mythic)
+- **Realistic Packs**: Mimics actual MTG booster pack structures
+
+**Example Use Cases:**
+- Standard 15-card booster packs
+- Draft simulation packs  
+- Theme-based card collections
+- Balanced rarity distributions
 
 ---
 
