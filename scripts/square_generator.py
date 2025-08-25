@@ -1,6 +1,6 @@
 """
 ================================================================================
- MTG Card Generator
+ Merlin's Aitomaton - MTG Card Skeleton Generator and MTG Card Generator API
 --------------------------------------------------------------------------------
  Generates Magic: The Gathering cards by building a prompt skeleton
  and calling the MTG Card Generator API, then polling for and logging results.
@@ -560,7 +560,7 @@ def card_skeleton_generator(
     card_skeleton = deepcopy(
         api_params.setParams
     )  # Copy set parameters for the skeleton
-    logging.info(f"Generating card skeleton for index {index}")
+    logging.info(f"[Card #{index+1}] Generating card skeleton for index {index+1}")
     time.sleep(sleepy_time)
 
     ############## Set dynamic values for each card
@@ -605,6 +605,7 @@ def card_skeleton_generator(
     basic_land_flag = False
     primary_land_flag = False
     spell_flag = False
+    creature_flag = False
 
     # Raise a basic land flag, if the selected type is basic land
     if selected_types[0].lower() == "basic land":
@@ -624,6 +625,11 @@ def card_skeleton_generator(
             f"[Card #{index+1}] Selected type is {selected_types[0]}, setting spell flag."
         )
         spell_flag = True
+    elif selected_types[0].lower() == "creature" or selected_types[0].lower() == "artifact creature":
+        logging.info(
+            f"[Card #{index+1}] Selected type is {selected_types[0]}, setting creature flag."
+        )
+        creature_flag = True
 
     # Change types based on mutation chance
     if (
@@ -798,6 +804,12 @@ def card_skeleton_generator(
         f"[Card #{index+1}] Checking for function tags. Available tags: {function_tags}"
     )
     for tag, chance in function_tags.items():
+        # Only allow 'vanilla or no abilities' if creature_flag is True
+        if tag.lower() == "vanilla or no abilities" and not creature_flag:
+            logging.debug(
+                f"[Card #{index+1}] Skipping tag '{tag}' (not a creature card)"
+            )
+            continue
         logging.debug(
             f"[Card #{index+1}] Checking special tag: {tag} with chance: {chance}"
         )

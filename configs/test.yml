@@ -1,3 +1,6 @@
+square_config:
+  total_cards: 60 # Overridden if pack_builder is enabled
+  concurrency: 1
 
 skeleton_params:
   power_level: 10
@@ -6,3 +9,6 @@ skeleton_params:
 
 pack_builder:
   enabled: true
+
+api_params:
+  image_model: "none" # options: dall-e-2, dall-e-3, none

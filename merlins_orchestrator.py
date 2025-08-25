@@ -573,6 +573,94 @@ class MerlinsAitomaton:
             print("\n❌ MODULE PROCESSING FAILED!")
             sys.exit(1)
 
+    def batch_mode(self, batch_count: int):
+        """Run the full pipeline multiple times with numbered outputs."""
+        print(f"\n🔄 RUNNING BATCH MODE: {batch_count} iterations")
+        
+        config_name = Path(self.config_path).stem
+        base_output_dir = Path(self.config["square_config"]["output_dir"])
+        batch_output_dir = base_output_dir / config_name
+        
+        print(f"📁 Batch output directory: {batch_output_dir}")
+        
+        # Ensure output directory exists
+        batch_output_dir.mkdir(parents=True, exist_ok=True)
+        
+        successes = 0
+        failures = 0
+        
+        for i in range(1, batch_count + 1):
+            print(f"\n{'='*60}")
+            print(f"🚀 BATCH ITERATION {i}/{batch_count}")
+            print(f"{'='*60}")
+            
+            # Create a deep copy of the config for this iteration
+            import copy
+            iteration_config = copy.deepcopy(self.config)
+            
+            # Update output paths - all files go to the same directory, just with numbered names
+            iteration_config["square_config"] = iteration_config["square_config"].copy()
+            iteration_config["square_config"]["output_dir"] = str(batch_output_dir)
+            
+            try:
+                # Run card generation with iteration-specific naming
+                print(f"\n🎲 RUNNING CARD GENERATION (iteration {i})...")
+                
+                # Set environment variables for this iteration
+                os.environ['MERLIN_VERBOSE'] = "1" if self.verbose else "0"
+                os.environ['MERLIN_ORCHESTRATED'] = '1'
+                os.environ['MERLIN_BATCH_ITERATION'] = str(i)
+                
+                # Import and run card generation
+                from scripts.square_generator import generate_cards
+                
+                # Handle pack builder override
+                pack_builder = iteration_config["pack_builder"]
+                if pack_builder["enabled"]:
+                    if "pack" in pack_builder and pack_builder["pack"]:
+                        total = sum(slot["count"] for slot in pack_builder["pack"])
+                        iteration_config["square_config"]["total_cards"] = total
+                        if i == 1:  # Only show this message once
+                            print(f"📦 Pack builder enabled: generating {total} cards per iteration")
+                    else:
+                        if i == 1:  # Only show this message once
+                            print(f"📦 Pack builder enabled but no pack definition found - using total_cards setting")
+                
+                # Generate cards with iteration-specific config
+                result = generate_cards(iteration_config, f"{config_name}-{i}")
+                
+                # Run MSE conversion with iteration-specific naming
+                print(f"\n📋 RUNNING MSE CONVERSION (iteration {i})...")
+                from scripts.MTGCG_mse import main_with_config
+                
+                # Create a virtual config path for iteration-specific naming
+                iteration_config_path = f"configs/{config_name}-{i}.yml"
+                main_with_config(iteration_config_path, iteration_config)
+                
+                successes += 1
+                print(f"✅ Iteration {i} completed successfully!")
+                
+            except Exception as e:
+                failures += 1
+                print(f"❌ Iteration {i} failed: {str(e)}")
+                if self.verbose:
+                    import traceback
+                    traceback.print_exc()
+                continue
+        
+        # Final summary
+        print(f"\n{'='*60}")
+        print(f"🎯 BATCH MODE COMPLETE")
+        print(f"{'='*60}")
+        print(f"✅ Successful iterations: {successes}")
+        print(f"❌ Failed iterations: {failures}")
+        print(f"📁 Output directory: {batch_output_dir}")
+        
+        if successes > 0:
+            print(f"\n🎉 Generated {successes} sets of cards!")
+        if failures > 0:
+            print(f"⚠️  {failures} iterations failed")
+
     def check_mode(self, save: bool = False):
         """Check configuration and display summary without running any steps."""
         print("\n🔍 CONFIGURATION CHECK MODE")
@@ -634,6 +722,8 @@ Examples:
   %(prog)s --module cards mse                 # Run all steps
   %(prog)s --module cards                     # Only generate cards
   %(prog)s my_config.yml --module mse         # Use custom config, run MSE only
+  %(prog)s my_config.yml --batch 5            # Run full pipeline 5 times with numbered outputs
+  %(prog)s --batch 3                          # Interactive config selection, then run 3 times
   %(prog)s my_config.yml --check             # Check config without running
   %(prog)s my_config.yml --check --save      # Check config and save normalized values
         """
@@ -654,6 +744,13 @@ Examples:
         nargs="*",
         choices=["cards", "mse", "images"],
         help="Run in module mode with specified steps (images handled by mse step)"
+    )
+    
+    parser.add_argument(
+        "--batch",
+        type=int,
+        metavar="N",
+        help="Run the full pipeline N times with numbered outputs (non-interactive)"
     )
     
     parser.add_argument(
@@ -680,6 +777,12 @@ Examples:
     if args.save and not args.check:
         parser.error("--save can only be used with --check")
     
+    if args.batch and args.module is not None:
+        parser.error("--batch and --module cannot be used together")
+    
+    if args.batch and args.check:
+        parser.error("--batch and --check cannot be used together")
+    
     # Setup logging based on verbose flag
     setup_logging(verbose=args.verbose)
     
@@ -696,6 +799,27 @@ Examples:
                     print(f.name)
         else:
             print("configs/ directory not found")
+        return
+
+    # Handle batch mode - may need interactive config selection
+    if args.batch:
+        if not args.config:
+            # No config specified, need to prompt for one
+            print("🔄 BATCH MODE: No config specified, selecting configuration...")
+            # Create a temporary orchestrator just to resolve config path
+            temp_orchestrator = MerlinsAitomaton(None, verbose=args.verbose)
+            if temp_orchestrator.defaults_only:
+                print("❌ Batch mode requires a specific configuration file")
+                print("   Please specify a config file or ensure config files exist in configs/")
+                return
+            selected_config = temp_orchestrator.config_path
+            print(f"✅ Selected configuration: {selected_config}")
+        else:
+            selected_config = args.config
+        
+        # Create orchestrator with selected config
+        orchestrator = MerlinsAitomaton(selected_config, verbose=args.verbose)
+        orchestrator.batch_mode(args.batch)
         return
 
     orchestrator = MerlinsAitomaton(args.config, verbose=args.verbose)

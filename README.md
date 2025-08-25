@@ -29,6 +29,9 @@ python merlins_orchestrator.py --module cards mse
 # Module mode with full logging for debugging
 python merlins_orchestrator.py my_config.yml --module cards mse --verbose
 
+# Batch mode - run same config multiple times with numbered outputs
+python merlins_orchestrator.py my_config.yml --batch 5
+
 # Run specific steps only
 python merlins_orchestrator.py --module cards         # Only generate cards
 python merlins_orchestrator.py --module mse           # Only convert to MSE (includes images)
@@ -450,6 +453,29 @@ python merlins_orchestrator.py --module mse images # Skip card generation
 # Custom configuration
 python merlins_orchestrator.py my_config.yml --module cards mse
 ```
+
+### Batch Mode
+
+For running multiple iterations of the same configuration:
+
+```bash
+# Run full pipeline 5 times with numbered outputs
+python merlins_orchestrator.py configs/my_config.yml --batch 5
+
+# Interactive config selection, then run 3 times  
+python merlins_orchestrator.py --batch 3
+
+# Outputs will be numbered: my_config-1_cards.json, my_config-2_cards.json, etc.
+# MSE sets: my_config-1-mse-out.mse-set, my_config-2-mse-out.mse-set, etc.
+```
+
+**Batch Mode Features:**
+- **Non-interactive execution** - runs automatically without prompts
+- **Numbered outputs** - each iteration gets unique filenames  
+- **Organized structure** - outputs go to `output/{config_name}/` directory
+- **Progress tracking** - shows current iteration and overall progress
+- **Error handling** - option to continue on individual iteration failures
+- **Interactive config selection** - if no config specified, prompts once before batch
 
 ---
 
