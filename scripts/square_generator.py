@@ -552,6 +552,8 @@ def card_skeleton_generator(
     sleepy_time = config["square_config"]["sleepy_time"]
     stdDePL = skeleton_params.standard_deviation_powerLevel
     powSkew = skeleton_params.power_level_rarity_skew
+    if predefined_keys is None:
+        predefined_keys = {}
 
     out_params = deepcopy(api_params)
 
