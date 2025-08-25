@@ -1,0 +1,52 @@
+set_params:
+  set: "Urban Jungle"
+  themes:
+    - "Finance bros"
+    - "Tech engineers"
+    - "Startup hustle"
+    - "Hipster bobos"
+    - "Gamer nerds"
+    - "Social media influencers"
+    - "Corporate espionage"
+    - "Coffee shop culture"
+    - "Urban nightlife"
+    - "Street artists"
+    - "Fitness enthusiasts"
+    - "Foodies"
+    - "Digital nomads"
+    - "Crypto traders"
+    - "Ride-share drivers"
+    - "Remote workers"
+    - "Streetwear fashionistas"
+    - "Vloggers"
+
+skeleton_params:
+  power_level: 10
+  standard_deviation_powerLevel: 0.5
+  power_level_rarity_skew: 0.2
+  function_tags:
+    ramp or mana fixing: 15
+    draw or card advantage: 15
+    removal or control: 10
+    board wipe or mass removal: 5
+    activated ability: 5
+    Flying or other evasion: 5
+    simple or straightforward: 10
+    networking: 12 # Unique: Cards interact based on shared "network" tags or connections
+    hustle: 12 # Unique: Provides bonuses for playing multiple cards in a turn
+    viral: 12 # Unique: Effects spread to other cards or players under certain conditions
+    influencer: 12 # Unique: Cards can copy or amplify effects of other cards in play
+    gig_economy: 12 # Unique: Temporary bonuses or effects that last only for a turn or phase
+    urban_legend: 12 # Unique: Triggers powerful effects if certain rare conditions are met
+  tags_maximum: 3 # Default is null, which means no limit
+  fixed_amount_themes: 1 # if not zero, will select a fixed amount of themes from the available ones instead of mutating them randomly
+  mutation_chance_per_theme: 11 # Chance to mutate each theme, ignored if fixed_amount_themes is not zero
+
+pack_builder:
+  enabled: true
+
+api_params:
+  image_model: "none" # options: dall-e-2, dall-e-3, none
+
+mtgcg_mse_config:
+  image_method: "localSD" # options: none, localSD, download

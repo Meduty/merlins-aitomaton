@@ -23,15 +23,15 @@ python merlins_orchestrator.py my_config.yml
 # Check configuration without running any steps
 python merlins_orchestrator.py my_config.yml --check
 
-# Batch mode - run all steps automatically with clean progress bars
-python merlins_orchestrator.py --batch cards mse
+# Module mode - run all steps automatically with clean progress bars
+python merlins_orchestrator.py --module cards mse
 
-# Batch mode with full logging for debugging
-python merlins_orchestrator.py my_config.yml --batch cards mse --verbose
+# Module mode with full logging for debugging
+python merlins_orchestrator.py my_config.yml --module cards mse --verbose
 
 # Run specific steps only
-python merlins_orchestrator.py --batch cards         # Only generate cards
-python merlins_orchestrator.py --batch mse           # Only convert to MSE (includes images)
+python merlins_orchestrator.py --module cards         # Only generate cards
+python merlins_orchestrator.py --module mse           # Only convert to MSE (includes images)
 ```
 
 > **📋 Note**: Image generation is handled automatically by the MSE conversion step based on your `mtgcg_mse_config.image_method` setting. Options are:
@@ -163,7 +163,7 @@ Merlin's Aitomaton offers two distinct output modes for different use cases:
 Perfect for regular use - shows only essential information and beautiful progress bars:
 
 ```
-🤖 RUNNING BATCH MODE: cards
+🤖 RUNNING MODULE MODE: cards
 
 🎲 RUNNING CARD GENERATION...
 Generating card information: 100%|████████████| 4/4 [Elapsed: 00:28 | Avg: 7.05s/card]
@@ -175,7 +175,7 @@ Ideal for debugging - includes all logs, timing, and detailed information:
 
 ```
 2025-08-20 22:21:31,605 - INFO - ✅ Configuration loaded from configs/config.yml
-🤖 RUNNING BATCH MODE: cards
+🤖 RUNNING MODULE MODE: cards
 
 🎲 RUNNING CARD GENERATION...
 2025-08-20 22:21:31,605 - INFO - Executing: /usr/bin/python scripts/square_generator.py
@@ -307,22 +307,22 @@ Set `image_method: "none"` in `mtgcg_mse_config` to skip image generation entire
 
 ### Example 1: Quick Start (Clean Mode)
 ```bash
-$ python merlins_orchestrator.py --batch cards
-🤖 RUNNING BATCH MODE: cards
+$ python merlins_orchestrator.py --module cards
+🤖 RUNNING MODULE MODE: cards
 
 🎲 RUNNING CARD GENERATION...
 Generating card information: 100%|████████████| 4/4 [Elapsed: 00:28 | Avg: 7.05s/card]
 ✅ Card generation completed successfully!
 
-🎉 BATCH PROCESSING COMPLETE!
+🎉 MODULE PROCESSING COMPLETE!
 ```
 
 ### Example 2: Full Pipeline with Debugging
 ```bash
-$ python merlins_orchestrator.py --batch cards mse images --verbose
+$ python merlins_orchestrator.py --module cards mse images --verbose
 2025-08-20 22:21:31,605 - INFO - ✅ Configuration loaded from configs/config.yml
 
-🤖 RUNNING BATCH MODE: cards mse images
+🤖 RUNNING MODULE MODE: cards mse images
 
 🎲 RUNNING CARD GENERATION...
 2025-08-20 22:21:31,605 - INFO - Executing: /usr/bin/python scripts/square_generator.py
@@ -339,7 +339,7 @@ Image 1: 100%|████████████| 100/100 [Elapsed: 00:15 | Sp
 [... more image progress bars ...]
 ✅ Image generation completed successfully!
 
-🎉 BATCH PROCESSING COMPLETE!
+🎉 MODULE PROCESSING COMPLETE!
 ```
 
 ### Example 3: Interactive Mode
@@ -435,20 +435,20 @@ The system validates:
    💡 To view your cards, open output/mse-out.mse-set in Magic Set Editor
    ```
 
-### Batch Mode
+### Module Mode
 
 For automation and scripting:
 
 ```bash
 # Full pipeline
-python merlins_orchestrator.py --batch cards mse images
+python merlins_orchestrator.py --module cards mse images
 
 # Selective execution  
-python merlins_orchestrator.py --batch cards      # Only generate cards
-python merlins_orchestrator.py --batch mse images # Skip card generation
+python merlins_orchestrator.py --module cards      # Only generate cards
+python merlins_orchestrator.py --module mse images # Skip card generation
 
 # Custom configuration
-python merlins_orchestrator.py my_config.yml --batch cards mse
+python merlins_orchestrator.py my_config.yml --module cards mse
 ```
 
 ---
@@ -673,7 +673,7 @@ Merlin's Aitomaton has been significantly modernized with:
 - Clean, focused output for regular use
 
 ### 🎛️ **Comprehensive Orchestrator**
-- Interactive and batch execution modes
+- Interactive and module execution modes
 - Prerequisite validation and environment checking
 - Runtime configuration display and modification
 - Seamless pipeline coordination with error handling

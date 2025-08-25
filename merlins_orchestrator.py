@@ -547,11 +547,11 @@ class MerlinsAitomaton:
         else:
             print("\nℹ️  Run the MSE conversion step to create a .mse-set archive.")
     
-    def batch_mode(self, steps: list):
-        """Run the orchestrator in batch mode with specified steps."""
-        print(f"\n🤖 RUNNING BATCH MODE: {' -> '.join(steps)}")
+    def module_mode(self, steps: list):
+        """Run the orchestrator in module mode with specified steps."""
+        print(f"\n🤖 RUNNING MODULE MODE: {' -> '.join(steps)}")
         
-        # Run config validation for batch mode (no save)
+        # Run config validation for module mode (no save)
         self._run_config_validation(save=False)
         
         success = True
@@ -568,9 +568,9 @@ class MerlinsAitomaton:
             print("   Configure 'mtgcg_mse_config.image_method' in your config file")
         
         if success:
-            print("\n🎉 BATCH PROCESSING COMPLETE!")
+            print("\n🎉 MODULE PROCESSING COMPLETE!")
         else:
-            print("\n❌ BATCH PROCESSING FAILED!")
+            print("\n❌ MODULE PROCESSING FAILED!")
             sys.exit(1)
 
     def check_mode(self, save: bool = False):
@@ -631,9 +631,9 @@ def main():
         epilog="""
 Examples:
   %(prog)s                                    # Interactive mode
-  %(prog)s --batch cards mse                 # Run all steps
-  %(prog)s --batch cards                     # Only generate cards
-  %(prog)s my_config.yml --batch mse         # Use custom config, run MSE only
+  %(prog)s --module cards mse                 # Run all steps
+  %(prog)s --module cards                     # Only generate cards
+  %(prog)s my_config.yml --module mse         # Use custom config, run MSE only
   %(prog)s my_config.yml --check             # Check config without running
   %(prog)s my_config.yml --check --save      # Check config and save normalized values
         """
@@ -650,10 +650,10 @@ Examples:
     )
     
     parser.add_argument(
-        "--batch", 
+        "--module", 
         nargs="*",
         choices=["cards", "mse", "images"],
-        help="Run in batch mode with specified steps (images handled by mse step)"
+        help="Run in module mode with specified steps (images handled by mse step)"
     )
     
     parser.add_argument(
@@ -703,8 +703,8 @@ Examples:
     # Run in appropriate mode
     if args.check:
         orchestrator.check_mode(save=args.save)
-    elif args.batch is not None:
-        orchestrator.batch_mode(args.batch)
+    elif args.module is not None:
+        orchestrator.module_mode(args.module)
     else:
         orchestrator.interactive_mode()
 

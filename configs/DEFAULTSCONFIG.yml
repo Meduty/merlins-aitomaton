@@ -301,14 +301,14 @@ skeleton_params:
     rare: 7.8
     mythic: 1.3
   function_tags:
-    "ramp or mana fixing": 15
-    "draw or card advantage": 15
-    "removal or control": 10
-    "board wipe or mass removal": 5
-    "activated ability": 5
-    "Flying or other evasion": 5
-    "simple or straightforward": 10
-    "vanilla or no abilities": 5
+    ramp or mana fixing: 15
+    draw or card advantage: 15
+    removal or control: 10
+    board wipe or mass removal: 5
+    activated ability: 5
+    Flying or other evasion: 5
+    simple or straightforward: 10
+    vanilla or no abilities: 5
   land_color_bleed_overlinear: 2
   legend_mutation_factor: 1
   rarity_based_mutation:
