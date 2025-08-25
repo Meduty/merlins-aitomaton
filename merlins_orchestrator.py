@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 ================================================================================
- MerlinAI - MTG Card Generation Orchestrator
+ Merlin's Aitomaton - MTG Card Generation Orchestrator
 --------------------------------------------------------------------------------
  Main CLI interface to orchestrate the complete MTG card generation pipeline:
  1. Card Generation (square_generator.py)
@@ -58,7 +58,7 @@ def setup_logging(verbose: bool = False):
         logging.getLogger().setLevel(logging.ERROR)
 
 
-class MerlinAIOrchestrator:
+class MerlinsAitomaton:
     """Main orchestrator class for the MTG card generation pipeline."""
 
     def __init__(self, config_path: str | None, verbose: bool = False):
@@ -421,8 +421,8 @@ class MerlinAIOrchestrator:
     
     def interactive_mode(self):
         """Run the orchestrator in interactive mode."""
-        print("\n🚀 WELCOME TO MERLINAI - MTG CARD GENERATION ORCHESTRATOR")
-        print("="*65)
+        print("\n🚀 WELCOME TO MERLIN'S AITOMATON - MTG CARD GENERATION ORCHESTRATOR")
+        print("="*71)
         
         # Run config validation for interactive mode (no save)
         self._run_config_validation(save=False)
@@ -626,7 +626,7 @@ class MerlinAIOrchestrator:
 def main():
     """Main entry point."""
     parser = argparse.ArgumentParser(
-        description="MerlinAI - MTG Card Generation Orchestrator",
+        description="Merlin's Aitomaton - MTG Card Generation Orchestrator",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
@@ -698,7 +698,7 @@ Examples:
             print("configs/ directory not found")
         return
 
-    orchestrator = MerlinAIOrchestrator(args.config, verbose=args.verbose)
+    orchestrator = MerlinsAitomaton(args.config, verbose=args.verbose)
     
     # Run in appropriate mode
     if args.check:

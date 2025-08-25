@@ -23,7 +23,7 @@ if "card_types_weights" not in skeleton_params_full:
 - Trust orchestrator validation pipeline
 - Ensure forward compatibility for schema evolution
 
-**Files Affected**: `scripts/square_generator.py`, `merlinAI.py`
+**Files Affected**: `scripts/square_generator.py`, `merlins_orchestrator.py`
 
 ---
 
@@ -32,7 +32,7 @@ if "card_types_weights" not in skeleton_params_full:
 **Logging Levels**:
 - `scripts/square_generator.py`: Uses `logging.info()` for debug-level information
 - `config_manager.py`: Uses structured error/warning/info with emoji prefixes  
-- `merlinAI.py`: Basic print statements mixed with logging calls
+- `merlins_orchestrator.py`: Basic print statements mixed with logging calls
 
 **Exception Types**:
 - Config errors: Mix of `ValueError`, `Exception`, `AssertionError`
@@ -56,7 +56,7 @@ if "card_types_weights" not in skeleton_params_full:
 API_KEY = os.getenv("API_KEY")           # Direct access
 AUTH_TOKEN = os.getenv("AUTH_TOKEN")     
 
-# merlinAI.py  
+# merlins_orchestrator.py  
 verbose = os.environ.get("MERLIN_VERBOSE", "1") == "1"  # Different pattern
 ```
 
@@ -76,7 +76,7 @@ verbose = os.environ.get("MERLIN_VERBOSE", "1") == "1"  # Different pattern
 ### 4. **Path Handling Inconsistencies** - **MEDIUM PRIORITY**
 
 **Problems**:
-- `merlinAI.py`: Hardcoded relative paths (`configs_dir = "configs"`)
+- `merlins_orchestrator.py`: Hardcoded relative paths (`configs_dir = "configs"`)
 - `config_manager.py`: Mix of absolute and relative path handling
 - No consistent base directory resolution
 - Potential issues when running from different working directories
@@ -132,7 +132,7 @@ def card_skeleton_generator(index, api_params, skeleton_params, config):  # No t
 # square_generator.py: Rich progress bars with tqdm
 with tqdm(total=total_cards, desc="Generating card information"...
 
-# merlinAI.py: Simple print statements  
+# merlins_orchestrator.py: Simple print statements  
 print("✓ Configuration validated and normalized successfully")
 ```
 

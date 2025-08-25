@@ -1,6 +1,6 @@
-# MerlinAI 🎯
+# Merlin's Aitomaton 🎯
 
-**MerlinAI** is a comprehensive AI-powered Magic: The Gathering (MTG) card generation and utility suite. It generates custom MTG cards using AI models with externalized configuration, exports sets compatible with Magic Set Editor (MSE), and supports image generation via Stable Diffusion. The system features a complete orchestrator with clean progress bars, verbose debugging modes, and a pack builder system for creating realistic booster packs.
+**Merlin's Aitomaton** is a comprehensive AI-powered Magic: The Gathering (MTG) card generation and utility suite. It generates custom MTG cards using AI models with externalized configuration, exports sets compatible with Magic Set Editor (MSE), and supports image generation via Stable Diffusion. The system features a complete orchestrator with clean progress bars, verbose debugging modes, and a pack builder system for creating realistic booster packs.
 
 ---
 
@@ -8,30 +8,30 @@
 
 ### Using the Orchestrator (Recommended)
 
-The easiest way to use MerlinAI is through the main orchestrator:
+The easiest way to use Merlin's Aitomaton is through the main orchestrator:
 
 ```bash
 # Interactive mode - guided setup with prompts (clean output)
-python merlinAI.py
+python merlins_orchestrator.py
 
 # Verbose mode - full debugging output  
-python merlinAI.py --verbose
+python merlins_orchestrator.py --verbose
 
 # Use custom configuration
-python merlinAI.py my_config.yml
+python merlins_orchestrator.py my_config.yml
 
 # Check configuration without running any steps
-python merlinAI.py my_config.yml --check
+python merlins_orchestrator.py my_config.yml --check
 
 # Batch mode - run all steps automatically with clean progress bars
-python merlinAI.py --batch cards mse
+python merlins_orchestrator.py --batch cards mse
 
 # Batch mode with full logging for debugging
-python merlinAI.py my_config.yml --batch cards mse --verbose
+python merlins_orchestrator.py my_config.yml --batch cards mse --verbose
 
 # Run specific steps only
-python merlinAI.py --batch cards         # Only generate cards
-python merlinAI.py --batch mse           # Only convert to MSE (includes images)
+python merlins_orchestrator.py --batch cards         # Only generate cards
+python merlins_orchestrator.py --batch mse           # Only convert to MSE (includes images)
 ```
 
 > **📋 Note**: Image generation is handled automatically by the MSE conversion step based on your `mtgcg_mse_config.image_method` setting. Options are:
@@ -79,7 +79,7 @@ Before running any generation steps, you can validate your configuration:
 
 ```bash
 # Check configuration without running any steps
-python merlinAI.py configs/my_config.yml --check
+python merlins_orchestrator.py configs/my_config.yml --check
 
 # This will show:
 # - Configuration validation results  
@@ -132,7 +132,7 @@ The `--check` flag is equivalent to running interactive mode and answering "no" 
 
 ```
 merlinAI/
-├── merlinAI.py                 # 🎯 Main orchestrator (START HERE)
+├── merlins_orchestrator.py     # 🎯 Main orchestrator (START HERE)
 ├── configs/
 │   ├── config.yml             # 🔧 Main configuration file
 │   └── DEFAULTSCONFIG.yml     # 📋 Default configuration template
@@ -157,7 +157,7 @@ merlinAI/
 
 ## 🎨 Output Modes
 
-MerlinAI offers two distinct output modes for different use cases:
+Merlin's Aitomaton offers two distinct output modes for different use cases:
 
 ### 🔇 Clean Mode (Default)
 Perfect for regular use - shows only essential information and beautiful progress bars:
@@ -188,7 +188,7 @@ Generating card information: 100%|████████████| 4/4 [Ela
 
 ## 🔧 Configuration System
 
-MerlinAI uses a **strict configuration system** with **fast-failing validation**:
+Merlin's Aitomaton uses a **strict configuration system** with **fast-failing validation**:
 
 - **📋 YAML Configuration**: All settings in `configs/user.yml` (default) or custom config files
 - **🚫 No Global Variables**: Configuration passed as function parameters
@@ -248,7 +248,7 @@ AUTH_TOKEN=your_auth_token
 
 The orchestrator uses `configs/config.yml` by default. You can:
 
-- **Use defaults:** Just run `python merlinAI.py` 
+- **Use defaults:** Just run `python merlins_orchestrator.py` 
 - **Customize settings:** Edit `configs/config.yml`
 - **Create custom configs:** Copy and modify for different scenarios
 
@@ -258,7 +258,7 @@ For local image generation, ensure a Stable Diffusion API is running and update 
 
 ### 4. Required Stable Diffusion Models
 
-MerlinAI comes with a comprehensive configuration for multiple Stable Diffusion models. For the default configuration to work, your Stable Diffusion installation should have these models available:
+Merlin's Aitomaton comes with a comprehensive configuration for multiple Stable Diffusion models. For the default configuration to work, your Stable Diffusion installation should have these models available:
 
 #### 🎨 **Core Models**
 - **`flux1DevHyperNF4Flux1DevBNB_flux1DevHyperNF4`** - Fast FLUX model (Primary)
@@ -307,7 +307,7 @@ Set `image_method: "none"` in `mtgcg_mse_config` to skip image generation entire
 
 ### Example 1: Quick Start (Clean Mode)
 ```bash
-$ python merlinAI.py --batch cards
+$ python merlins_orchestrator.py --batch cards
 🤖 RUNNING BATCH MODE: cards
 
 🎲 RUNNING CARD GENERATION...
@@ -319,7 +319,7 @@ Generating card information: 100%|████████████| 4/4 [Ela
 
 ### Example 2: Full Pipeline with Debugging
 ```bash
-$ python merlinAI.py --batch cards mse images --verbose
+$ python merlins_orchestrator.py --batch cards mse images --verbose
 2025-08-20 22:21:31,605 - INFO - ✅ Configuration loaded from configs/config.yml
 
 🤖 RUNNING BATCH MODE: cards mse images
@@ -344,8 +344,8 @@ Image 1: 100%|████████████| 100/100 [Elapsed: 00:15 | Sp
 
 ### Example 3: Interactive Mode
 ```bash
-$ python merlinAI.py
-🚀 WELCOME TO MERLINAI - MTG CARD GENERATION ORCHESTRATOR
+$ python merlins_orchestrator.py
+🚀 WELCOME TO MERLIN'S AITOMATON - MTG CARD GENERATION ORCHESTRATOR
 
 🔧 CONFIGURATION SUMMARY
 📊 Total Cards: 4
@@ -371,7 +371,7 @@ Modify any settings? [y/N]: n
 The orchestrator provides a guided experience:
 
 ```bash
-python merlinAI.py
+python merlins_orchestrator.py
 ```
 
 **What happens:**
@@ -441,14 +441,14 @@ For automation and scripting:
 
 ```bash
 # Full pipeline
-python merlinAI.py --batch cards mse images
+python merlins_orchestrator.py --batch cards mse images
 
 # Selective execution  
-python merlinAI.py --batch cards      # Only generate cards
-python merlinAI.py --batch mse images # Skip card generation
+python merlins_orchestrator.py --batch cards      # Only generate cards
+python merlins_orchestrator.py --batch mse images # Skip card generation
 
 # Custom configuration
-python merlinAI.py my_config.yml --batch cards mse
+python merlins_orchestrator.py my_config.yml --batch cards mse
 ```
 
 ---
@@ -642,8 +642,8 @@ pack_builder:
 
 ### Debug Modes
 
-- **Clean Mode (Default)**: `python merlinAI.py` - Only progress bars and essential messages
-- **Verbose Mode**: `python merlinAI.py --verbose` - Full debugging output
+- **Clean Mode (Default)**: `python merlins_orchestrator.py` - Only progress bars and essential messages
+- **Verbose Mode**: `python merlins_orchestrator.py --verbose` - Full debugging output
 - **Interactive Mode**: Step-by-step guided execution with confirmations
 
 ### Getting Help
@@ -658,7 +658,7 @@ pack_builder:
 
 ## 🏆 Recent Improvements
 
-MerlinAI has been significantly modernized with:
+Merlin's Aitomaton has been significantly modernized with:
 
 ### 🔧 **Configuration Externalization**
 - Eliminated global variables throughout codebase
