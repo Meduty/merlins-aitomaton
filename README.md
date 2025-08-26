@@ -1,685 +1,489 @@
 # Merlin's Aitomaton 🎯
 
-**Merlin's Aitomaton** is a comprehensive AI-powered Magic: The Gathering (MTG) card generation and utility suite. It generates custom MTG cards using AI models with externalized configuration, exports sets compatible with Magic Set Editor (MSE), and supports image generation via Stable Diffusion. The system features a complete orchestrator with clean progress bars, verbose debugging modes, and a pack builder system for creating realistic booster packs.
+**Merlin's Aitomaton** is a comprehensive AI-powered Magic: The Gathering (MTG) card generation system. It creates custom MTG cards using OpenAI GPT models, exports sets compatible with Magic Set Editor (MSE), and supports image generation via Stable Diffusion. The system features an interactive orchestrator with clean progress visualization, configurable pack builder for realistic booster packs, and robust error handling.
+
+## 📋 Table of Contents
+
+- [✨ Features](#-features)
+- [📁 Project Structure](#-project-structure)
+- [📦 Installation](#-installation)
+- [🚀 Quick Start Guide](#-quick-start-guide)
+- [📝 Usage Guide](#-usage-guide)
+- [🔧 Troubleshooting](#-troubleshooting)
+- [🏆 Recent Improvements](#-recent-improvements)
+- [📄 License](#-license)
 
 ---
 
-## 🚀 Quick Start
+## 📦 Installation
 
-### Using the Orchestrator (Recommended)
+### Prerequisites
 
-The easiest way to use Merlin's Aitomaton is through the main orchestrator:
+- **Python 3.8+** (tested with Python 3.8-3.11)
+- **Git** (for cloning the repository)
+- **Text editor** (for configuration files)
+
+### Step 1: Clone the Repository
 
 ```bash
-# Interactive mode - guided setup with prompts (clean output)
-python merlins_orchestrator.py
-
-# Verbose mode - full debugging output  
-python merlins_orchestrator.py --verbose
-
-# Use custom configuration
-python merlins_orchestrator.py my_config.yml
-
-# Check configuration without running any steps
-python merlins_orchestrator.py my_config.yml --check
-
-# Module mode - run all steps automatically with clean progress bars
-python merlins_orchestrator.py --module cards mse
-
-# Module mode with full logging for debugging
-python merlins_orchestrator.py my_config.yml --module cards mse --verbose
-
-# Batch mode - run same config multiple times with numbered outputs
-python merlins_orchestrator.py my_config.yml --batch 5
-
-# Run specific steps only
-python merlins_orchestrator.py --module cards         # Only generate cards
-python merlins_orchestrator.py --module mse           # Only convert to MSE (includes images)
+git clone https://github.com/Meduty/merlins-aitomaton.git
+cd merlins-aitomaton
 ```
 
-> **📋 Note**: Image generation is handled automatically by the MSE conversion step based on your `mtgcg_mse_config.image_method` setting. Options are:
-> - `"download"` - Download images from external API
-> - `"localSD"` - Generate with local Stable Diffusion
-> - `"none"` - No images (text-only cards)
-
-### Progress Bar Modes
-
-- **Default Mode**: Clean output with only progress bars and essential messages
-- **Verbose Mode** (`--verbose`): Full debugging logs plus progress bars
-
-### Manual Execution
-
-You can also run individual components:
+### Step 2: Install Dependencies
 
 ```bash
-# 1. Generate cards (outputs to output/{config_name}/{config_name}_cards.json)
-python scripts/square_generator.py [config.yml]
-
-# 2. Convert to MSE + handle images (based on config image_method)
-python scripts/MTGCG_mse.py [config.yml]
+# Install required Python packages
+pip install -r requirements.txt
 ```
 
-### Output Organization
+**Required packages:**
+- `requests` - HTTP requests to MTG Card Generator API
+- `tqdm` - Progress bars and visual feedback
+- `numpy` - Numerical computations for card parameters
+- `pyyaml` - YAML configuration file parsing
+- `python-dotenv` - Environment variable management
+- `openai` - OpenAI API integration for AI features
+- `scipy` - Scientific computing for distribution calculations
 
-Each configuration creates its own organized subdirectory:
+### Step 3: Set Up Environment Variables
 
-```
-output/
-├── user/                          # Default config outputs
-│   ├── user_cards.json           # Generated cards
-│   └── user-mse-out.mse-set      # MSE set file
-├── my_custom_config/              # Custom config outputs
-│   ├── my_custom_config_cards.json
-│   └── my_custom_config-mse-out.mse-set
-└── another_config/
-    ├── another_config_cards.json
-    └── another_config-mse-out.mse-set
-```
-
-### Configuration Validation
-
-Before running any generation steps, you can validate your configuration:
+Create a `.env` file in the project root directory:
 
 ```bash
-# Check configuration without running any steps
-python merlins_orchestrator.py configs/my_config.yml --check
-
-# This will show:
-# - Configuration validation results  
-# - Prerequisite checks (API keys, dependencies)
-# - Output directory structure
-# - Existing output files
-# - Detailed config summary
+# Create .env file
+touch .env
 ```
 
-The `--check` flag is equivalent to running interactive mode and answering "no" to all generation steps - perfect for debugging configuration issues.
-
----
-
-## ✨ Features
-
-- **🎛️ Interactive Orchestrator:**  
-  Guided pipeline execution with real-time configuration, prerequisite checking, smart error handling, and clean progress visualization.
-
-- **📊 Clean Progress Bars:**  
-  Beautiful progress tracking in default mode, with optional verbose logging for debugging.
-
-- **🤖 AI-Powered Card Generation:**  
-  Creates MTG cards using OpenAI GPT models via MTG Card Generator API, with configurable parameters for colors, rarities, types, and themes.
-
-- **📦 Pack Builder System:**  
-  Generate realistic booster packs with customizable slot definitions, weighted rarity distribution, type constraints, and special function tags for tokens, player aids, and non-playable cards.
-
-- **🎨 Advanced Image Generation:**  
-  Supports Stable Diffusion (local), external API downloads, with Lora weights, custom prompts, and model swapping.
-
-- **📋 Magic Set Editor Integration:**  
-  Converts generated cards into MSE (.mse-set) format with images and metadata for easy set creation and sharing.
-
-- **🔧 External Configuration Management:**  
-  All parameters managed via YAML configuration files with strict validation, fast-failing error handling, and CLI overrides.
-
-- **📁 Organized Output Structure:**  
-  Each configuration generates outputs in its own subdirectory, preventing overwrites and keeping projects organized.
-
-- **⚡ Concurrent Processing:**  
-  Multi-threaded generation with real-time progress tracking, thread-safe operations, and clean progress visualization.
-
-- **🛡️ Robust Error Handling:**  
-  Comprehensive error handling with automatic retries, authentication recovery, and detailed logging.  
-  Comprehensive validation, graceful failure recovery, detailed logging (when verbose), and fast-failing configuration validation.
-
----
-
-## 📁 Project Structure
-
-```
-merlinAI/
-├── merlins_orchestrator.py     # 🎯 Main orchestrator (START HERE)
-├── configs/
-│   ├── config.yml             # 🔧 Main configuration file
-│   └── DEFAULTSCONFIG.yml     # 📋 Default configuration template
-├── scripts/
-│   ├── square_generator.py    # 🎲 Core card generation
-│   ├── MTGCG_mse.py          # 📋 MSE conversion & export
-│   ├── imagesSD.py           # 🎨 Stable Diffusion image generation
-│   ├── config_manager.py     # ⚙️ Configuration loading & validation
-│   ├── metrics.py            # 📊 Generation metrics & tracking
-│   └── merlinAI_lib.py       # 🧰 Shared utilities & helpers
-├── output/                    # 📁 Generated files (created automatically)
-│   ├── generated_cards.json  # 🃏 Card data
-│   ├── mse-out.mse-set       # 📦 Magic Set Editor file
-│   ├── mse-out/              # 🖼️ Card images
-│   └── forge_out/            # ⚡ Forge format files
-├── ORCHESTRATOR_GUIDE.md     # 📖 Detailed orchestrator usage
-├── README.md                 # 📝 This file
-└── LICENSE                   # 📄 MIT License
-```
-
----
-
-## 🎨 Output Modes
-
-Merlin's Aitomaton offers two distinct output modes for different use cases:
-
-### 🔇 Clean Mode (Default)
-Perfect for regular use - shows only essential information and beautiful progress bars:
-
-```
-🤖 RUNNING MODULE MODE: cards
-
-🎲 RUNNING CARD GENERATION...
-Generating card information: 100%|████████████| 4/4 [Elapsed: 00:28 | Avg: 7.05s/card]
-✅ Card generation completed successfully!
-```
-
-### 🔊 Verbose Mode (`--verbose`)
-Ideal for debugging - includes all logs, timing, and detailed information:
-
-```
-2025-08-20 22:21:31,605 - INFO - ✅ Configuration loaded from configs/config.yml
-🤖 RUNNING MODULE MODE: cards
-
-🎲 RUNNING CARD GENERATION...
-2025-08-20 22:21:31,605 - INFO - Executing: /usr/bin/python scripts/square_generator.py
-2025-08-20 22:21:32,073 - INFO - No auth token found, attempting to login...
-2025-08-20 22:21:33,234 - INFO - Authorization token updated successfully.
-[... detailed logs ...]
-Generating card information: 100%|████████████| 4/4 [Elapsed: 00:28 | Avg: 7.05s/card]
-✅ Card generation completed successfully!
-```
-
-## 🔧 Configuration System
-
-Merlin's Aitomaton uses a **strict configuration system** with **fast-failing validation**:
-
-- **📋 YAML Configuration**: All settings in `configs/user.yml` (default) or custom config files
-- **🚫 No Global Variables**: Configuration passed as function parameters
-- **⚡ Fast Failing**: Missing or invalid config causes immediate errors
-- **✅ Type Validation**: All values validated for correct types and ranges
-- **🔄 Runtime Loading**: Configuration loaded at execution time from CLI arguments
-- **📁 Organized Outputs**: Each config creates its own output subdirectory
-
-### Configuration Files
-
-- **`configs/user.yml`**: Default configuration (rename from old `config.yml`)
-- **`configs/DEFAULTSCONFIG.yml`**: Base defaults (do not modify)
-- **Custom configs**: Create `configs/myname.yml` for project-specific settings
-
-### CLI Overrides
-
-All scripts support command-line overrides:
-
-```bash
-# Override output directory
-python scripts/square_generator.py --output-dir /tmp/my_cards
-
-# Override card count and concurrency
-python scripts/square_generator.py --total-cards 10 --concurrency 2
-
-# Use custom config with overrides
-python scripts/square_generator.py my_project.yml --total-cards 20
-```
-
----
-
-## 🔧 Setup
-
-### 1. Prerequisites
-
-- **Python 3.8+**
-- **Required packages:**
-  ```bash
-  pip install -r requirements.txt
-  ```
-
-### 2. Environment Configuration
-
-Create a `.env` file in the project root with your API credentials:
+Add your API credentials to `.env`:
 
 ```env
-# Required for card generation
-MTGCG_USERNAME=your_mtg_username
-MTGCG_PASSWORD=your_mtg_password
+# Required for card generation via MTG Card Generator API
+MTGCG_USERNAME=your_mtgcardgenerator_username
+MTGCG_PASSWORD=your_mtgcardgenerator_password
+
+# Required for AI features (OpenAI GPT models)
 API_KEY=your_openai_api_key
 
-# Optional - will auto-login if not provided
-AUTH_TOKEN=your_auth_token
+# Optional - system will auto-login if not provided
+AUTH_TOKEN=your_existing_auth_token
 ```
 
-### 5. Configuration
+**⚠️ Important Notes:**
+- Replace the placeholder values with your actual credentials
+- **MTGCG credentials**: Sign up at [MTG Card Generator](https://www.mtgcardgenerator.com/)
+- **OpenAI API Key**: Get from [OpenAI Platform](https://platform.openai.com/api-keys)
+- Keep your `.env` file secure and never commit it to version control
 
-The orchestrator uses `configs/config.yml` by default. You can:
+### Step 4: Verify Installation
 
-- **Use defaults:** Just run `python merlins_orchestrator.py` 
-- **Customize settings:** Edit `configs/config.yml`
-- **Create custom configs:** Copy and modify for different scenarios
+Test your installation with a quick configuration check:
 
-### 3. Stable Diffusion Setup (Optional)
-
-For local image generation, ensure a Stable Diffusion API is running and update the `forge_url_base` in your configuration.
-
-### 4. Required Stable Diffusion Models
-
-Merlin's Aitomaton comes with a comprehensive configuration for multiple Stable Diffusion models. For the default configuration to work, your Stable Diffusion installation should have these models available:
-
-#### 🎨 **Core Models**
-- **`flux1DevHyperNF4Flux1DevBNB_flux1DevHyperNF4`** - Fast FLUX model (Primary)
-- **`prefectIllustriousXL_v20p`** - High-quality illustration style
-- **`prefectPonyXL_v50`** - Versatile fantasy art
-- **`realDream_sdxlPony15`** - Realistic fantasy style
-- **`realismByStableYogi_v40FP16`** - Photorealistic generation (can produce NSFW, typically doesn't in correct setup)
-- **`sdxlUnstableDiffusers_v9DIVINITYMACHINEVAE`** - Enhanced D&D style
-- **`waiNSFWIllustrious_v110`** - Artsy Illustrated style (can produce NSFW, typically doesn't in correct setup)
-
-#### 🔧 **Required LoRA Models**
-- **`FantasyWorldPonyV2`** - Core fantasy enhancement
-- **`fantasyV1.1`** - Fantasy world styling
-- **`dungeons_and_dragons_xl_v3`** - D&D specific enhancement
-- **`Dark_Fantasy_1.5_IL`** - Dark fantasy aesthetics
-
-#### 📝 **Customization Options**
-
-**Option 1: Use Provided Configuration**
-Copy the complete configuration from `configs/DEFAULTSCONFIG.yml`:
 ```bash
-cp configs/DEFAULTSCONFIG.yml configs/config.yml
-# Edit config.yml to adjust weights, remove unwanted models, etc.
+python merlins_orchestrator.py --check
 ```
 
-**Option 2: Minimal Configuration**
-Remove models you don't have and adjust weights:
-```yaml
-SD_config:
-  image_options:
-    - name: FLUX_ONLY
-      weight: 1.0
-      option_params:
-        model: FLUX1DEV_HYPERNF4_FLUX1DEVBNB_FLUX1DEVHYPERNF4
-        # ... minimal LoRA setup
-```
-
-**Option 3: Disable Image Generation**
-Set `image_method: "none"` in `mtgcg_mse_config` to skip image generation entirely.
-
-💡 **Note**: The default `DEFAULTSCONFIG.yml` includes all supported models with optimal settings. You can easily remove or modify any models you don't have installed.
+This will:
+- ✅ Validate all dependencies are installed
+- ✅ Check environment variables are set correctly  
+- ✅ Test configuration file loading
+- ✅ Verify output directories can be created
+- ✅ Show detailed system status
 
 ---
 
-## 📚 Usage Examples
+## 🚀 Quick Start Guide
 
-### Example 1: Quick Start (Clean Mode)
+### Option 1: Interactive Mode (Recommended for Beginners)
+
+The easiest way to get started:
+
 ```bash
-$ python merlins_orchestrator.py --module cards
-🤖 RUNNING MODULE MODE: cards
-
-🎲 RUNNING CARD GENERATION...
-Generating card information: 100%|████████████| 4/4 [Elapsed: 00:28 | Avg: 7.05s/card]
-✅ Card generation completed successfully!
-
-🎉 MODULE PROCESSING COMPLETE!
+python merlins_orchestrator.py
 ```
 
-### Example 2: Full Pipeline with Debugging
-```bash
-$ python merlins_orchestrator.py --module cards mse images --verbose
-2025-08-20 22:21:31,605 - INFO - ✅ Configuration loaded from configs/config.yml
+This launches an **interactive guided experience** that will:
+1. Show your current configuration summary
+2. Check all prerequisites automatically
+3. Walk you through each step with clear prompts
+4. Allow you to modify settings on-the-fly
+5. Generate cards with beautiful progress bars
 
-🤖 RUNNING MODULE MODE: cards mse images
-
-🎲 RUNNING CARD GENERATION...
-2025-08-20 22:21:31,605 - INFO - Executing: /usr/bin/python scripts/square_generator.py
-[... detailed logs ...]
-Generating card information: 100%|████████████| 4/4 [Elapsed: 00:28 | Avg: 7.05s/card]
-✅ Card generation completed successfully!
-
-📋 RUNNING MSE CONVERSION...
-[... MSE conversion logs ...]
-✅ MSE conversion completed successfully!
-
-🎨 RUNNING IMAGE GENERATION...
-Image 1: 100%|████████████| 100/100 [Elapsed: 00:15 | Speed: 6.67%/s]
-[... more image progress bars ...]
-✅ Image generation completed successfully!
-
-🎉 MODULE PROCESSING COMPLETE!
+**Example Interactive Session:**
 ```
-
-### Example 3: Interactive Mode
-```bash
-$ python merlins_orchestrator.py
 🚀 WELCOME TO MERLIN'S AITOMATON - MTG CARD GENERATION ORCHESTRATOR
 
 🔧 CONFIGURATION SUMMARY
-📊 Total Cards: 4
-🔀 Concurrency: 4
-📁 Output Directory: output
+📊 Total Cards: 15 (pack_builder enabled)
+🔀 Concurrency: 4 threads
+📁 Output Directory: output/
 🤖 AI Model: gpt-41
+🎨 Image Model: none
 
 🔍 CHECKING PREREQUISITES...
-✅ All prerequisites met!
+✅ All prerequisites satisfied!
 
-🎲 Generate 4 cards with image model 'dall-e-3' using 4 threads? [Y/n]: y
-Modify any settings? [y/N]: n
+🎲 Generate 15 cards using pack builder with 4 threads? [Y/n]: y
+📋 Convert to Magic Set Editor format? [Y/n]: y
 
-[... pipeline execution ...]
+🎲 RUNNING CARD GENERATION...
+Generating card information: 100%|████████████| 15/15 [Elapsed: 02:05 | Avg: 8.3s/card]
+✅ Card generation completed successfully!
+
+📋 RUNNING MSE CONVERSION...
+[... conversion progress ...]
+✅ MSE conversion completed successfully!
+
+🎉 GENERATION COMPLETE! Files saved to: output/test/
+```
+
+### Option 2: Direct Execution (Advanced Users)
+
+For direct control and automation:
+
+```bash
+# Generate cards only
+python merlins_orchestrator.py --module cards
+
+# Full pipeline: cards + MSE conversion
+python merlins_orchestrator.py --module cards mse
+
+# With verbose debugging output
+python merlins_orchestrator.py --module cards mse --verbose
+
+# Use custom configuration
+python merlins_orchestrator.py configs/my_custom_set.yml --module cards mse
+
+# Batch mode - generate multiple iterations
+python merlins_orchestrator.py configs/test.yml --batch 5
+
+# Configuration check only (no generation)
+python merlins_orchestrator.py configs/my_config.yml --check
 ```
 
 ---
 
-## 🎯 Orchestrator Features
+## 📝 Usage Guide
 
-### Interactive Mode
+### Basic Workflow
 
-The orchestrator provides a guided experience:
+1. **Configure Your Set** (optional - defaults work great!)
+2. **Run Generation** (`python merlins_orchestrator.py`)
+3. **Review Output** (cards JSON + MSE file in `output/` directory)
+4. **Import to MSE** (open the `.mse-set` file in Magic Set Editor)
 
-```bash
-python merlins_orchestrator.py
+### Configuration System
+
+Merlin's Aitomaton uses **YAML configuration files** for all settings:
+
+```
+configs/
+├── DEFAULTSCONFIG.yml    # ← Base defaults (don't modify)
+├── test.yml             # ← Simple test configuration
+├── maxi01.yml           # ← Goblin vehicle themed set
+├── urbanJungle.yml      # ← Modern urban themed set
+└── your_custom.yml      # ← Your custom configurations
 ```
 
-**What happens:**
-1. **🔧 Configuration Summary:** Shows current settings (cards, models, output dir)
-2. **🔍 Prerequisites Check:** Validates environment variables and dependencies  
-3. **🎯 Pipeline Steps:** Guides you through each step with clear prompts
-4. **⚙️ Runtime Modifications:** Allows you to change settings on-the-fly
-5. **📊 Results Summary:** Shows generated files and next steps
-
-### Prerequisites Checking
-
-The system validates:
-- ✅ **Required environment variables** (`MTGCG_USERNAME`, `MTGCG_PASSWORD`, `API_KEY`)
-- ⚠️ **Optional variables** (`AUTH_TOKEN` - will attempt auto-login if missing)
-- 📁 **Output directories** (creates them if missing)
-- 📄 **Script files** (ensures all components are present)
-
-### User Information Flow
-
-1. **Configuration Display:**
-   ```
-   🔧 CONFIGURATION SUMMARY
-   📊 Total Cards: 4
-   🤖 AI Model: gpt-41
-   🎨 Image Model: dall-e-3
-   📁 Output Directory: output
-   ```
-
-2. **Prerequisites Validation:**
-   ```
-   🔍 CHECKING PREREQUISITES...
-   ⚠️ WARNINGS:
-      • Optional environment variable not set: AUTH_TOKEN
-   ✅ All prerequisites met!
-   ```
-
-3. **Interactive Prompts:**
-   ```
-   🎲 Generate 4 cards with image model 'dall-e-3'? [Y/n]: 
-   Modify any settings? [y/N]:
-   Total cards [4]: 8
-   Image model (dall-e-3/dall-e-2/none) [dall-e-3]: none
-   ```
-
-4. **Progress Feedback:**
-   ```
-   🎲 RUNNING CARD GENERATION...
-   ✅ Card generation completed successfully!
-   
-   📋 RUNNING MSE CONVERSION...
-   ✅ MSE conversion completed successfully!
-   ```
-
-5. **Results Summary:**
-   ```
-   📊 Generated files:
-      ✅ generated_cards.json - Card data
-      ✅ mse-out.mse-set - MSE set file  
-      ✅ mse-out/ - 8 card images
-   
-   💡 To view your cards, open output/mse-out.mse-set in Magic Set Editor
-   ```
-
-### Module Mode
-
-For automation and scripting:
-
-```bash
-# Full pipeline
-python merlins_orchestrator.py --module cards mse images
-
-# Selective execution  
-python merlins_orchestrator.py --module cards      # Only generate cards
-python merlins_orchestrator.py --module mse images # Skip card generation
-
-# Custom configuration
-python merlins_orchestrator.py my_config.yml --module cards mse
-```
-
-### Batch Mode
-
-For running multiple iterations of the same configuration:
-
-```bash
-# Run full pipeline 5 times with numbered outputs
-python merlins_orchestrator.py configs/my_config.yml --batch 5
-
-# Interactive config selection, then run 3 times  
-python merlins_orchestrator.py --batch 3
-
-# Outputs will be numbered: my_config-1_cards.json, my_config-2_cards.json, etc.
-# MSE sets: my_config-1-mse-out.mse-set, my_config-2-mse-out.mse-set, etc.
-```
-
-**Batch Mode Features:**
-- **Non-interactive execution** - runs automatically without prompts
-- **Numbered outputs** - each iteration gets unique filenames  
-- **Organized structure** - outputs go to `output/{config_name}/` directory
-- **Progress tracking** - shows current iteration and overall progress
-- **Error handling** - option to continue on individual iteration failures
-- **Interactive config selection** - if no config specified, prompts once before batch
-
----
-
-## 🛠️ Individual Components
-
-### Card Generation (`square_generator.py`)
-
-Generates MTG cards using AI with threading support:
-
-```bash
-python scripts/square_generator.py --config configs/config.yml \
-  --total-cards 10 --concurrency 4 --image-model none
-```
-
-**Features:**
-- 🔀 Multi-threaded generation with thread-safe auth token management
-- 🎯 Configurable card parameters (colors, types, rarities, themes)
-- 📊 Real-time metrics and progress tracking
-- 🛡️ Robust error handling with retry mechanisms
-- 🔒 Thread-safe operations for concurrent processing
-
-### MSE Conversion (`MTGCG_mse.py`)
-
-Converts card data to Magic Set Editor format:
-
-```bash
-python scripts/MTGCG_mse.py configs/config.yml
-```
-
-**Outputs:**
-- 📦 `mse-out.mse-set` - Complete MSE set file
-- 🖼️ `mse-out/` - Individual card images
-- ⚡ `forge_out/` - Forge-compatible format
-
-### Image Generation (`imagesSD.py`)
-
-Generates custom card art using Stable Diffusion:
-
-```bash
-python scripts/imagesSD.py configs/config.yml
-```
-
-**Features:**
-- 🎨 Multiple model support with dynamic switching
-- 🔧 Lora weights and custom prompts
-- 📈 Progress tracking and error handling
-- 🖼️ High-quality image generation
-
----
-
-## ⚙️ Configuration
-
-### Main Configuration File (`configs/config.yml`)
-
-Key sections:
+**Key Configuration Sections:**
 
 ```yaml
+# Card Generation Settings
 square_config:
-  total_cards: 4              # Number of cards to generate
-  concurrency: 4              # Parallel threads  
-  output_dir: "output"        # Output directory
-  sleepy_time: 0.1           # Delay between operations
+  total_cards: 60          # Number of cards (overridden by pack_builder)
+  concurrency: 4           # Parallel generation threads
+  output_dir: "output"     # Where files are saved
 
+# AI Model Settings  
 api_params:
-  model: "gpt-41"            # AI model for card generation
-  image_model: "dall-e-3"    # Image generation model
-  generate_image_prompt: false
+  model: "gpt-41"          # OpenAI model for card generation
+  image_model: "none"      # dall-e-2, dall-e-3, or none
+  creative: false          # Extra creative AI responses
 
+# Pack Builder (generates realistic booster packs)
 pack_builder:
-  enabled: false             # Enable structured pack generation
-  pack: [                    # Define booster pack slots
+  enabled: true            # Enable pack-style generation
+  pack: [                  # Pack composition
     {"rarity": "common", "count": 7},
     {"rarity": "uncommon", "count": 3},
     {"rarity": {"rare": 6, "mythic": 1}, "count": 1},
     {"type": "basic land", "count": 1}
   ]
 
-skeleton_params:
-  colors: ["white", "blue", "black", "red", "green", "colorless"]
-  rarities: ["common", "uncommon", "rare", "mythic"]
-  # ... detailed card generation parameters
-
+# Set Theme and Flavor
 set_params:
-  setName: "Custom Set"       # Your set name
-  setCode: "CST"             # 3-letter set code
+  set: "My Custom Set"
+  themes:
+    - "Epic battles"
+    - "Ancient powers"
+    - "Mystical creatures"
+    # ... add your themes
 ```
 
-### CLI Overrides
+### Common Use Cases
 
-Most settings can be overridden via command line:
+#### 1. Generate a Quick Test Set
+```bash
+python merlins_orchestrator.py configs/test.yml
+```
+Uses the simple test configuration with pack builder enabled.
+
+#### 2. Create a Themed Set
+```yaml
+# configs/my_pirate_set.yml
+set_params:
+  set: "Seas of Adventure"
+  themes:
+    - "Pirate ships"
+    - "Ocean storms"  
+    - "Treasure hunting"
+    - "Naval combat"
+```
 
 ```bash
-python scripts/square_generator.py --config config.yml \
-  --total-cards 20 \
-  --concurrency 8 \
-  --output-dir custom_output \
-  --image-model none
+python merlins_orchestrator.py configs/my_pirate_set.yml --module cards mse
 ```
 
-### Pack Builder Configuration
+#### 3. Generate Multiple Variations
+```bash
+# Generate 5 different versions of the same set
+python merlins_orchestrator.py configs/my_set.yml --batch 5
+```
 
-The pack builder system allows you to generate structured booster packs instead of random card collections:
+Output structure:
+```
+output/my_set/
+├── my_set-1_cards.json + my_set-1-mse-out.mse-set
+├── my_set-2_cards.json + my_set-2-mse-out.mse-set  
+├── my_set-3_cards.json + my_set-3-mse-out.mse-set
+└── ... (etc)
+```
+
+#### 4. High-Volume Generation
+```yaml
+# configs/large_set.yml
+square_config:
+  total_cards: 200
+  concurrency: 8    # Use more threads for faster generation
+
+pack_builder:
+  enabled: false    # Disable for exact card count
+```
+
+#### 5. Debug Configuration Issues
+```bash
+# Check configuration without generating anything
+python merlins_orchestrator.py configs/my_config.yml --check --verbose
+
+# This shows:
+# - Detailed configuration validation
+# - Environment variable status  
+# - Output directory structure
+# - Existing files
+# - Prerequisites check results
+```
+
+### Output Structure
+
+Each configuration creates organized output directories:
+
+```
+output/
+├── test/                           # Configuration name becomes directory
+│   ├── test_cards.json            # Generated card data (JSON)
+│   └── test-mse-out.mse-set       # Magic Set Editor file
+├── my_pirate_set/
+│   ├── my_pirate_set_cards.json
+│   └── my_pirate_set-mse-out.mse-set
+└── batch_example/                  # Batch mode creates numbered sets
+    ├── batch_example-1_cards.json
+    ├── batch_example-1-mse-out.mse-set
+    ├── batch_example-2_cards.json
+    └── batch_example-2-mse-out.mse-set
+```
+
+### Output Modes
+
+**🔇 Clean Mode (Default)** - Perfect for regular use:
+```
+🎲 RUNNING CARD GENERATION...
+Generating card information: 100%|████████████| 15/15 [Elapsed: 02:05 | Avg: 8.3s/card]
+✅ Card generation completed successfully!
+```
+
+**🔊 Verbose Mode** - Ideal for debugging with `--verbose`:
+```
+2025-08-25 22:21:31,605 - INFO - ✅ Configuration loaded from configs/test.yml
+🎲 RUNNING CARD GENERATION...
+2025-08-25 22:21:32,073 - INFO - No auth token found, attempting to login...
+2025-08-25 22:21:33,234 - INFO - Authorization token updated successfully.
+[... detailed API logs, timing information, etc ...]
+Generating card information: 100%|████████████| 15/15 [Elapsed: 02:05 | Avg: 8.3s/card]
+✅ Card generation completed successfully!
+```
+
+### Advanced Configuration Examples
+
+#### Pack Builder System
+Generate realistic MTG booster packs:
 
 ```yaml
 pack_builder:
-  enabled: true              # Enable pack mode
-  pack: [                    # Define pack slots
-    {
-      "rarity": "common",    # Fixed rarity
-      "count": 7
-    },
-    {
-      "rarity": "uncommon",
-      "count": 3  
-    },
-    {
-      "rarity": {            # Weighted rarity selection
-        "rare": 6,           # 6/7 chance for rare
-        "mythic": 1          # 1/7 chance for mythic
-      },
-      "count": 1
-    },
-    {
-      "count": 2             # No constraints (random)
-    },
-    {
-      "type": "basic land",  # Fixed type
-      "count": 1
-    },
-    {
-      "type": "Non-playable", # Special function cards
-      "function_tags": {
-        "Fun card": 33,
-        "Token": 33,
-        "Player Aid": 33
-      },
-      "count": 1
-    }
+  enabled: true
+  pack: [
+    {"rarity": "common", "count": 10},           # 10 commons
+    {"rarity": "uncommon", "count": 3},          # 3 uncommons  
+    {"rarity": {"rare": 7, "mythic": 1}, "count": 1}, # 1 rare/mythic (weighted)
+    {"type": "basic land", "count": 1},          # 1 basic land
+    {"type": "Non-playable", "count": 1}         # 1 token/player aid
   ]
 ```
 
-**Pack Builder Features:**
-- **Automatic Count Override**: When enabled, `total_cards` is automatically set to match pack slot counts
-- **Flexible Constraints**: Each slot can specify `rarity`, `type`, `function_tags`, or leave unconstrained
-- **Weighted Selection**: Use dictionaries for probabilistic choices (e.g., rare vs mythic)
-- **Realistic Packs**: Mimics actual MTG booster pack structures
+#### Image Generation Integration
+Configure AI image generation:
 
-**Example Use Cases:**
-- Standard 15-card booster packs
-- Draft simulation packs  
-- Theme-based card collections
-- Balanced rarity distributions
+```yaml
+api_params:
+  image_model: "dall-e-3"    # Enable DALL-E image generation
+
+mtgcg_mse_config:
+  image_method: "download"   # or "localSD" for Stable Diffusion
+```
 
 ---
 
-## 🔍 Troubleshooting
+## 🔧 Troubleshooting
 
-### Common Issues
+### Common Issues and Solutions
 
-1. **Configuration Errors:**
-   - **Fast-failing validation** will immediately show missing or invalid config keys
-   - Check `configs/config.yml` against `configs/DEFAULTSCONFIG.yml` for reference
-   - All required keys must be present - no fallback defaults
-   - Use `--verbose` to see detailed configuration loading
+#### Environment Variable Issues
+```bash
+# Problem: "Missing environment variable: API_KEY"
+# Solution: Check your .env file exists and has correct format
+cat .env  # Should show your variables
 
-2. **Import Errors in IDE:**
-   - The `# type: ignore` comments suppress VS Code linting errors
-   - These are false positives due to dynamic path manipulation
-   - Code runs correctly despite IDE warnings
+# Problem: .env file not being read
+# Solution: Ensure .env is in the project root directory
+ls -la .env  # Should exist in same directory as merlins_orchestrator.py
+```
 
-3. **Missing Environment Variables:**
-   - The orchestrator will clearly indicate missing variables during prerequisite check
-   - Required: `MTGCG_USERNAME`, `MTGCG_PASSWORD`, `API_KEY`
-   - Optional: `AUTH_TOKEN` (will auto-login if missing)
+#### Configuration Issues
+```bash
+# Problem: "Configuration validation failed"
+# Solution: Use --check to see detailed validation errors
+python merlins_orchestrator.py configs/my_config.yml --check --verbose
 
-4. **API Authentication Issues:**
-   - Check your MTGCG credentials in `.env`
-   - The system will attempt automatic re-authentication
-   - Look for "401 Unauthorized" errors in verbose logs
+# Problem: "DEFAULTSCONFIG.yml not found" 
+# Solution: Ensure you're in the project directory and file exists
+ls configs/DEFAULTSCONFIG.yml
+```
 
-5. **Progress Bar Issues:**
-   - Use default mode for clean progress bars only
-   - Use `--verbose` if progress bars seem stuck (shows detailed logs)
-   - Progress bars work correctly with multi-threading
+#### API Connection Issues
+```bash
+# Problem: "MTGCG_USERNAME and MTGCG_PASSWORD must be set"
+# Solution: Check credentials are correct and account is active
+# Test login manually at https://www.mtgcardgenerator.com/
 
-6. **Threading Issues:**
-   - All auth token updates are thread-safe with locks
-   - Configuration sharing across threads is safe
-   - Metrics collection is synchronized across threads
+# Problem: OpenAI API errors
+# Solution: Verify API key and check usage limits
+# Check https://platform.openai.com/usage
+```
 
-### Debug Modes
+#### Permission and Path Issues
+```bash
+# Problem: "Permission denied" when creating output files
+# Solution: Check directory permissions
+chmod 755 output/  # Make output directory writable
 
-- **Clean Mode (Default)**: `python merlins_orchestrator.py` - Only progress bars and essential messages
-- **Verbose Mode**: `python merlins_orchestrator.py --verbose` - Full debugging output
-- **Interactive Mode**: Step-by-step guided execution with confirmations
+# Problem: "scripts not found"
+# Solution: Ensure you're running from the project root
+ls scripts/  # Should show square_generator.py, MTGCG_mse.py, etc.
+```
+
+#### Performance and Generation Issues
+```bash
+# Problem: Generation is very slow
+# Solution: Reduce concurrency or total cards
+# Edit configs/my_config.yml:
+square_config:
+  concurrency: 1    # Reduce from 4 to 1
+  total_cards: 5    # Start with fewer cards
+
+# Problem: Cards generated but no MSE file
+# Solution: Check MSE conversion step completed
+python merlins_orchestrator.py --module mse --verbose  # Run just MSE step
+```
+
+#### Batch Mode Issues
+```bash
+# Problem: Batch mode creates subdirectories instead of flat files  
+# Current behavior: output/test/test-1/, output/test/test-2/
+# This is intended behavior for organization
+
+# Problem: Batch mode fails on iteration 2+
+# Solution: Check for config corruption - should be fixed with deep copy
+python merlins_orchestrator.py configs/test.yml --batch 2 --verbose
+```
 
 ### Getting Help
 
-- 📖 See `ORCHESTRATOR_GUIDE.md` for detailed usage examples
-- 🔧 Check `configs/DEFAULTSCONFIG.yml` for all available options
-- 📊 Run with `--verbose` flag for detailed logging and debugging
-- 🛡️ Use interactive mode for guided troubleshooting and configuration checking
-- ⚡ Configuration errors show immediate, specific error messages
+1. **Check Prerequisites**: `python merlins_orchestrator.py --check`
+2. **Use Verbose Mode**: Add `--verbose` to see detailed logs
+3. **Test Components**: Run each module separately to isolate issues
+4. **Check Configuration**: Validate YAML syntax and required fields
+5. **Review Output**: Check `output/` directory for partial results
 
+### Debug Commands
+
+```bash
+# Full system check with detailed output
+python merlins_orchestrator.py --check --verbose
+
+# Test just card generation
+python merlins_orchestrator.py --module cards --verbose
+
+# Test configuration loading
+python -c "import yaml; print(yaml.safe_load(open('configs/test.yml')))"
+
+# Check environment variables
+python -c "import os; print([f'{k}={v[:10]}...' for k,v in os.environ.items() if 'API' in k or 'MTGCG' in k])"
+```
+
+## ✨ Features
+
+- **🎛️ Interactive Orchestrator**: Guided pipeline execution with real-time configuration checking, prerequisite validation, and clean progress visualization
+- **🤖 AI-Powered Card Generation**: Creates MTG cards using OpenAI GPT models with configurable parameters for colors, rarities, types, and themes
+- **📦 Pack Builder System**: Generate realistic booster packs with customizable slot definitions and weighted rarity distribution
+- **🎨 Image Generation**: Supports Stable Diffusion (local) and DALL-E with custom prompts and model switching
+- **📋 Magic Set Editor Integration**: Converts generated cards into MSE (.mse-set) format for easy import and sharing
+- **⚡ Concurrent Processing**: Multi-threaded generation with thread-safe operations and real-time progress tracking
+- **🔧 YAML Configuration**: External configuration management with strict validation and CLI overrides
+- **� Batch Mode**: Generate multiple iterations with organized output structure
+- **📁 Organized Output**: Each configuration creates its own subdirectory preventing overwrites
+- **🛡️ Robust Error Handling**: Comprehensive validation with automatic retries and detailed logging
+
+---
+
+## 📁 Project Structure
+
+```
+merlins-aitomaton/
+├── merlins_orchestrator.py    # 🎯 Main orchestrator (START HERE)
+├── configs/
+│   ├── DEFAULTSCONFIG.yml     # 📋 Base configuration template
+│   ├── test.yml              # 🧪 Simple test configuration
+│   ├── maxi01.yml            # 🏆 Goblin vehicle themed set
+│   └── *.yml                 # � Your custom configurations
+├── scripts/
+│   ├── square_generator.py   # 🎲 Core card generation
+│   ├── MTGCG_mse.py         # 📋 MSE conversion & export
+│   ├── imagesSD.py          # 🎨 Stable Diffusion integration
+│   ├── config_manager.py    # ⚙️ Configuration loading & validation
+│   └── merlinAI_lib.py      # 🧰 Shared utilities & helpers
+├── output/                   # � Generated files (auto-created)
+├── requirements.txt          # 📦 Python dependencies
+└── README.md                # 📖 This documentation
+```
 ---
 
 ## 🏆 Recent Improvements
