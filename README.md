@@ -1,6 +1,6 @@
 # Merlin's Aitomaton 🎯
 
-**Merlin's Aitomaton** is a comprehensive AI-powered Magic: The Gathering (MTG) card generation system. It creates custom MTG cards using OpenAI GPT models, exports sets compatible with Magic Set Editor (MSE), and supports image generation via Stable Diffusion. The system features an interactive orchestrator with clean progress visualization, configurable pack builder for realistic booster packs, and robust error handling.
+**Merlin's Aitomaton** is a comprehensive AI-powered Magic: The Gathering (MTG) card generation system. It creates custom MTG cards using OpenAI GPT models, exports sets compatible with Magic Set Editor (MSE), generates AI artwork via Stable Diffusion, and **exports ready-to-play decks for Tabletop Simulator (TTS)**. The system features an interactive orchestrator with clean progress visualization, configurable pack builder for realistic booster packs, and robust error handling.
 
 ## 📋 Table of Contents
 
@@ -9,6 +9,7 @@
 - [📦 Installation](#-installation)
 - [🚀 Quick Start Guide](#-quick-start-guide)
 - [📝 Usage Guide](#-usage-guide)
+- [🎮 Tabletop Simulator Export](#-tabletop-simulator-export)
 - [🔧 Troubleshooting](#-troubleshooting)
 - [🏆 Recent Improvements](#-recent-improvements)
 - [📄 License](#-license)
@@ -45,6 +46,8 @@ pip install -r requirements.txt
 - `python-dotenv` - Environment variable management
 - `openai` - OpenAI API integration for AI features
 - `scipy` - Scientific computing for distribution calculations
+- `pillow` - Image processing for TTS export
+- `pathlib` - Cross-platform path handling
 
 ### Step 3: Set Up Environment Variables
 
@@ -70,12 +73,20 @@ AUTH_TOKEN=your_existing_auth_token
 
 # Optional - for MSE image export functionality
 MSE_EXE_PATH=path/to/mse.exe
+
+# Optional - for TTS export functionality
+IMGBB_KEY=your_imgbb_api_key
+TTS_SAVEDOBJS_PATH="C:/Users/YourName/Documents/My Games/Tabletop Simulator/Saves/Saved Objects"
+TTS_DECKCONVERTER_PATH=path/to/tts-deckconverter.exe
 ```
 
 **⚠️ Important Notes:**
 - Replace the placeholder values with your actual credentials
 - **MTGCG credentials**: Sign up at [MTG Card Generator](https://www.mtgcardgenerator.com/)
 - **OpenAI API Key**: Get from [OpenAI Platform](https://platform.openai.com/api-keys)
+- **ImgBB API Key** (optional): Get from [ImgBB API](https://api.imgbb.com/) for TTS web-hosted images
+- **TTS Saved Objects Path** (optional): Points to your TTS Saved Objects folder for automatic deck copying
+- **tts-deckconverter** (optional): Download from [GitHub releases](https://github.com/jeandeaual/tts-deckconverter/releases)
 - Keep your `.env` file secure and never commit it to version control
 
 ### Step 4: Verify Installation
@@ -116,7 +127,65 @@ This launches an **interactive guided experience** that will:
 ```
 🚀 WELCOME TO MERLIN'S AITOMATON - MTG CARD GENERATION ORCHESTRATOR
 
-🔧 CONFIGURATION SUMMARY
+## 🎮 Tabletop Simulator Export
+
+The orchestrator includes a comprehensive TTS export system that automatically creates playable deck files for Tabletop Simulator.
+
+### Quick Start
+1. Enable TTS export in your config:
+   ```yaml
+   tts_export:
+     enabled: true
+     upload_mode: "imgbb"  # or "local"
+   ```
+2. Set up your environment variables (see [Environment Variables](#-environment-variables))
+3. Run the orchestrator - TTS files are automatically generated
+4. Import the `.json` files into Tabletop Simulator
+
+### How It Works
+1. **MSE Export**: Card images are exported from Magic Set Editor
+2. **TTS Conversion**: Images are converted to TTS deck format using tts-deckconverter
+3. **Upload Management**: Images are hosted via ImgBB (web) or saved locally
+4. **File Organization**: TTS deck files are saved alongside your card data
+
+### Upload Modes
+
+**ImgBB Mode (Recommended)**
+```yaml
+tts_export:
+  upload_mode: "imgbb"
+```
+- Uploads images to ImgBB for web hosting
+- Creates portable TTS decks that work anywhere
+- Requires `IMGBB_KEY` environment variable
+
+**Local Mode**
+```yaml
+tts_export:
+  upload_mode: "local"
+```
+- Saves images to local TTS directory
+- No internet required after setup
+- Requires `TTS_SAVEDOBJS_PATH` environment variable
+
+### Configuration Options
+```yaml
+tts_export:
+  enabled: true
+  upload_mode: "imgbb"  # "imgbb" or "local"
+  cleanup: true         # Remove temp files after export
+  template_format: "png" # Image format for deck template
+```
+
+### Troubleshooting
+- **Missing Environment Variables**: Check that all required variables are set
+- **TTS Converter Not Found**: Verify `TTS_DECKCONVERTER_PATH` points to the executable
+- **Upload Failures**: For ImgBB mode, verify your API key is valid
+- **File Not Found**: For local mode, ensure TTS SavedObjects directory exists
+
+---
+
+## 🔧 Configuration SUMMARY
 📊 Total Cards: 15 (pack_builder enabled)
 🔀 Concurrency: 4 threads
 📁 Output Directory: output/
@@ -148,14 +217,20 @@ For direct control and automation:
 # Generate cards only
 python merlins_orchestrator.py --module cards
 
-# Full pipeline: cards + MSE conversion
+# Full pipeline: cards + MSE conversion  
 python merlins_orchestrator.py --module cards mse
 
+# Complete pipeline: cards + MSE + TTS export
+python merlins_orchestrator.py --module cards mse tts
+
+# TTS export only (requires existing MSE files)
+python merlins_orchestrator.py --module tts
+
 # With verbose debugging output
-python merlins_orchestrator.py --module cards mse --verbose
+python merlins_orchestrator.py --module cards mse tts --verbose
 
 # Use custom configuration
-python merlins_orchestrator.py configs/my_custom_set.yml --module cards mse
+python merlins_orchestrator.py configs/my_custom_set.yml --module cards mse tts
 
 # Batch mode - generate multiple iterations
 python merlins_orchestrator.py configs/test.yml --batch 5
@@ -172,8 +247,9 @@ python merlins_orchestrator.py configs/my_config.yml --check
 
 1. **Configure Your Set** (optional - defaults work great!)
 2. **Run Generation** (`python merlins_orchestrator.py`)
-3. **Review Output** (cards JSON + MSE file in `output/` directory)
+3. **Review Output** (cards JSON + MSE file + TTS deck in `output/` directory)
 4. **Import to MSE** (open the `.mse-set` file in Magic Set Editor)
+5. **Play in TTS** (TTS deck automatically copied to your Saved Objects)
 
 ### Configuration System
 
@@ -192,10 +268,17 @@ configs/
 
 ```yaml
 # Card Generation Settings
-square_config:
+aitomaton_config:
   total_cards: 60          # Number of cards (overridden by pack_builder)
   concurrency: 4           # Parallel generation threads
-  output_dir: "output"     # Where files are saved
+  image_mode: "dall-e-2"   # options: custom, dall-e-2, dall-e-3, localSD, none  (auto changes api_params and mse image method to fit mode)
+
+# TTS Export Settings
+tts_export:
+  upload_mode: "imgbb"     # "imgbb" for web-hosted or "local" for file-based
+  image_format: "png"      # Image format for TTS templates
+  cleanup: true            # Clean up temporary files after export
+  copy_to_savedobj: true   # Auto-copy to TTS Saved Objects
 
 # AI Model Settings  
 api_params:
@@ -234,6 +317,7 @@ Uses the simple test configuration with pack builder enabled.
 #### 2. Create a Themed Set
 ```yaml
 # configs/my_pirate_set.yml
+# configure theme and setting
 set_params:
   set: "Seas of Adventure"
   themes:
@@ -241,10 +325,33 @@ set_params:
     - "Ocean storms"  
     - "Treasure hunting"
     - "Naval combat"
+
+# Configure functions and mechanics
+skeleton_params:
+  fixed_amount_themes: 1 # if not zero, will select a fixed amount of themes from the available ones instead of mutating them randomly
+  mutation_chance_per_theme: 11 # Chance to mutate each theme, ignored if fixed_amount_themes is not zero
+  power_level: 10
+  standard_deviation_powerLevel: 0.5
+  power_level_rarity_skew: 0.2
+  function_tags:
+    ramp or treasure generation: 15
+    draw or plunder: 15
+    removal or cannon fire: 10
+    board wipe or mutiny: 5
+    activated ability: 5
+    Flying or sailing: 5
+    simple or straightforward: 10
+    crew: 12 # Unique: Cards interact based on shared "crew" tags or ship assignments
+    raid: 12 # Unique: Provides bonuses for attacking or playing multiple pirates in a turn
+    bounty: 12 # Unique: Effects trigger when opponents' permanents are destroyed or stolen
+    legend of the seas: 12 # Unique: Triggers powerful effects if certain rare conditions are met (e.g., controlling an island or legendary pirate)
+    buried treasure: 12 # Unique: Temporary bonuses or effects for finding or exiling cards
+    sea shanty: 12 # Unique: Cards that boost others when played together, like a crew singing in unison
+  tags_maximum: 3 # Default is null, which means no limit
 ```
 
 ```bash
-python merlins_orchestrator.py configs/my_pirate_set.yml --module cards mse
+python merlins_orchestrator.py configs/my_pirate_set.yml --module cards mse tts
 ```
 
 #### 3. Generate Multiple Variations
@@ -256,9 +363,14 @@ python merlins_orchestrator.py configs/my_set.yml --batch 5
 Output structure:
 ```
 output/my_set/
-├── my_set-1_cards.json + my_set-1-mse-out.mse-set
-├── my_set-2_cards.json + my_set-2-mse-out.mse-set  
-├── my_set-3_cards.json + my_set-3-mse-out.mse-set
+├── my_set-1/
+│   ├── my_set-1-cards.json
+│   ├── my_set-1-mse-out.mse-set
+│   └── my_set-1-tts-obj.json     # ← TTS deck file
+├── my_set-2/
+│   ├── my_set-2-cards.json
+│   ├── my_set-2-mse-out.mse-set
+│   └── my_set-2-tts-obj.json     # ← TTS deck file
 └── ... (etc)
 ```
 
@@ -456,6 +568,7 @@ python -c "import os; print([f'{k}={v[:10]}...' for k,v in os.environ.items() if
 
 - **🎛️ Interactive Orchestrator**: Guided pipeline execution with real-time configuration checking, prerequisite validation, and clean progress visualization
 - **🤖 AI-Powered Card Generation**: Creates MTG cards using OpenAI GPT models with configurable parameters for colors, rarities, types, and themes
+- **🎮 Tabletop Simulator Export**: Complete TTS deck generation with configurable upload modes (ImgBB web hosting or local files)
 - **📦 Pack Builder System**: Generate realistic booster packs with customizable slot definitions and weighted rarity distribution
 - **🎨 Image Generation**: Supports Stable Diffusion (local) and DALL-E with custom prompts and model switching
 - **📋 Magic Set Editor Integration**: Converts generated cards into MSE (.mse-set) format for easy import and sharing
@@ -464,6 +577,8 @@ python -c "import os; print([f'{k}={v[:10]}...' for k,v in os.environ.items() if
 - **� Batch Mode**: Generate multiple iterations with organized output structure
 - **📁 Organized Output**: Each configuration creates its own subdirectory preventing overwrites
 - **🛡️ Robust Error Handling**: Comprehensive validation with automatic retries and detailed logging
+- **🔒 Cross-Platform Compatibility**: Windows, macOS, and Linux support with proper path handling  
+- **📄 Filename Sanitization**: Automatic cleaning of special characters for cross-platform compatibility
 
 ---
 
@@ -480,8 +595,10 @@ merlins-aitomaton/
 ├── scripts/
 │   ├── square_generator.py   # 🎲 Core card generation
 │   ├── MTGCG_mse.py         # 📋 MSE conversion & export
+│   ├── exportToTTS.py       # 🎮 Tabletop Simulator export
 │   ├── imagesSD.py          # 🎨 Stable Diffusion integration
 │   ├── config_manager.py    # ⚙️ Configuration loading & validation
+│   ├── metrics.py           # 📊 Card analysis and metrics
 │   └── merlinAI_lib.py      # 🧰 Shared utilities & helpers
 ├── output/                   # � Generated files (auto-created)
 ├── requirements.txt          # 📦 Python dependencies
@@ -492,6 +609,12 @@ merlins-aitomaton/
 ## 🏆 Recent Improvements
 
 Merlin's Aitomaton has been significantly modernized with:
+
+### 🎮 **Tabletop Simulator Integration**
+- Complete TTS deck export pipeline with tts-deckconverter integration
+- Configurable upload modes: ImgBB web hosting or local file management
+- Automatic image hosting and deck file generation
+- Cross-platform compatibility with robust path handling
 
 ### 🔧 **Configuration Externalization**
 - Eliminated global variables throughout codebase
@@ -517,6 +640,12 @@ Merlin's Aitomaton has been significantly modernized with:
 - Safe configuration sharing across worker threads
 - Synchronized metrics collection and reporting
 
+### 🛡️ **Enhanced Reliability**
+- Filename sanitization for cross-platform compatibility
+- Configurable cleanup system respecting user preferences
+- Robust error handling with graceful degradation
+- Environment variable validation and fallback systems
+
 ---
 
 ## 📄 License
@@ -528,9 +657,10 @@ MIT License. See [LICENSE](LICENSE) for details.
 ## 🙏 Credits
 
 - **Author:** Merlin Duty-Knez
-- **AI Integration:** OpenAI GPT models, MTG Card Generator API
+- **AI Integration:** OpenAI GPT models, MTG Card Generator API  
 - **Image Generation:** Stable Diffusion, AUTOMATIC1111
-- **Export Format:** Magic Set Editor compatibility
+- **Export Formats:** Magic Set Editor compatibility, Tabletop Simulator integration
+- **TTS Integration:** tts-deckconverter utility, ImgBB hosting service
 - **Threading & Concurrency:** Python threading with safety locks
 - **Configuration System:** YAML-based with strict validation
 

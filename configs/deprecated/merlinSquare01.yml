@@ -1,0 +1,57 @@
+aitomaton_config:
+  total_cards: 40
+  concurrency: 4
+  sleepy_time: 0.5
+set_params:
+  set: "Crimson Dominion"
+  themes:
+    - "Blood magic and sacrifice"
+    - "Ancient vampiric nobility"
+    - "Forbidden rituals"
+    - "Power through corruption"
+    - "Eternal night"
+    - "Gothic architecture"
+    - "The price of immortality written in crimson"
+    - "Shadows that feast on the living"
+    - "Decadence"
+    - "A throne built upon the bones of the innocent"
+
+api_params:
+  generate_image_prompt: false
+  creative: false
+  include_explanation: false
+  image_model: "dall-e-3" # options: dall-e-2, dall-e-3, none
+  model: "gpt-41"
+
+
+mtgcg_mse_config:
+  image_method: "download" # options: none, localSD, download
+
+skeleton_params:
+  types_mode: normal
+  power_level: 7.5 # Power level of the card, 1-10 or None
+  wildcard_supertype: false
+  fixed_amount_themes: 0 # if not zero, will select a fixed amount of themes from the available ones instead of mutating them randomly
+  mutation_chance_per_theme: 12.5 # Chance to mutate each theme, ignored if fixed_amount_themes is not zero
+  card_types_color_weights:
+    _all:
+      kindred: 0
+      saga: 3
+    white:
+      enchantment: 20
+  function_tags:
+    # user specific
+    vampiric or blood-related: 20
+    sacrifice mechanics: 15
+    graveyard interaction: 10
+    life drain or lifegain: 10
+    aristocrats or death triggers: 8
+    # recommended
+    ramp or mana fixing: 15
+    draw or card advantage: 15
+    removal or control: 10 
+    board wipe or mass removal: 5
+    activated ability: 5
+    Flying or other evasion: 5
+    simple or straightforward: 10
+  tags_maximum: 2 # Default is null, which means no limit
