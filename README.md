@@ -268,9 +268,9 @@ Merlin's Aitomaton comes with a comprehensive configuration for multiple Stable 
 - **`prefectIllustriousXL_v20p`** - High-quality illustration style
 - **`prefectPonyXL_v50`** - Versatile fantasy art
 - **`realDream_sdxlPony15`** - Realistic fantasy style
-- **`realismByStableYogi_v40FP16`** - Photorealistic generation
+- **`realismByStableYogi_v40FP16`** - Photorealistic generation (can produce NSFW, typically doesn't in correct setup)
 - **`sdxlUnstableDiffusers_v9DIVINITYMACHINEVAE`** - Enhanced D&D style
-- **`waiNSFWIllustrious_v110`** - Adult content (optional)
+- **`waiNSFWIllustrious_v110`** - Artsy Illustrated style (can produce NSFW, typically doesn't in correct setup)
 
 #### 🔧 **Required LoRA Models**
 - **`FantasyWorldPonyV2`** - Core fantasy enhancement
