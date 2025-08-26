@@ -779,9 +779,11 @@ def main():
         epilog="""
 Examples:
   %(prog)s                                    # Interactive mode
+  %(prog)s -y                                 # Run full pipeline (cards + mse + tts)
   %(prog)s --module cards mse tts             # Run all steps including TTS export
   %(prog)s --module cards                     # Only generate cards
   %(prog)s --module tts                       # Only export TTS images (requires existing MSE set)
+  %(prog)s my_config.yml -y                   # Use custom config, run full pipeline
   %(prog)s my_config.yml --module mse         # Use custom config, run MSE only
   %(prog)s my_config.yml --batch 5            # Run full pipeline 5 times with numbered outputs
   %(prog)s --batch 3                          # Interactive config selection, then run 3 times
@@ -821,6 +823,12 @@ Examples:
     )
     
     parser.add_argument(
+        "-y", "--yes",
+        action="store_true",
+        help="Run full pipeline (equivalent to --module cards mse tts)"
+    )
+    
+    parser.add_argument(
         "--check",
         action="store_true",
         help="Check configuration and display summary without running any steps"
@@ -833,6 +841,14 @@ Examples:
     )
     
     args = parser.parse_args()
+    
+    # Handle -y flag by setting modules to full pipeline
+    if args.yes:
+        if args.module is not None:
+            parser.error("-y/--yes cannot be used with --module (use one or the other)")
+        if args.check:
+            parser.error("-y/--yes cannot be used with --check (use --check alone for validation)")
+        args.module = ["cards", "mse", "tts"]
     
     # Validate argument combinations
     if args.save and not args.check:
