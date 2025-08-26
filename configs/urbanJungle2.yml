@@ -1,7 +1,5 @@
 aitomaton_config:
-  total_cards: 60 # Overridden if pack_builder is enabled
-  concurrency: 15
-  image_mode: "dall-e-2" # options: custom, dall-e-2, dall-e-3, localSD, none
+  image_mode: "black-forest-labs-flux-schnell"
 
 set_params:
   set: "Urban Jungle"
@@ -46,3 +44,6 @@ skeleton_params:
   tags_maximum: 3 # Default is null, which means no limit
   fixed_amount_themes: 1 # if not zero, will select a fixed amount of themes from the available ones instead of mutating them randomly
   mutation_chance_per_theme: 11 # Chance to mutate each theme, ignored if fixed_amount_themes is not zero
+
+pack_builder:
+  enabled: true

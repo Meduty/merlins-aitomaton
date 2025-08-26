@@ -227,20 +227,36 @@ def _normalize_all_weights_with_diffs(config: dict, defaults: dict, total: float
         # Define the transformations for each image_mode
         mode_transformations = {
             "dall-e-2": {
-                "api_params": {"image_model": "dall-e-2"},
-                "mtgcg_mse_config": {"image_method": "download"}
+            "api_params": {"image_model": "dall-e-2"},
+            "mtgcg_mse_config": {"image_method": "download"}
             },
             "dall-e-3": {
-                "api_params": {"image_model": "dall-e-3"},
-                "mtgcg_mse_config": {"image_method": "download"}
+            "api_params": {"image_model": "dall-e-3"},
+            "mtgcg_mse_config": {"image_method": "download"}
             },
             "localSD": {
-                "api_params": {"image_model": "none"},
-                "mtgcg_mse_config": {"image_method": "localSD"}
+            "api_params": {"image_model": "none"},
+            "mtgcg_mse_config": {"image_method": "localSD"}
             },
             "none": {
-                "api_params": {"image_model": "none"},
-                "mtgcg_mse_config": {"image_method": "none"}
+            "api_params": {"image_model": "none"},
+            "mtgcg_mse_config": {"image_method": "none"}
+            },
+            "imagen-3-fast": {
+            "api_params": {"image_model": "imagen-3-fast"},
+            "mtgcg_mse_config": {"image_method": "download"}
+            },
+            "imagen-4-fast": {
+            "api_params": {"image_model": "imagen-4-fast"},
+            "mtgcg_mse_config": {"image_method": "download"}
+            },
+            "stable-diffusion-3.5-medium": {
+            "api_params": {"image_model": "stable-diffusion-3.5-medium"},
+            "mtgcg_mse_config": {"image_method": "download"}
+            },
+            "black-forest-labs-flux-schnell": {
+            "api_params": {"image_model": "black-forest-labs-flux-schnell"},
+            "mtgcg_mse_config": {"image_method": "download"}
             }
         }
         

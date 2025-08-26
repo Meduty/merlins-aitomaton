@@ -77,8 +77,9 @@ class APIParams:
 
     def __init__(
         self,
-        api_key: str,
-        auth_token: str,
+        api_key: str = None,
+        replicate_key: str = None,
+        auth_token: str = None,
         userPrompt: Optional[Dict[str, Any]] = None,  # should be dict
         setParams: Optional[Dict[str, Any]] = None,  # should be dict
         generate_image_prompt: bool = False,
@@ -88,6 +89,7 @@ class APIParams:
         model: str = "gpt-41",
     ):
         self.api_key = api_key
+        self.replicate_key = replicate_key
 
         # Keep raw token (don’t reconstruct by parsing headers later)
         self.auth_token = auth_token
@@ -114,6 +116,7 @@ class APIParams:
         """
         return APIParams(
             api_key=self.api_key,
+            replicate_key=self.replicate_key,
             auth_token=self.auth_token,
             userPrompt=copy(self.userPrompt),
             setParams=copy(self.setParams),
@@ -130,6 +133,7 @@ class APIParams:
         """
         return APIParams(
             api_key=deepcopy(self.api_key, memo),
+            replicate_key=deepcopy(self.replicate_key, memo),
             auth_token=deepcopy(self.auth_token, memo),
             userPrompt=deepcopy(self.userPrompt, memo),
             setParams=deepcopy(self.setParams, memo),
@@ -939,7 +943,6 @@ def generate_card(index, api_params: APIParams, metrics: GenerationMetrics, conf
     time.sleep(sleepy_time)
 
     params = {
-        "x-openai-api-key": local_api_params.api_key,
         "generateImagePrompt": local_api_params.generate_image_prompt,
         "extraCreative": local_api_params.creative,
         "includeExplanation": local_api_params.include_explanation,
@@ -954,7 +957,9 @@ def generate_card(index, api_params: APIParams, metrics: GenerationMetrics, conf
     #    # Delete openAIApiKey if imageModel is none
     #    del params["openAIApiKey"]
 
-    auth = local_api_params.headers
+    auth = local_api_params.headers.copy()
+    auth["x-openai-api-key"] = local_api_params.api_key
+    auth["x-replicate-api-key"] = local_api_params.replicate_key
 
     logging.debug(f"[#{index+1}] Request parameters: {json.dumps(params, indent=2)}")
 
@@ -1194,6 +1199,7 @@ def generate_cards(config: Dict[str, Any], config_name: str) -> Dict[str, Any]:
     
     # Load API credentials from environment variables
     API_KEY = os.getenv("API_KEY")
+    REPLICATE_KEY = os.getenv("REPLICATE_KEY")
     AUTH_TOKEN = os.getenv("AUTH_TOKEN")
     
     # Progress bar format
@@ -1237,6 +1243,7 @@ def generate_cards(config: Dict[str, Any], config_name: str) -> Dict[str, Any]:
 
     api_params = APIParams(
         api_key=API_KEY,
+        replicate_key=REPLICATE_KEY,
         auth_token=AUTH_TOKEN,
         setParams=set_params,
         **config["api_params"],

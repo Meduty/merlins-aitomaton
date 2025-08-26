@@ -7,7 +7,7 @@ aitomaton_config:
   concurrency: 4
   sleepy_time: 0.5
   output_dir: "output"
-  image_mode: "custom" # options: custom, dall-e-2, dall-e-3, localSD, none
+  image_mode: "custom" # options: custom, dall-e-2, dall-e-3, localSD, none, imagen-3-fast, imagen-4-fast, stable-diffusion-3.5-medium, black-forest-labs-flux-schnell
 
 tts_export:
   upload_mode: "imgbb" # options: imgbb, local 
@@ -23,7 +23,7 @@ http_config:
   polling_interval: 1
 
 api_params:
-  image_model: "dall-e-3" # options: dall-e-2, dall-e-3, none
+  image_model: "dall-e-3" # options: dall-e-2, dall-e-3, none, imagen-3-fast, imagen-4-fast, stable-diffusion-3.5-medium, black-forest-labs-flux-schnell
   generate_image_prompt: false
   creative: false
   include_explanation: false
