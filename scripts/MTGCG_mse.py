@@ -316,7 +316,7 @@ def convert_cards(json_cards, ai=None):
 def download_images(cards, output_dir, on_done=None):
     """
     Concurrent image downloader.
-    - Respects config['square_config']['concurrency'] if present.
+    - Respects config['aitomaton_config']['concurrency'] if present.
     - Calls on_done(1) once per card (even on failure or missing URL).
     """
     os.makedirs(output_dir, exist_ok=True)
@@ -470,11 +470,11 @@ def main_with_config(config_path=None, config=None):
     timeout = config["http_config"]["timeout"]
     image_method = config["mtgcg_mse_config"]["image_method"]
     model_swap_chance = config["SD_config"]["model_swap_chance"]
-    sleepy_time = config["square_config"]["sleepy_time"]
-    concurrency = int(config["square_config"]["concurrency"])
+    sleepy_time = config["aitomaton_config"]["sleepy_time"]
+    concurrency = int(config["aitomaton_config"]["concurrency"])
     
     with logging_redirect_tqdm():
-        outdir = config["square_config"]["output_dir"]
+        outdir = config["aitomaton_config"]["output_dir"]
         config_outdir = os.path.join(outdir, config_name)
         cardsjson = os.path.join(config_outdir, f"{config_name}_cards.json")
         
@@ -539,6 +539,6 @@ if __name__ == "__main__":
     # Load and apply overrides if needed
     config = config_manager.load_config(config_path)
     if args.output_dir:
-        config["square_config"]["output_dir"] = args.output_dir
+        config["aitomaton_config"]["output_dir"] = args.output_dir
     
     main_with_config(config_path, config)

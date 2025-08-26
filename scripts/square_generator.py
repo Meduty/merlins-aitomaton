@@ -549,7 +549,7 @@ def card_skeleton_generator(
     """
 
     # Extract config values instead of using globals
-    sleepy_time = config["square_config"]["sleepy_time"]
+    sleepy_time = config["aitomaton_config"]["sleepy_time"]
     stdDePL = skeleton_params.standard_deviation_powerLevel
     powSkew = skeleton_params.power_level_rarity_skew
     if predefined_keys is None:
@@ -928,7 +928,7 @@ def card_skeleton_generator(
 
 def generate_card(index, api_params: APIParams, metrics: GenerationMetrics, config: Dict[str, Any]) -> dict:
     """API parameters with metrics tracking and config passed as arguments."""
-    sleepy_time = config["square_config"]["sleepy_time"]
+    sleepy_time = config["aitomaton_config"]["sleepy_time"]
     timeout = config["http_config"]["timeout"]
     polling_interval = config["http_config"]["polling_interval"]
 
@@ -950,9 +950,9 @@ def generate_card(index, api_params: APIParams, metrics: GenerationMetrics, conf
         ),  # Use compact JSON to minimize URL length
     }
 
-    if params["imageModel"] == "none":
-        # Delete openAIApiKey if imageModel is none
-        del params["openAIApiKey"]
+    #if params["imageModel"] == "none":
+    #    # Delete openAIApiKey if imageModel is none
+    #    del params["openAIApiKey"]
 
     auth = local_api_params.headers
 
@@ -1073,7 +1073,7 @@ def get_card_graceful(i, api_params: APIParams, skeleton_params: SkeletonParams,
     """
     Wrapper to handle card generation with retries.
     """
-    sleepy_time = config["square_config"]["sleepy_time"]
+    sleepy_time = config["aitomaton_config"]["sleepy_time"]
 
     logging.debug(
         f"[Card #{i+1}] User prompt: {api_params.userPrompt}, Creative: {api_params.creative}"
@@ -1151,7 +1151,7 @@ def card_worker(card_queue, pbar, api_params, skeleton_params, metrics, config, 
             predefined_keys = None
             if pack is not None:
                 logging.info(f"[Card #{i+1}] Using predefined pack data.")
-                time.sleep(config["square_config"]["sleepy_time"])
+                time.sleep(config["aitomaton_config"]["sleepy_time"])
                 predefined_keys = pack[i]
             card = get_card_graceful(
                 i, api_params=api_params, skeleton_params=skeleton_params, predefined_keys=predefined_keys,
@@ -1165,7 +1165,7 @@ def card_worker(card_queue, pbar, api_params, skeleton_params, metrics, config, 
         finally:
             card_queue.task_done()
             pbar.update(1)  # <- keeps the bar in sync
-            sleepy_time = config["square_config"]["sleepy_time"]
+            sleepy_time = config["aitomaton_config"]["sleepy_time"]
             logging.info(f"[Card #{i+1}] task done.")
             time.sleep(sleepy_time)
 
@@ -1185,11 +1185,11 @@ def generate_cards(config: Dict[str, Any], config_name: str) -> Dict[str, Any]:
     setup_logging()
     
     # Extract configuration values
-    total_cards = config["square_config"]["total_cards"]
-    concurrency = config["square_config"]["concurrency"]
+    total_cards = config["aitomaton_config"]["total_cards"]
+    concurrency = config["aitomaton_config"]["concurrency"]
     max_retries = config["http_config"]["retries"]
     retry_delay = config["http_config"]["retry_delay"]
-    sleepy_time = config["square_config"]["sleepy_time"]
+    sleepy_time = config["aitomaton_config"]["sleepy_time"]
     set_params = config["set_params"]
     
     # Load API credentials from environment variables
@@ -1312,7 +1312,7 @@ def generate_cards(config: Dict[str, Any], config_name: str) -> Dict[str, Any]:
     time.sleep(sleepy_time)
     logging.info("=== End of Generation ===")
 
-    outdir = config["square_config"]["output_dir"]
+    outdir = config["aitomaton_config"]["output_dir"]
     config_outdir = os.path.join(outdir, config_name)
     os.makedirs(config_outdir, exist_ok=True)
     outname = os.path.join(config_outdir, f"{config_name}_cards.json")

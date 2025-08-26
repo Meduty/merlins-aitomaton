@@ -1,4 +1,4 @@
-square_config:
+aitomaton_config:
   total_cards: 60
   concurrency: 1
   sleepy_time: 0.5

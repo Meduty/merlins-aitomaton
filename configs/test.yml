@@ -1,4 +1,4 @@
-square_config:
+aitomaton_config:
   total_cards: 60 # Overridden if pack_builder is enabled
   concurrency: 1
 

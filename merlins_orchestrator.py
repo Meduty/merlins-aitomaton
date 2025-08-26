@@ -15,9 +15,6 @@
 
 import os
 import sys
-import json
-import time
-import yaml
 import logging
 import argparse
 import subprocess
@@ -262,7 +259,7 @@ class MerlinsAitomaton:
         print("="*60)
         
         # Card generation settings
-        square_config = self.config.get("square_config", {})
+        square_config = self.config.get("aitomaton_config", {})  # Updated to use correct key
         print(f"📊 Total Cards: {square_config.get('total_cards', 'N/A')}")
         print(f"🔀 Concurrency: {square_config.get('concurrency', 'N/A')}")
         print(f"📁 Output Directory: {square_config.get('output_dir', 'N/A')}")
@@ -285,54 +282,24 @@ class MerlinsAitomaton:
         print("="*60)
     
     def check_prerequisites(self) -> bool:
-        """Check if all prerequisites are met."""
-        print("\n🔍 CHECKING PREREQUISITES...")
-        
-        issues = []
+        """Check if all required environment variables and files are present."""
+        missing = []
         warnings = []
-        
-        # Check environment variables
-        required_env_vars = ['MTGCG_USERNAME', 'MTGCG_PASSWORD', 'API_KEY']
+
+        # Check required environment variables
+        required_env_vars = ["MTGCG_USERNAME", "MTGCG_PASSWORD", "API_KEY"]
         for var in required_env_vars:
             if not os.getenv(var):
-                issues.append(f"Missing environment variable: {var}")
-        
+                missing.append(f"Environment variable: {var}")
+
         # Check optional environment variables
-        optional_env_vars = ['AUTH_TOKEN']
+        optional_env_vars = ["AUTH_TOKEN"]
         for var in optional_env_vars:
             if not os.getenv(var):
-                warnings.append(f"Optional environment variable not set: {var} (will attempt to login)")
-        
-        # Check script files exist
-        required_scripts = ['square_generator.py', 'MTGCG_mse.py', 'imagesSD.py']
-        for script in required_scripts:
-            script_path = self.scripts_dir / script
-            if not script_path.exists():
-                issues.append(f"Missing script: {script_path}")
-        
-        # Check output directory
-        output_dir = Path(self.config["square_config"]["output_dir"])
-        if not output_dir.exists():
-            try:
-                output_dir.mkdir(parents=True, exist_ok=True)
-                logging.info(f"✅ Created output directory: {output_dir}")
-            except Exception as e:
-                issues.append(f"Cannot create output directory {output_dir}: {e}")
-        
-        # Show results
-        if warnings:
-            print("⚠️  WARNINGS:")
-            for warning in warnings:
-                print(f"   • {warning}")
-        
-        if issues:
-            print("❌ ISSUES FOUND:")
-            for issue in issues:
-                print(f"   • {issue}")
-            return False
-        else:
-            print("✅ All prerequisites met!")
-            return True
+                warnings.append(f"Optional environment variable not set: {var}")
+
+        # Check output directory exists or can be created
+        output_dir = Path(self.config["aitomaton_config"]["output_dir"])
     
     def ask_user_confirmation(self, question: str, default: bool = True) -> bool:
         """Ask user for yes/no confirmation."""
@@ -683,7 +650,7 @@ class MerlinsAitomaton:
         
         # Check output directory structure
         print("\n📁 OUTPUT DIRECTORY STRUCTURE:")
-        output_dir = Path(self.config["square_config"]["output_dir"])
+        output_dir = Path(self.config["aitomaton_config"]["output_dir"])
         config_name = Path(self.config_path).stem
         config_subdir = output_dir / config_name
         

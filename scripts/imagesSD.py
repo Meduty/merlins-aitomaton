@@ -577,7 +577,7 @@ if __name__ == "__main__":
     logging.info("Starting image generation from JSON...")
     sleepy_time = config["SD_config"]["sleepy_time"]
     time.sleep(sleepy_time)
-    outdir = config["square_config"]["output_dir"]
+    outdir = config["aitomaton_config"]["output_dir"]
     config_outdir = os.path.join(outdir, config_name)
     cardsjson = os.path.join(config_outdir, f"{config_name}_cards.json")
     

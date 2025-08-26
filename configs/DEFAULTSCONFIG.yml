@@ -2,12 +2,12 @@
 # This file contains all default values used by the application
 # User configs will override these values
 
-square_config:
+aitomaton_config:
   total_cards: 60 # Overridden if pack_builder is enabled
   concurrency: 4
   sleepy_time: 0.5
   output_dir: "output"
-  
+  image_mode: "custom" # options: custom, dall-e-2, dall-e-3, localSD, none
 
 http_config:
   timeout: 60

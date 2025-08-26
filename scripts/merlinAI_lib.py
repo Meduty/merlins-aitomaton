@@ -216,7 +216,49 @@ def _normalize_all_weights_with_diffs(config: dict, defaults: dict, total: float
     Uses fallback values from defaults config.
     """
 
-    total_cards = config["square_config"]["total_cards"]
+    total_cards = config["aitomaton_config"]["total_cards"]
+
+    # Apply image_mode transformations if not 'custom'
+    image_mode = config.get("aitomaton_config", {}).get("image_mode", "custom")
+    if image_mode != "custom":
+        original_image_model = config.get("api_params", {}).get("image_model", "unknown")
+        original_image_method = config.get("mtgcg_mse_config", {}).get("image_method", "unknown")
+        
+        # Define the transformations for each image_mode
+        mode_transformations = {
+            "dall-e-2": {
+                "api_params": {"image_model": "dall-e-2"},
+                "mtgcg_mse_config": {"image_method": "download"}
+            },
+            "dall-e-3": {
+                "api_params": {"image_model": "dall-e-3"},
+                "mtgcg_mse_config": {"image_method": "download"}
+            },
+            "localSD": {
+                "api_params": {"image_model": "none"},
+                "mtgcg_mse_config": {"image_method": "localSD"}
+            },
+            "none": {
+                "api_params": {"image_model": "none"},
+                "mtgcg_mse_config": {"image_method": "none"}
+            }
+        }
+        
+        # Apply transformations if mode is recognized
+        if image_mode in mode_transformations:
+            transformations = mode_transformations[image_mode]
+            for section, values in transformations.items():
+                if section not in config:
+                    config[section] = {}
+                config[section].update(values)
+            
+            # Log the transformations for user visibility
+            new_image_model = config["api_params"]["image_model"]
+            new_image_method = config["mtgcg_mse_config"]["image_method"]
+            if verbose:
+                print(f"📸 image_mode='{image_mode}' → image_model: '{original_image_model}' → '{new_image_model}', image_method: '{original_image_method}' → '{new_image_method}'")
+        elif verbose:
+            print(f"⚠️  WARNING: Unknown image_mode '{image_mode}' - supported modes: custom, dall-e-2, dall-e-3, localSD, none")
 
     if config["pack_builder"]["enabled"]:
         countsum = 0
@@ -225,7 +267,7 @@ def _normalize_all_weights_with_diffs(config: dict, defaults: dict, total: float
         if countsum != total_cards:
             print(f"⚠️  WARNING: Updating total_cards from {total_cards} to {countsum} based on pack_builder counts.\n")
             total_cards = countsum
-            config["square_config"]["total_cards"] = total_cards
+            config["aitomaton_config"]["total_cards"] = total_cards
 
     # Ensure skeleton_params exists and merge with defaults
     if "skeleton_params" not in config:
@@ -1086,9 +1128,9 @@ def _validate_config_integrity(config: dict, defaults: dict) -> list[str]:
                 issues.append(f"ℹ️  INFO: Extensive _default override with types_mode '{types_mode}'. The profile will be applied after your _default, which may override some of your settings. Consider using a color-specific override instead.")
     
     # 8. Check generation parameters - use correct config parameter names
-    square_config = config.get("square_config", {})
-    if "total_cards" in square_config:
-        total_cards = square_config["total_cards"]
+    aitomaton_config = config.get("aitomaton_config", {})
+    if "total_cards" in aitomaton_config:
+        total_cards = aitomaton_config["total_cards"]
         if isinstance(total_cards, (int, float)):
             if total_cards <= 0:
                 issues.append("❌ ERROR: 'total_cards' must be positive")
@@ -1102,8 +1144,8 @@ def _validate_config_integrity(config: dict, defaults: dict) -> list[str]:
                 issues.append(f"⚠️  WARNING: Pack builder counts sum ({countsum}) does not match total_cards ({total_cards}) Using pack_builder countsum as total_cards.")
 
     # 9. Check concurrency parameters
-    if "concurrency" in square_config:
-        concurrency = square_config["concurrency"]
+    if "concurrency" in aitomaton_config:
+        concurrency = aitomaton_config["concurrency"]
         if isinstance(concurrency, (int, float)):
             if concurrency <= 0:
                 issues.append("❌ ERROR: 'concurrency' must be positive")

@@ -115,12 +115,12 @@ def apply_cli_overrides(config: Dict[str, Any], args) -> Dict[str, Any]:
     result_config = copy.deepcopy(config)
     
     if args.total_cards is not None:
-        result_config["square_config"]["total_cards"] = args.total_cards
+        result_config["aitomaton_config"]["total_cards"] = args.total_cards
     
     if args.concurrency is not None:
-        result_config["square_config"]["concurrency"] = args.concurrency
+        result_config["aitomaton_config"]["concurrency"] = args.concurrency
         
     if args.output_dir is not None:
-        result_config["square_config"]["output_dir"] = args.output_dir
+        result_config["aitomaton_config"]["output_dir"] = args.output_dir
     
     return result_config
