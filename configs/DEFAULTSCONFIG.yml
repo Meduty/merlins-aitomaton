@@ -9,6 +9,13 @@ aitomaton_config:
   output_dir: "output"
   image_mode: "custom" # options: custom, dall-e-2, dall-e-3, localSD, none
 
+tts_export:
+  upload_mode: "imgbb" # options: imgbb, local 
+  output_dir: "tts-export"
+  image_format: "png"
+  cleanup: true
+  copy_to_savedobj: true
+
 http_config:
   timeout: 60
   retries: 3

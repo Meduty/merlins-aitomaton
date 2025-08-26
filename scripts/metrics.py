@@ -17,7 +17,7 @@ class GenerationMetrics:
     rarities: Dict[str, int] = field(default_factory=dict)
     successful: int = 0
     total_runtime: float = 0.0
-    all_cards: list = field(default_factory=list)
+    all_cards: Dict[int, Dict[str, Any]] = field(default_factory=dict)  # Changed to dict for index-based storage
     
     # Thread locks
     _color_lock: threading.Lock = field(default_factory=threading.Lock)
@@ -54,10 +54,27 @@ class GenerationMetrics:
         with self._runtime_lock:
             self.total_runtime += runtime
     
-    def add_card(self, card_data: Dict[str, Any]) -> None:
-        """Thread-safe card addition."""
+    def add_card(self, card_data: Dict[str, Any], index: int = None) -> None:
+        """Thread-safe card addition with optional index preservation."""
         with self._cards_lock:
-            self.all_cards.append(card_data)
+            if index is not None:
+                self.all_cards[index] = card_data
+            else:
+                # Fallback for backward compatibility - append at next available index
+                next_index = max(self.all_cards.keys(), default=-1) + 1
+                self.all_cards[next_index] = card_data
+    
+    def get_ordered_cards(self) -> list:
+        """Get cards in index order."""
+        if not self.all_cards:
+            return []
+        
+        max_index = max(self.all_cards.keys())
+        ordered_cards = []
+        for i in range(max_index + 1):
+            if i in self.all_cards:
+                ordered_cards.append(self.all_cards[i])
+        return ordered_cards
     
     def get_average_time_per_card(self) -> float:
         """Calculate average time per card."""

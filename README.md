@@ -67,6 +67,9 @@ API_KEY=your_openai_api_key
 
 # Optional - system will auto-login if not provided
 AUTH_TOKEN=your_existing_auth_token
+
+# Optional - for MSE image export functionality
+MSE_EXE_PATH=path/to/mse.exe
 ```
 
 **⚠️ Important Notes:**

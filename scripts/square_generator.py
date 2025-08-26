@@ -939,7 +939,7 @@ def generate_card(index, api_params: APIParams, metrics: GenerationMetrics, conf
     time.sleep(sleepy_time)
 
     params = {
-        "openAIApiKey": local_api_params.api_key,
+        "x-openai-api-key": local_api_params.api_key,
         "generateImagePrompt": local_api_params.generate_image_prompt,
         "extraCreative": local_api_params.creative,
         "includeExplanation": local_api_params.include_explanation,
@@ -1158,7 +1158,7 @@ def card_worker(card_queue, pbar, api_params, skeleton_params, metrics, config, 
                 metrics=metrics, config=config, retries=max_retries, retry_delay=retry_delay,
                 auth_lock=auth_lock
             )
-            metrics.add_card(card["cards"][0])
+            metrics.add_card(card["cards"][0], index=i)  # Pass index to preserve order
 
         except Exception as e:
             logging.error(f"[Card #{i+1}] failed: {e}")
@@ -1315,10 +1315,11 @@ def generate_cards(config: Dict[str, Any], config_name: str) -> Dict[str, Any]:
     outdir = config["aitomaton_config"]["output_dir"]
     config_outdir = os.path.join(outdir, config_name)
     os.makedirs(config_outdir, exist_ok=True)
-    outname = os.path.join(config_outdir, f"{config_name}_cards.json")
+    outname = os.path.join(config_outdir, f"{config_name}-cards.json")
 
+    ordered_cards = metrics.get_ordered_cards()
     with open(outname, "w") as f:
-        json.dump(metrics.all_cards, f, indent=2)
+        json.dump(ordered_cards, f, indent=2)
         logging.info(f"Generated cards saved to {outname}")
         time.sleep(sleepy_time)
     logging.info("All threads completed successfully.")
@@ -1326,7 +1327,7 @@ def generate_cards(config: Dict[str, Any], config_name: str) -> Dict[str, Any]:
     
     return {
         "metrics": summary,
-        "cards": metrics.all_cards,
+        "cards": ordered_cards,
         "output_file": outname
     }
 

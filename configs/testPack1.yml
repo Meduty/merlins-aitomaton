@@ -1,0 +1,20 @@
+aitomaton_config:
+  total_cards: 5 # Overridden if pack_builder is enabled
+  concurrency: 1
+  image_mode: "localSD" 
+
+http_config:
+  timeout: 60
+  retries: 1
+
+
+api_params:
+  image_model: "dalle-3"
+
+skeleton_params:
+  power_level: 10
+  standard_deviation_powerLevel: 0.5
+  power_level_rarity_skew: 0.2
+
+pack_builder:
+  enabled: false

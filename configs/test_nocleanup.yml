@@ -1,0 +1,16 @@
+aitomaton_config:
+  concurrency: 5
+  image_mode: dall-e-2
+  total_cards: 5
+http_config:
+  retries: 1
+  timeout: 60
+pack_builder:
+  enabled: false
+skeleton_params:
+  power_level: 10
+  power_level_rarity_skew: 0.2
+  standard_deviation_powerLevel: 0.5
+tts_export:
+  cleanup: false
+  upload_mode: local

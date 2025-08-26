@@ -476,7 +476,7 @@ def main_with_config(config_path=None, config=None):
     with logging_redirect_tqdm():
         outdir = config["aitomaton_config"]["output_dir"]
         config_outdir = os.path.join(outdir, config_name)
-        cardsjson = os.path.join(config_outdir, f"{config_name}_cards.json")
+        cardsjson = os.path.join(config_outdir, f"{config_name}-cards.json")
         
         if not os.path.exists(cardsjson):
             logging.error(f"Cards file not found: {cardsjson}")

@@ -1,0 +1,21 @@
+aitomaton_config:
+  total_cards: 5 # Overridden if pack_builder is enabled
+  concurrency: 5
+  image_mode: "dall-e-2" 
+
+tts_export:
+  upload_mode: "local" # options: imgbb, local 
+  cleanup: false
+
+http_config:
+  timeout: 60
+  retries: 1
+
+
+skeleton_params:
+  power_level: 10
+  standard_deviation_powerLevel: 0.5
+  power_level_rarity_skew: 0.2
+
+pack_builder:
+  enabled: false

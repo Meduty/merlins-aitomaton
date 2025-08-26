@@ -1,0 +1,10 @@
+aitomaton_config:
+  total_cards: 3
+  concurrency: 1
+  image_mode: "localSD"
+
+tts_export:
+  upload_mode: "local"  # Test local mode
+
+skeleton_params:
+  power_level: 8

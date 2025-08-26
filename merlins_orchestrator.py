@@ -259,10 +259,10 @@ class MerlinsAitomaton:
         print("="*60)
         
         # Card generation settings
-        square_config = self.config.get("aitomaton_config", {})  # Updated to use correct key
-        print(f"📊 Total Cards: {square_config.get('total_cards', 'N/A')}")
-        print(f"🔀 Concurrency: {square_config.get('concurrency', 'N/A')}")
-        print(f"📁 Output Directory: {square_config.get('output_dir', 'N/A')}")
+        aitomaton_config = self.config.get("aitomaton_config", {})  # Updated to use correct key
+        print(f"📊 Total Cards: {aitomaton_config.get('total_cards', 'N/A')}")
+        print(f"🔀 Concurrency: {aitomaton_config.get('concurrency', 'N/A')}")
+        print(f"📁 Output Directory: {aitomaton_config.get('output_dir', 'N/A')}")
         
         # API settings
         api_params = self.config.get("api_params", {})
@@ -328,9 +328,9 @@ class MerlinsAitomaton:
             # Apply CLI overrides to the config
             for key, value in overrides.items():
                 if key == "total_cards":
-                    config["square_config"]["total_cards"] = value
+                    config["aitomaton_config"]["total_cards"] = value
                 elif key == "concurrency":
-                    config["square_config"]["concurrency"] = value
+                    config["aitomaton_config"]["concurrency"] = value
                 elif key == "image_model":
                     config["api_params"]["image_model"] = str(value)
 
@@ -341,7 +341,7 @@ class MerlinsAitomaton:
                 pack = pack_builder["pack"]
                 for slot in pack:
                     total += slot["count"]
-                config["square_config"]["total_cards"] = total
+                config["aitomaton_config"]["total_cards"] = total
                 print(f"\n ⚠️ Pack builder enabled: generating {total} cards as per pack configuration")
 
             # Extract config name from the config path
@@ -386,6 +386,59 @@ class MerlinsAitomaton:
             print(f"❌ Unexpected error during MSE conversion: {e}")
             return False
     
+    def run_tts_export(self, export_format: str = "png", output_dir: Optional[str] = None, mode: str = "complete") -> bool:
+        """Run the TTS (Tabletop Simulator) export step."""
+        if mode == "complete":
+            print(f"\n🎮 RUNNING COMPLETE TTS EXPORT...")
+        else:
+            print(f"\n🖼️ RUNNING TTS IMAGE EXPORT (format: {export_format})...")
+        
+        try:
+            if mode == "complete":
+                # Import and call complete TTS export with orchestrator-processed config  
+                from scripts.exportToTTS import export_complete_tts_deck
+                if self.verbose:
+                    logging.info(f"Running complete TTS export with processed config")
+                
+                # Pass the already processed config directly
+                success = export_complete_tts_deck(
+                    config=self.config,
+                    config_path=self.config_path,
+                    output_dir=output_dir
+                )
+            else:
+                # Import and call image export only 
+                from scripts.exportToTTS import export_card_images_with_mse
+                if self.verbose:
+                    logging.info(f"Running TTS image export with processed config")
+                
+                # Pass the already processed config directly
+                success = export_card_images_with_mse(
+                    config=self.config,
+                    config_path=self.config_path,
+                    output_format=export_format,
+                    output_dir=output_dir
+                )
+            
+            if success:
+                if mode == "complete":
+                    print("✅ Complete TTS export completed successfully!")
+                else:
+                    print("✅ TTS image export completed successfully!")
+                return True
+            else:
+                if mode == "complete":
+                    print("❌ Complete TTS export failed!")
+                else:
+                    print("❌ TTS image export failed!")
+                return False
+            
+        except Exception as e:
+            print(f"❌ Unexpected error during TTS export: {e}")
+            if self.verbose:
+                logging.exception("Full error details:")
+            return False
+
     def interactive_mode(self):
         """Run the orchestrator in interactive mode."""
         print("\n🚀 WELCOME TO MERLIN'S AITOMATON - MTG CARD GENERATION ORCHESTRATOR")
@@ -407,12 +460,14 @@ class MerlinsAitomaton:
         print("   1. Generate Cards (square_generator.py)")
         print("   2. Convert to MSE + Images (MTGCG_mse.py)")
         print("      └─ Images handled via config 'image_method' setting")
+        print("   3. Export for TTS (exportToTTS.py) - Optional")
+        print("      └─ Export card images with meaningful names")
         
         # Step 1: Card Generation
         print("\n" + "="*50)
-        current_cards = self.config["square_config"]["total_cards"]
+        current_cards = self.config["aitomaton_config"]["total_cards"]
         current_image_model = self.config["api_params"]["image_model"]
-        current_concurrency = self.config["square_config"]["concurrency"]
+        current_concurrency = self.config["aitomaton_config"]["concurrency"]
         
         if self.ask_user_confirmation(
             f"🎲 Generate {current_cards} cards with image model '{current_image_model}' using {current_concurrency} threads?"
@@ -451,8 +506,29 @@ class MerlinsAitomaton:
         if self.ask_user_confirmation(f"📋 Convert cards to MSE format + handle images (method: {current_image_method})?"):
             if not self.run_mse_conversion():
                 print("❌ MSE conversion failed.")
+                if not self.ask_user_confirmation("Continue with TTS export despite MSE failure?", default=False):
+                    print("❌ Stopping pipeline due to MSE conversion failure.")
+                    return
         else:
             print("⏭️ Skipping MSE conversion...")
+        
+        # Step 3: TTS Export (Optional)
+        print("\n" + "="*50)
+        if self.ask_user_confirmation("🖼️ Export card images for Tabletop Simulator (TTS)?"):
+            format_choice = input("Image format (png/jpg/bmp) [png]: ").strip().lower()
+            if not format_choice:
+                format_choice = "png"
+            elif format_choice not in ["png", "jpg", "bmp"]:
+                print(f"⚠️ Unknown format '{format_choice}', using 'png'")
+                format_choice = "png"
+            
+            custom_dir = input("Custom output directory (leave empty for default): ").strip()
+            output_dir = custom_dir if custom_dir else None
+            
+            if not self.run_tts_export(export_format=format_choice, output_dir=output_dir):
+                print("❌ TTS export failed.")
+        else:
+            print("⏭️ Skipping TTS export...")
         
         print("\n🎉 PIPELINE COMPLETE!")
         print("="*30)
@@ -462,7 +538,7 @@ class MerlinsAitomaton:
         
     def show_results(self):
         """Display results summary after completion."""
-        output_dir = Path(self.config["square_config"]["output_dir"])  # Base output directory
+        output_dir = Path(self.config["aitomaton_config"]["output_dir"])  # Base output directory
         config_name = Path(self.config_path).stem
         config_outdir = output_dir / config_name  # New schema: per-config subdirectory
 
@@ -529,6 +605,9 @@ class MerlinsAitomaton:
         if "mse" in steps and success:
             success &= self.run_mse_conversion()
         
+        if "tts" in steps and success:
+            success &= self.run_tts_export()
+        
         # Note: 'images' step is handled within MTGCG_mse.py based on config
         if "images" in steps:
             print("ℹ️  Images are handled automatically by the MSE conversion step")
@@ -545,7 +624,7 @@ class MerlinsAitomaton:
         print(f"\n🔄 RUNNING BATCH MODE: {batch_count} iterations")
         
         config_name = Path(self.config_path).stem
-        base_output_dir = Path(self.config["square_config"]["output_dir"])
+        base_output_dir = Path(self.config["aitomaton_config"]["output_dir"])
         batch_output_dir = base_output_dir / config_name
         
         print(f"📁 Batch output directory: {batch_output_dir}")
@@ -566,8 +645,8 @@ class MerlinsAitomaton:
             iteration_config = copy.deepcopy(self.config)
             
             # Update output paths - all files go to the same directory, just with numbered names
-            iteration_config["square_config"] = iteration_config["square_config"].copy()
-            iteration_config["square_config"]["output_dir"] = str(batch_output_dir)
+            iteration_config["aitomaton_config"] = iteration_config["aitomaton_config"].copy()
+            iteration_config["aitomaton_config"]["output_dir"] = str(batch_output_dir)
             
             try:
                 # Run card generation with iteration-specific naming
@@ -586,7 +665,7 @@ class MerlinsAitomaton:
                 if pack_builder["enabled"]:
                     if "pack" in pack_builder and pack_builder["pack"]:
                         total = sum(slot["count"] for slot in pack_builder["pack"])
-                        iteration_config["square_config"]["total_cards"] = total
+                        iteration_config["aitomaton_config"]["total_cards"] = total
                         if i == 1:  # Only show this message once
                             print(f"📦 Pack builder enabled: generating {total} cards per iteration")
                     else:
@@ -603,6 +682,20 @@ class MerlinsAitomaton:
                 # Create a virtual config path for iteration-specific naming
                 iteration_config_path = f"configs/{config_name}-{i}.yml"
                 main_with_config(iteration_config_path, iteration_config)
+                
+                # Run TTS export for this iteration
+                print(f"\n🎮 RUNNING COMPLETE TTS EXPORT (iteration {i})...")
+                
+                # Use the normal TTS export directory structure - don't override output_dir
+                # This ensures proper cleanup and consistent file organization
+                from scripts.exportToTTS import export_complete_tts_deck
+                success = export_complete_tts_deck(
+                    config=iteration_config,
+                    config_path=iteration_config_path  # Use iteration-specific config path
+                )
+                
+                if not success:
+                    print(f"⚠️ Complete TTS export failed for iteration {i}, but continuing...")
                 
                 successes += 1
                 print(f"✅ Iteration {i} completed successfully!")
@@ -686,8 +779,9 @@ def main():
         epilog="""
 Examples:
   %(prog)s                                    # Interactive mode
-  %(prog)s --module cards mse                 # Run all steps
+  %(prog)s --module cards mse tts             # Run all steps including TTS export
   %(prog)s --module cards                     # Only generate cards
+  %(prog)s --module tts                       # Only export TTS images (requires existing MSE set)
   %(prog)s my_config.yml --module mse         # Use custom config, run MSE only
   %(prog)s my_config.yml --batch 5            # Run full pipeline 5 times with numbered outputs
   %(prog)s --batch 3                          # Interactive config selection, then run 3 times
@@ -709,8 +803,8 @@ Examples:
     parser.add_argument(
         "--module", 
         nargs="*",
-        choices=["cards", "mse", "images"],
-        help="Run in module mode with specified steps (images handled by mse step)"
+        choices=["cards", "mse", "images", "tts"],
+        help="Run in module mode with specified steps (images handled by mse step, tts exports card images)"
     )
     
     parser.add_argument(

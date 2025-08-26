@@ -579,7 +579,7 @@ if __name__ == "__main__":
     time.sleep(sleepy_time)
     outdir = config["aitomaton_config"]["output_dir"]
     config_outdir = os.path.join(outdir, config_name)
-    cardsjson = os.path.join(config_outdir, f"{config_name}_cards.json")
+    cardsjson = os.path.join(config_outdir, f"{config_name}-cards.json")
     
     try:
         with open(cardsjson, "r", encoding="utf-8") as f:
