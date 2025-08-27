@@ -1,5 +1,5 @@
 aitomaton_config:
-  image_mode: "black-forest-labs-flux-schnell"
+  image_mode: "localSD"
 
 set_params:
   set: "Urban Jungle"
