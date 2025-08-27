@@ -7,12 +7,11 @@ aitomaton_config:
   concurrency: 4
   sleepy_time: 0.5
   output_dir: "output"
-  image_mode: "custom" # options: custom, dall-e-2, dall-e-3, localSD, none, imagen-3-fast, imagen-4-fast, stable-diffusion-3.5-medium, black-forest-labs-flux-schnell
+  image_mode: "custom" # options: custom, dall-e-2, dall-e-3, localSD, none, imagen-3-fast, imagen-4-fast, stable-diffusion-3.5-medium, black-forest-labs-flux-schnell, random (chooses random remote image model per card)
 
 tts_export:
   upload_mode: "imgbb" # options: imgbb, local 
-  output_dir: "tts-export"
-  image_format: "png"
+  image_format: "png" # options: png, jpg
   cleanup: true
   copy_to_savedobj: true
 
@@ -24,10 +23,17 @@ http_config:
 
 api_params:
   image_model: "dall-e-3" # options: dall-e-2, dall-e-3, none, imagen-3-fast, imagen-4-fast, stable-diffusion-3.5-medium, black-forest-labs-flux-schnell
+  random_options:
+    dall-e-2: 1
+    dall-e-3: 1
+    imagen-3-fast: 1
+    imagen-4-fast: 1
+    stable-diffusion-3.5-medium: 1
+    black-forest-labs-flux-schnell: 1
   generate_image_prompt: false
   creative: false
   include_explanation: false
-  model: "gpt-41"
+  model: "gpt-41" #
 
 
 mtgcg_mse_config:
@@ -90,6 +96,7 @@ skeleton_params:
   canonical_card_types:
     - "creature"
     - "artifact creature"
+    - "vehicle"
     - "planeswalker"
     - "instant"
     - "sorcery"
@@ -106,7 +113,8 @@ skeleton_params:
         white:
           # Slight bump to creature share to top of white's typical range; instant trimmed.
           creature: 51
-          artifact creature: 1  # counted inside effective creature share
+          artifact creature: 0.9 
+          vehicle: 0.1
           planeswalker: 1
           instant: 9
           sorcery: 9
@@ -120,7 +128,8 @@ skeleton_params:
         blue:
           # Lower creature share; shift weight into instants/sorceries; slight enchantment trim.
           creature: 40
-          artifact creature: 1
+          artifact creature: 0.9
+          vehicle: 0.1
           planeswalker: 1
           instant: 18
           sorcery: 15
@@ -133,7 +142,8 @@ skeleton_params:
           kindred: 2
         black:
           creature: 48
-          artifact creature: 1
+          artifact creature: 0.9
+          vehicle: 0.1
           planeswalker: 1
           instant: 10
           sorcery: 13
@@ -147,7 +157,8 @@ skeleton_params:
         red:
           # Shift a little from creatures into burn (instants/sorceries).
           creature: 45
-          artifact creature: 1
+          artifact creature: 0.9
+          vehicle: 0.1
           planeswalker: 1
           instant: 14
           sorcery: 17
@@ -160,7 +171,8 @@ skeleton_params:
           kindred: 2
         green:
           creature: 55
-          artifact creature: 1
+          artifact creature: 0.9
+          vehicle: 0.1
           planeswalker: 1
           instant: 6
           sorcery: 9
@@ -174,7 +186,8 @@ skeleton_params:
         colorless:
           # Moderate artifact saturation; spread a little into other minor types & lands.
           creature: 4
-          artifact creature: 24
+          artifact creature: 0.9
+          vehicle: 0.1
           planeswalker: 1
           instant: 1
           sorcery: 1
@@ -190,7 +203,8 @@ skeleton_params:
         # Approx targets: Lands ~40%, Creatures (incl artifact creature) ~30–42 depending on color, remainder spells.
         white:
           creature: 36.5
-          artifact creature: 1
+          artifact creature: 0.9
+          vehicle: 0.1
           planeswalker: 0.4
           instant: 8.5
           sorcery: 6.6
@@ -203,7 +217,8 @@ skeleton_params:
           kindred: 0.4
         blue:
           creature: 31
-          artifact creature: 1
+          artifact creature: 0.9
+          vehicle: 0.1
           planeswalker: 0.5
           instant: 13.5
           sorcery: 9
@@ -216,7 +231,8 @@ skeleton_params:
           kindred: 0.5
         black:
           creature: 37
-          artifact creature: 1
+          artifact creature: 0.9
+          vehicle: 0.1
           planeswalker: 0.4
           instant: 9
           sorcery: 9
@@ -229,7 +245,8 @@ skeleton_params:
           kindred: 0.7
         red:
           creature: 35
-          artifact creature: 1
+          artifact creature: 0.9
+          vehicle: 0.1
           planeswalker: 0.4
           instant: 12
           sorcery: 10
@@ -242,7 +259,8 @@ skeleton_params:
           kindred: 0.4
         green:
           creature: 41
-          artifact creature: 1
+          artifact creature: 0.9
+          vehicle: 0.1
           planeswalker: 0.4
           instant: 5
           sorcery: 6
@@ -256,7 +274,8 @@ skeleton_params:
         colorless:
           # Colorless in deck context: small share; lands + utility artifacts.
           creature: 2
-          artifact creature: 10
+          artifact creature: 9
+          vehicle: 1
           planeswalker: 0.3
           instant: 2.5
           sorcery: 2.5
@@ -324,7 +343,7 @@ skeleton_params:
     rare: [4, 12]
     mythic: [8, 12]
   type_mutation_factor: 10
-  wildcard_mutation_factor: 5
+  wildcard_mutation_factor: 2.5
   wildcard_supertype: true
   tags_maximum: 2
   mutation_chance_per_theme: 20
@@ -518,3 +537,42 @@ SD_config:
         negative_prompt: "blurry, low quality, watermark, text, signature, cropped, extra limbs, disfigured, bad anatomy"
 
 
+# Do not edit
+validation:
+  image_mode_options: 
+    - custom
+    - dall-e-2
+    - dall-e-3
+    - localSD
+    - imagen-3-fast
+    - imagen-4-fast
+    - stable-diffusion-3.5-medium
+    - black-forest-labs-flux-schnell
+    - random
+    - none
+  api_image_model_options:
+    - dall-e-2
+    - dall-e-3
+    - imagen-3-fast
+    - imagen-4-fast
+    - stable-diffusion-3.5-medium
+    - black-forest-labs-flux-schnell
+    - random
+    - none
+  llm_ai_model_options:
+    - gpt-41
+    - gpt-40
+    - gpt-o3
+  mtgcg_mse_image_method_options:
+    - none
+    - localSD
+    - download
+  sp_types_mode_options:
+    - play
+    - normal
+  tts_export_upload_mode:
+    - imgbb
+    - local
+  tts_export_image_format:
+    - png
+    - jpg

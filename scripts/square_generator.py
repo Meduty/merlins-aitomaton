@@ -86,6 +86,7 @@ class APIParams:
         creative: bool = False,
         include_explanation: bool = False,
         image_model: str = "dall-e-3",  # dall-e-3, dall-e-2, none
+        random_options: Dict[str, int] = None,
         model: str = "gpt-41",
     ):
         self.api_key = api_key
@@ -102,6 +103,7 @@ class APIParams:
         self.creative = bool(creative)
         self.include_explanation = bool(include_explanation)
         self.image_model = image_model
+        self.random_options = random_options or {}
         self.model = model
 
         # Fresh dicts to avoid shared state across instances
@@ -124,6 +126,7 @@ class APIParams:
             creative=self.creative,
             include_explanation=self.include_explanation,
             image_model=self.image_model,
+            random_options=self.random_options,
             model=self.model,
         )
 
@@ -141,6 +144,7 @@ class APIParams:
             creative=self.creative,
             include_explanation=self.include_explanation,
             image_model=self.image_model,
+            random_options=self.random_options,
             model=self.model,
         )
 
@@ -936,17 +940,26 @@ def generate_card(index, api_params: APIParams, metrics: GenerationMetrics, conf
     timeout = config["http_config"]["timeout"]
     polling_interval = config["http_config"]["polling_interval"]
 
-    local_api_params = copy(api_params)
+    local_api_params = deepcopy(api_params)
 
     card_start = time.time()
     logging.info(f"[#{index+1}] Send card generation request...")
     time.sleep(sleepy_time)
 
+    if local_api_params.image_model == "random":
+        random_options_dict = local_api_params.random_options
+        random_options = [k for k, v in random_options_dict.items() if v > 0]
+        random_options_weights = [random_options_dict[k] for k in random_options]
+        image_model = random.choices(random_options, weights=random_options_weights, k=1)[0]
+        logging.info(f"[#{index+1}] Randomly selected image model: {image_model}")
+    else:
+        image_model = local_api_params.image_model
+
     params = {
         "generateImagePrompt": local_api_params.generate_image_prompt,
         "extraCreative": local_api_params.creative,
         "includeExplanation": local_api_params.include_explanation,
-        "imageModel": local_api_params.image_model,
+        "imageModel": image_model,
         "model": local_api_params.model,
         "userPrompt": json.dumps(
             local_api_params.userPrompt, separators=(',', ':')
@@ -1042,6 +1055,7 @@ def generate_card(index, api_params: APIParams, metrics: GenerationMetrics, conf
     try:
         color_identity = output_data["cards"][0].get("colorIdentity", "").lower()
         generated_rarity = output_data["cards"][0].get("rarity", "").lower()
+        generated_cost = output_data["costs"].get("cost", 0.0)
     except (KeyError, IndexError, TypeError) as e:
         logging.error(f"[#{index+1}] Error accessing card data for card ID {card_id}: {e}")
         logging.error(f"[#{index+1}] Available keys in output_data: {list(output_data.keys()) if isinstance(output_data, dict) else 'Not a dict'}")
@@ -1055,8 +1069,10 @@ def generate_card(index, api_params: APIParams, metrics: GenerationMetrics, conf
     # Update metrics using the passed metrics object instead of global variables
     metrics.update_color(color_identity)
     metrics.update_rarity(generated_rarity)
+    metrics.add_cost(generated_cost)
 
     card_runtime = time.time() - card_start
+
     metrics.add_runtime(card_runtime)
     metrics.increment_successful()
     

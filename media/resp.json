@@ -1,0 +1,29 @@
+{                                                                                                 
+  "cards": [
+    {
+      "id": "71fc3870-3331-4740-a6e9-e92d7c3ec87e",
+      "name": "Threshold Vale",
+      "manaCost": "",
+      "type": "Land",
+      "typeLine": "Basic Land",
+      "oracleText": "Threshold Vale enters the battlefield tapped.\n\n{T}: Add {G}.\n\nTributary \u2014 {1}{G} (You may play this card by sacrificing a land and paying its tributary cost. If you do, Threshold Vale enters the battlefield untapped.)",
+      "flavorText": "Only those who cross the hidden line can sense the valley's boundless magic.",
+      "colorIdentity": "Colorless",
+      "rarity": "Rare",
+      "pt": "",
+      "explanation": null,
+      "funnyExplanation": null,
+      "userPrompt": "{\"set\":\"Merlins Menagerie\",\"themes\":[\"Threshold Effects\"],\"type\":\"basic land\",\"colorIdentity\":\"colorless\",\"rarity\":\"rare\",\"function_tags\":\"Basic Land, SHOULD NOT HAVE ANY ABILITIES\",\"powerLevel\":\"9.56 out of 10\"}",
+      "imageUrl": "",
+      "temporaryImageUrl": "",
+      "alternativeImageUrls": [],
+      "url": "https://www.mtgcardgenerator.com/Card?id=71fc3870-3331-4740-a6e9-e92d7c3ec87e"
+    }
+  ],
+  "costs": {
+    "userRemainingDailySpendLimit": 0.5,
+    "cost": 0.003376,
+    "userIncurredCost": 0.003376,
+    "serverIncurredCost": 0.0
+  }
+}

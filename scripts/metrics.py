@@ -15,6 +15,7 @@ class GenerationMetrics:
     
     colors: Dict[str, int] = field(default_factory=dict)
     rarities: Dict[str, int] = field(default_factory=dict)
+    cost: float = 0.0
     successful: int = 0
     total_runtime: float = 0.0
     all_cards: Dict[int, Dict[str, Any]] = field(default_factory=dict)  # Changed to dict for index-based storage
@@ -22,6 +23,7 @@ class GenerationMetrics:
     # Thread locks
     _color_lock: threading.Lock = field(default_factory=threading.Lock)
     _rarity_lock: threading.Lock = field(default_factory=threading.Lock)
+    _cost_lock: threading.Lock = field(default_factory=threading.Lock)
     _successful_lock: threading.Lock = field(default_factory=threading.Lock)
     _runtime_lock: threading.Lock = field(default_factory=threading.Lock)
     _cards_lock: threading.Lock = field(default_factory=threading.Lock)
@@ -53,6 +55,11 @@ class GenerationMetrics:
         """Thread-safe runtime addition."""
         with self._runtime_lock:
             self.total_runtime += runtime
+
+    def add_cost(self, cost: float) -> None:
+        """Thread-safe cost addition."""
+        with self._cost_lock:
+            self.cost += cost
     
     def add_card(self, card_data: Dict[str, Any], index: int = None) -> None:
         """Thread-safe card addition with optional index preservation."""
@@ -79,14 +86,20 @@ class GenerationMetrics:
     def get_average_time_per_card(self) -> float:
         """Calculate average time per card."""
         return self.total_runtime / self.successful if self.successful > 0 else 0.0
-    
+
+    def get_average_cost_per_card(self) -> float:
+        """Calculate average cost per card."""
+        return self.cost / self.successful if self.successful > 0 else 0.0
+
     def get_summary(self) -> Dict[str, Any]:
         """Get a summary of all metrics."""
         return {
             "colors": dict(self.colors),
             "rarities": dict(self.rarities),
             "successful": self.successful,
+            "total_cost": self.cost,
             "total_runtime": self.total_runtime,
             "average_time_per_card": self.get_average_time_per_card(),
+            "average_cost_per_card": self.get_average_cost_per_card(),
             "total_cards": len(self.all_cards)
         }

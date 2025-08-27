@@ -122,13 +122,21 @@ def check_and_normalize_config(config_path: str, save: bool = False, total: floa
 
     # Raw validation (omission awareness)
     raw_issues = _validate_raw_user_config_structure(raw_user)
+    
     if verbose:
         print("=" * 80)
         print("🔍 CONFIGURATION VALIDATION & NORMALIZATION")
         print("=" * 80)
         print("\n📋 Validating user configuration structure (raw before merge)...")
         print("-" * 40)
-        _print_validation_results(raw_issues)
+        raw_stop = _print_validation_results(raw_issues)
+    else:
+        raw_stop = any("❌" in x for x in raw_issues)
+    
+    if raw_stop:
+        if verbose:
+            print("\n" + "=" * 80)
+        return None
 
     # Merged validation (structure)
     if verbose:
@@ -137,6 +145,17 @@ def check_and_normalize_config(config_path: str, save: bool = False, total: floa
     merged_structure_issues = _validate_user_config_structure(config)
     stop_early = _print_validation_results(merged_structure_issues) if verbose else any("❌" in x for x in merged_structure_issues)
     if stop_early:
+        if verbose:
+            print("\n" + "=" * 80)
+        return None
+
+    # Options validation (before normalization)
+    if verbose:
+        print("\n📋 Validating configuration options...")
+        print("-" * 40)
+    options_issues = _validate_options_against_whitelist(config)
+    options_stop = _print_validation_results(options_issues) if verbose else any("❌" in x for x in options_issues)
+    if options_stop:
         if verbose:
             print("\n" + "=" * 80)
         return None
@@ -155,7 +174,15 @@ def check_and_normalize_config(config_path: str, save: bool = False, total: floa
     if verbose:
         print("\n📊 WEIGHT NORMALIZATION")
         print("-" * 40)
-    fixed = _normalize_all_weights_with_diffs(config, defaults, total=total, verbose=verbose)
+    
+    try:
+        fixed = _normalize_all_weights_with_diffs(config, defaults, total=total, verbose=verbose)
+    except ValueError as e:
+        # Critical validation error occurred during normalization
+        if verbose:
+            print(str(e))
+            print("\n" + "=" * 80)
+        return None
 
     # Final validation
     if verbose:
@@ -257,6 +284,10 @@ def _normalize_all_weights_with_diffs(config: dict, defaults: dict, total: float
             "black-forest-labs-flux-schnell": {
             "api_params": {"image_model": "black-forest-labs-flux-schnell"},
             "mtgcg_mse_config": {"image_method": "download"}
+            },
+            "random": {
+            "api_params": {"image_model": "random"},
+            "mtgcg_mse_config": {"image_method": "download"}
             }
         }
         
@@ -273,8 +304,13 @@ def _normalize_all_weights_with_diffs(config: dict, defaults: dict, total: float
             new_image_method = config["mtgcg_mse_config"]["image_method"]
             if verbose:
                 print(f"📸 image_mode='{image_mode}' → image_model: '{original_image_model}' → '{new_image_model}', image_method: '{original_image_method}' → '{new_image_method}'")
-        elif verbose:
-            print(f"⚠️  WARNING: Unknown image_mode '{image_mode}' - supported modes: custom, dall-e-2, dall-e-3, localSD, none")
+        else:
+            # Invalid image_mode - this is a critical error
+            supported_modes = ", ".join(mode_transformations.keys())
+            error_msg = f"❌ CRITICAL: Invalid image_mode '{image_mode}'. Allowed options: {supported_modes}"
+            if verbose:
+                print(error_msg)
+            raise ValueError(error_msg)
 
     if config["pack_builder"]["enabled"]:
         countsum = 0
@@ -898,9 +934,92 @@ def _derive_card_types(ctw: dict) -> list[str]:
 
     return derived
 
+def _validate_options_against_whitelist(config: dict) -> list[str]:
+    """
+    Validate that config values exist in the validation options list from the merged config.
+    Only validates fields that have corresponding validation option lists defined.
+    This prevents users from silently choosing unavailable options.
+    """
+    issues = []
+    
+    # Get validation section from the merged config
+    validation = config.get("validation", {})
+    if not validation:
+        # No validation section found - skip validation
+        return issues
+    
+    # Define mappings between config paths and validation option lists
+    validations = [
+        {
+            "path": ["aitomaton_config", "image_mode"],
+            "validation_key": "image_mode_options",
+            "description": "image_mode"
+        },
+        {
+            "path": ["api_params", "image_model"],
+            "validation_key": "api_image_model_options", 
+            "description": "api_params.image_model"
+        },
+        {
+            "path": ["api_params", "model"],
+            "validation_key": "llm_ai_model_options",
+            "description": "api_params.model"
+        },
+        {
+            "path": ["mtgcg_mse_config", "image_method"],
+            "validation_key": "mtgcg_mse_image_method_options",
+            "description": "mtgcg_mse_config.image_method"
+        },
+        {
+            "path": ["skeleton_params", "types_mode"],
+            "validation_key": "sp_types_mode_options",
+            "description": "skeleton_params.types_mode"
+        },
+        {
+            "path": ["tts_export", "upload_mode"],
+            "validation_key": "tts_export_upload_mode_options",
+            "description": "tts_export.upload_mode"
+        },
+        {
+            "path": ["tts_export", "image_format"],
+            "validation_key": "tts_export_image_format_options",
+            "description": "tts_export.image_format"
+        }
+
+
+    ]
+    
+    for validation_rule in validations:
+        # Check if validation options exist for this field
+        allowed_options = validation.get(validation_rule["validation_key"])
+        if not allowed_options:
+            continue  # No validation options defined for this field, skip
+        
+        # Navigate to the config value in merged config
+        current_config = config
+        try:
+            for path_part in validation_rule["path"]:
+                current_config = current_config[path_part]
+            
+            config_value = current_config
+            
+            # Check if config value is in allowed options
+            if config_value not in allowed_options:
+                allowed_str = ", ".join(f"'{opt}'" for opt in allowed_options)
+                error_msg = f"❌ CRITICAL: Invalid {validation_rule['description']} value '{config_value}'. Allowed options: {allowed_str}"
+                issues.append(error_msg)
+                            
+        except (KeyError, TypeError) as e:
+            # Path doesn't exist in config - this is okay, means it's not set
+            pass
+    
+    return issues
+
+
 def _validate_final_config(config: dict) -> list[str]:
     """
     Final validation after normalization - catch issues that would break the actual system.
+    Also validates that user-selected options exist in the validation options list.
     """
     issues = []
     
@@ -1006,6 +1125,11 @@ def _validate_raw_user_config_structure(raw: dict) -> list[str]:
     if not raw:
         issues.append("ℹ️  INFO: Empty user config (defaults only)")
         return issues
+    
+    # Check if user is trying to override the validation section (not allowed)
+    if "validation" in raw:
+        issues.append("❌ CRITICAL: The 'validation' section cannot be overridden in user configs. It is managed automatically.")
+    
     sp = raw.get("skeleton_params")
     if sp is None:
         issues.append("⚠️  WARNING: Missing 'skeleton_params' in user config (defaults will supply it)")
@@ -1179,7 +1303,7 @@ def _print_validation_results(issues: list[str]):
         print("✅ No issues found - configuration is valid!")
         return False
     
-    errors = [issue for issue in issues if "❌ ERROR:" in issue]
+    errors = [issue for issue in issues if "❌ ERROR:" in issue or "❌ CRITICAL:" in issue]
     warnings = [issue for issue in issues if "⚠️  WARNING:" in issue]
     info_messages = [issue for issue in issues if "ℹ️  INFO:" in issue]
     
