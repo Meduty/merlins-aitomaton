@@ -55,14 +55,14 @@ def setup_logging():
     verbose = os.environ.get("MERLIN_VERBOSE", "1") == "1"
     if verbose:
         logging.basicConfig(
-            level=logging.INFO, 
+            level=logging.DEBUG, 
             format="%(asctime)s - %(levelname)s - %(message)s",
             force=True
         )
     else:
         # Suppress all logs except errors in quiet mode
         logging.basicConfig(
-            level=logging.WARNING,
+            level=logging.INFO,
             format="%(message)s",
             force=True
         )
@@ -185,7 +185,7 @@ class APIParams:
         """
         self.auth_token = new_auth_token
         self.headers["Authorization"] = f"Bearer {new_auth_token}"
-        logging.info("Authorization token updated successfully.")
+        logging.debug("Authorization token updated successfully.")
         time.sleep(sleepy_time)
 
     # -------- convenience --------
@@ -568,7 +568,7 @@ def card_skeleton_generator(
     card_skeleton = deepcopy(
         api_params.setParams
     )  # Copy set parameters for the skeleton
-    logging.info(f"[Card #{index+1}] Generating card skeleton for index {index+1}")
+    logging.debug(f"[Card #{index+1}] Generating card skeleton for index {index+1}")
     time.sleep(sleepy_time)
 
     ############## Set dynamic values for each card
@@ -601,7 +601,7 @@ def card_skeleton_generator(
         
         if total_weight == 0:
             # All type weights are zero for this color - set type to None
-            logging.info(f"[Card #{index+1}] Color '{selected_colors[0]}' has zero type weights, setting type to 'None'")
+            logging.debug(f"[Card #{index+1}] Color '{selected_colors[0]}' has zero type weights, setting type to 'None'")
             selected_types = ["None"]
         else:
             selected_types = random.choices(t, weights=card_types_weights, k=1)
@@ -618,23 +618,23 @@ def card_skeleton_generator(
     # Raise a basic land flag, if the selected type is basic land
     if selected_types[0].lower() == "basic land":
         time.sleep(sleepy_time)
-        logging.info(f"[Card #{index+1}] Selected type is basic land, setting flag.")
+        logging.debug(f"[Card #{index+1}] Selected type is basic land, setting flag.")
         basic_land_flag = True
     elif selected_types[0].lower() == "land":
         time.sleep(sleepy_time)
-        logging.info(
+        logging.debug(
             f"[Card #{index+1}] Selected type is land, setting primary land flag."
         )
         primary_land_flag = True
     elif (
         selected_types[0].lower() == "sorcery" or selected_types[0].lower() == "instant"
     ):
-        logging.info(
+        logging.debug(
             f"[Card #{index+1}] Selected type is {selected_types[0]}, setting spell flag."
         )
         spell_flag = True
     elif selected_types[0].lower() == "creature" or selected_types[0].lower() == "artifact creature":
-        logging.info(
+        logging.debug(
             f"[Card #{index+1}] Selected type is {selected_types[0]}, setting creature flag."
         )
         creature_flag = True
@@ -645,7 +645,7 @@ def card_skeleton_generator(
         and not primary_land_flag
         and merlinAI_lib.check_mutation(t_chance)
     ):
-        logging.info(f"[Card #{index+1}] Type mutation occurred.")
+        logging.debug(f"[Card #{index+1}] Type mutation occurred.")
         time.sleep(sleepy_time)
         selected_types = [random.choice(t)]
         logging.debug(
@@ -671,7 +671,7 @@ def card_skeleton_generator(
 
     new_type = ", ".join(selected_types)
 
-    logging.info(f"[Card #{index+1}] Final type: {new_type}")
+    logging.debug(f"[Card #{index+1}] Final type: {new_type}")
     time.sleep(sleepy_time)
 
     card_skeleton["type"] = new_type
@@ -685,7 +685,7 @@ def card_skeleton_generator(
             skeleton_params.mana_curves["default"]
         )
         selected_mana_value = random.choices(mana_values, weights=curve, k=1)[0]
-        logging.info(f"[Card #{index+1}] Selected mana value: {selected_mana_value}")
+        logging.debug(f"[Card #{index+1}] Selected mana value: {selected_mana_value}")
         time.sleep(sleepy_time)
         card_skeleton["manaValue"] = selected_mana_value
 
@@ -699,7 +699,7 @@ def card_skeleton_generator(
 
     if primary_land_flag:
         land_color_bleed_overlinear = skeleton_params.land_color_bleed_overlinear
-        logging.info(
+        logging.debug(
             f"[Card #{index+1}] Land color bleed factor: {land_color_bleed_overlinear}, "
             f"original bleed chance: {color_bleed_factor}"
         )
@@ -707,7 +707,7 @@ def card_skeleton_generator(
         color_bleed_factor = chance_advantage(
             color_bleed_factor, steigung=land_color_bleed_overlinear
         )
-        logging.info(f"[Card #{index+1}] New bleed chance: {color_bleed_factor}")
+        logging.debug(f"[Card #{index+1}] New bleed chance: {color_bleed_factor}")
         time.sleep(sleepy_time)
 
     while (
@@ -736,7 +736,7 @@ def card_skeleton_generator(
             f"[Card #{index+1}] Added bleed color: {bleed_color}, new colors: {selected_colors}"
         )
 
-    logging.info(f"[Card #{index+1}] Final color identity: {selected_colors}")
+    logging.debug(f"[Card #{index+1}] Final color identity: {selected_colors}")
     time.sleep(sleepy_time)
     card_skeleton["colorIdentity"] = ", ".join(selected_colors)
 
@@ -754,7 +754,7 @@ def card_skeleton_generator(
         rarity_weights = skeleton_params.rarities_weights
         selected_rarity = random.choices(rarities, weights=rarity_weights, k=1)[0]
     
-    logging.info(f"[Card #{index+1}] Selected rarity: {selected_rarity}")
+    logging.debug(f"[Card #{index+1}] Selected rarity: {selected_rarity}")
     time.sleep(sleepy_time)
     card_skeleton["rarity"] = selected_rarity
 
@@ -787,7 +787,7 @@ def card_skeleton_generator(
 
     if supertypes:
         card_skeleton["supertypes"] = ", ".join(supertypes)
-        logging.info(
+        logging.debug(
             f"[Card #{index+1}] Added supertypes: {card_skeleton['supertypes']}"
         )
         time.sleep(sleepy_time)
@@ -798,7 +798,7 @@ def card_skeleton_generator(
     extra_creative_chance = (a / den * 100.0) if den > 0 else 0.0
     if merlinAI_lib.check_mutation(extra_creative_chance):
         out_params.creative = True
-        logging.info(f"[Card #{index+1}] Extra creative!")
+        logging.debug(f"[Card #{index+1}] Extra creative!")
         time.sleep(sleepy_time)
 
     # function tags
@@ -825,13 +825,13 @@ def card_skeleton_generator(
             selected_tags.append(tag)
             logging.debug(f"[Card #{index+1}] Added special tag: {tag}")
 
-    logging.info(f"[Card #{index+1}] Selected function tags: {selected_tags}")
+    logging.debug(f"[Card #{index+1}] Selected function tags: {selected_tags}")
     time.sleep(sleepy_time)
 
     otag_max = skeleton_params.tags_maximum
 
     if basic_land_flag:
-        logging.info(f"[Card #{index+1}] Basic land card, no function tags allowed.")
+        logging.debug(f"[Card #{index+1}] Basic land card, no function tags allowed.")
         time.sleep(sleepy_time)
         otag_max = None
     elif primary_land_flag:
@@ -843,7 +843,7 @@ def card_skeleton_generator(
         ), "tags_maximum must be a non-negative int."
         logging.debug(f"[Card #{index+1}] Maximum function tags allowed: {otag_max}")
         if len(selected_tags) > otag_max:
-            logging.info(
+            logging.debug(
                 f"[Card #{index+1}] Selected tags exceed maximum, trimming to {otag_max}"
             )
             time.sleep(sleepy_time)
@@ -851,7 +851,7 @@ def card_skeleton_generator(
 
     if selected_tags:
         card_skeleton["function_tags"] = ", ".join(selected_tags)
-        logging.info(
+        logging.debug(
             f"[Card #{index+1}] Added function tags: {card_skeleton['function_tags']}"
         )
         time.sleep(sleepy_time)
@@ -880,13 +880,13 @@ def card_skeleton_generator(
         )
         powerLevel = round(powerLevel, 2)  # Round to 2 decimal places
         card_skeleton["powerLevel"] = f"{powerLevel} out of 10"
-        logging.info(
+        logging.debug(
             f"[Card #{index+1}] Set power level to {skeleton_params.power_level}, adjusted to {powerLevel}."
         )
         time.sleep(sleepy_time)
 
         # PATCH: replace the “Themes” header block
-        logging.info(f"[Card #{index+1}] Checking for themes.")
+        logging.debug(f"[Card #{index+1}] Checking for themes.")
         themes = list(card_skeleton.get("themes", []))
         logging.debug(f"[Card #{index+1}] Available themes: {themes}")
         time.sleep(sleepy_time)
@@ -903,7 +903,7 @@ def card_skeleton_generator(
                 )
                 amount = len(th)
             selected_themes = random.sample(th, amount)
-            logging.info(f"[Card #{index+1}] Selected themes: {selected_themes}")
+            logging.debug(f"[Card #{index+1}] Selected themes: {selected_themes}")
             time.sleep(sleepy_time)
         else:
             for theme in th:
@@ -918,7 +918,7 @@ def card_skeleton_generator(
                     logging.debug(f"[Card #{index+1}] Added theme: {theme}")
 
         card_skeleton["themes"] = selected_themes
-        logging.info(f"[Card #{index+1}] Selected themes: {selected_themes}")
+        logging.debug(f"[Card #{index+1}] Selected themes: {selected_themes}")
         time.sleep(sleepy_time)
 
     ########### Logging the generated card skeleton
@@ -943,7 +943,7 @@ def generate_card(index, api_params: APIParams, metrics: GenerationMetrics, conf
     local_api_params = deepcopy(api_params)
 
     card_start = time.time()
-    logging.info(f"[#{index+1}] Send card generation request...")
+    logging.debug(f"[#{index+1}] Send card generation request...")
     time.sleep(sleepy_time)
 
     if local_api_params.image_model == "random":
@@ -951,7 +951,7 @@ def generate_card(index, api_params: APIParams, metrics: GenerationMetrics, conf
         random_options = [k for k, v in random_options_dict.items() if v > 0]
         random_options_weights = [random_options_dict[k] for k in random_options]
         image_model = random.choices(random_options, weights=random_options_weights, k=1)[0]
-        logging.info(f"[#{index+1}] Randomly selected image model: {image_model}")
+        logging.debug(f"[#{index+1}] Randomly selected image model: {image_model}")
     else:
         image_model = local_api_params.image_model
 
@@ -977,7 +977,7 @@ def generate_card(index, api_params: APIParams, metrics: GenerationMetrics, conf
     logging.debug(f"[#{index+1}] Request parameters: {json.dumps(params, indent=2)}")
 
     try:
-        logging.info(f"[#{index+1}] Sending request...")
+        logging.debug(f"[#{index+1}] Sending request...")
         time.sleep(sleepy_time)
         
         # Check URL length to warn about potential 414 errors
@@ -1004,9 +1004,9 @@ def generate_card(index, api_params: APIParams, metrics: GenerationMetrics, conf
         logging.error(f"[#{index+1}] Card generation failed: {e}")
         raise Exception("Card generation failed") from e
 
-    logging.info(f"[#{index+1}] Received card ID: {card_id}")
+    logging.debug(f"[#{index+1}] Received card ID: {card_id}")
     time.sleep(sleepy_time)
-    logging.info(f"[#{index+1}] Now Polling card generation status ...")
+    logging.debug(f"[#{index+1}] Now Polling card generation status ...")
     time.sleep(sleepy_time)
 
     status_url = f"https://mtgcardgenerator.azurewebsites.net/api/GetMagicCardGenerationStatus?instanceId={card_id}"
@@ -1081,7 +1081,7 @@ def generate_card(index, api_params: APIParams, metrics: GenerationMetrics, conf
     )
     time.sleep(sleepy_time)
 
-    logging.info(f"[Card #{index+1}] Card generation successful.")
+    logging.debug(f"[Card #{index+1}] Card generation successful.")
     time.sleep(sleepy_time)
     logging.debug(f"[Card #{index+1}] Card output data: {output_data}")
 
@@ -1109,7 +1109,7 @@ def get_card_graceful(i, api_params: APIParams, skeleton_params: SkeletonParams,
                 i, api_params=api_params, skeleton_params=skeleton_params, predefined_keys=predefined_keys, config=config
             )
 
-            logging.info(
+            logging.debug(
                 f"[Card #{i+1}] API requests:\n"
                 f"{json.dumps(local_api_params.params_out(), indent=2)}"
             )
@@ -1126,7 +1126,7 @@ def get_card_graceful(i, api_params: APIParams, skeleton_params: SkeletonParams,
                         with auth_lock:
                             new_auth_token = login_mtgcg()
                             api_params.update_auth_token(new_auth_token, sleepy_time)
-                            logging.info(f"[Card #{i+1}] Auth token updated under lock")
+                            logging.debug(f"[Card #{i+1}] Auth token updated under lock")
                     else:
                         new_auth_token = login_mtgcg()
                         api_params.update_auth_token(new_auth_token, sleepy_time)
@@ -1150,9 +1150,9 @@ def get_card_graceful(i, api_params: APIParams, skeleton_params: SkeletonParams,
         )
         raise Exception(f"Failed to generate card #{i+1} after {retries} attempts.")
 
-    logging.info(f"[Card #{i+1}] generation complete.")
+    logging.debug(f"[Card #{i+1}] generation complete.")
     time.sleep(sleepy_time)
-    logging.info(f"[Card #{i+1}] Card output: {json.dumps(card, indent=2)}")
+    logging.debug(f"[Card #{i+1}] Card output: {json.dumps(card, indent=2)}")
     time.sleep(sleepy_time)
     return card
 
@@ -1171,7 +1171,7 @@ def card_worker(card_queue, pbar, api_params, skeleton_params, metrics, config, 
         try:
             predefined_keys = None
             if pack is not None:
-                logging.info(f"[Card #{i+1}] Using predefined pack data.")
+                logging.debug(f"[Card #{i+1}] Using predefined pack data.")
                 time.sleep(config["aitomaton_config"]["sleepy_time"])
                 predefined_keys = pack[i]
             card = get_card_graceful(
@@ -1187,7 +1187,7 @@ def card_worker(card_queue, pbar, api_params, skeleton_params, metrics, config, 
             card_queue.task_done()
             pbar.update(1)  # <- keeps the bar in sync
             sleepy_time = config["aitomaton_config"]["sleepy_time"]
-            logging.info(f"[Card #{i+1}] task done.")
+            logging.debug(f"[Card #{i+1}] task done.")
             time.sleep(sleepy_time)
 
 
@@ -1250,9 +1250,9 @@ def generate_cards(config: Dict[str, Any], config_name: str) -> Dict[str, Any]:
     if pack_builder["enabled"]:
         pack_cfg = pack_builder["pack"]
         pack = build_pack(pack_cfg=pack_cfg)
-        logging.info(f"Booster pack configuration enabled with {len(pack)} cards.")
+        logging.info(f"🎲 Booster pack configuration enabled with {len(pack)} cards")
         time.sleep(sleepy_time)
-        logging.info(f"Booster pack contents: {pack}")
+        logging.debug(f"Booster pack contents: {pack}")
         time.sleep(sleepy_time)
 
     card_skeleton_params = SkeletonParams(**skeleton_params_filtered)
@@ -1266,7 +1266,7 @@ def generate_cards(config: Dict[str, Any], config_name: str) -> Dict[str, Any]:
     )
 
     if AUTH_TOKEN is None or AUTH_TOKEN == "None" or AUTH_TOKEN == "":
-        logging.info("No auth token found, attempting to login...")
+        logging.debug("No auth token found, attempting to login...")
         time.sleep(sleepy_time)
         try:
             with auth_lock:
@@ -1276,12 +1276,18 @@ def generate_cards(config: Dict[str, Any], config_name: str) -> Dict[str, Any]:
             logging.error(f"Login failed: {e}")
             raise
 
-    logging.info(f"[init] Set Params: {json.dumps(api_params.setParams, indent=2)}")
+    logging.debug(f"[init] Set Params: {json.dumps(api_params.setParams, indent=2)}")
     time.sleep(sleepy_time)
-    logging.info("=== Starting MTG Card Generation ===")
+    logging.info("🎮 === STARTING MTG CARD GENERATION ===")
     time.sleep(sleepy_time)
 
     threads = []
+    # Start generation with clear progress info
+    if pack:
+        logging.info(f"🎯 Starting generation of {total_cards} cards using booster pack configuration")
+    else:
+        logging.info(f"🎯 Starting generation of {total_cards} cards using configuration '{config_name}'")
+    
     card_queue = Queue()
     for i in range(total_cards):
         card_queue.put(i)
@@ -1320,20 +1326,23 @@ def generate_cards(config: Dict[str, Any], config_name: str) -> Dict[str, Any]:
     # Get metrics summary
     summary = metrics.get_summary()
 
-    # Final stats
-    logging.info("=== Generation Complete ===")
+    # Final stats - keep these at INFO level for orchestrator
+    logging.info("🎉 === GENERATION COMPLETE ===")
     time.sleep(sleepy_time)
-    logging.info(f"Rarity Distribution: {summary['rarities']}")
+    logging.info(f"📊 Total Cards Generated: {summary['successful']}/{total_cards}")
     time.sleep(sleepy_time)
-    logging.info(f"Color Distribution: {summary['colors']}")
+    if summary.get('total_cost', 0) > 0:
+        logging.info(f"💰 Total Cost: ${summary['total_cost']:.4f} (${summary['average_cost_per_card']:.4f}/card)")
+        time.sleep(sleepy_time)
+    logging.info(f"⏱️  Total Runtime: {summary['total_runtime']:.2f}s ({summary['average_time_per_card']:.2f}s/card)")
     time.sleep(sleepy_time)
-    logging.info(f"Total Cards Generated: {summary['successful']}/{total_cards}")
+    
+    # Move detailed distributions to debug
+    logging.debug(f"Color Distribution: {summary['colors']}")
     time.sleep(sleepy_time)
-    logging.info(f"Total Runtime: {summary['total_runtime']:.2f}s")
+    logging.debug(f"Rarity Distribution: {summary['rarities']}")
     time.sleep(sleepy_time)
-    logging.info(f"Avg Time per Card: {summary['average_time_per_card']:.2f}s")
-    time.sleep(sleepy_time)
-    logging.info("=== End of Generation ===")
+    logging.info("🎉 === END OF GENERATION ===")
 
     outdir = config["aitomaton_config"]["output_dir"]
     config_outdir = os.path.join(outdir, config_name)
