@@ -195,6 +195,12 @@ def create_tts_deck_list(config: Dict[str, Any], config_path: str,
     """
     Create a deck list file in the format required by tts-deckconverter.
     
+    This function now works independently of cards.json by:
+    1. Scanning the MSE export directory for all image files
+    2. Validating the count matches expected total_cards from config
+    3. Optionally matching with cards.json if available for proper card names
+    4. Falling back to image filenames if cards.json is not available
+    
     Args:
         config: Configuration dictionary
         config_path: Path to the configuration file
@@ -205,72 +211,72 @@ def create_tts_deck_list(config: Dict[str, Any], config_path: str,
         Path to the created deck list file, or None if failed
     """
     config_name = Path(config_path).stem
+    expected_total_cards = config["aitomaton_config"]["total_cards"]
     
-    # Load card data from JSON
-    cards_json_path = Path(config["aitomaton_config"]["output_dir"]) / config_name / f"{config_name}-cards.json"
+    # Step 1: Scan the MSE export directory for all image files
+    image_extensions = ['*.png', '*.jpg', '*.jpeg']
+    all_image_files = []
     
-    if not cards_json_path.exists():
-        logging.error(f"❌ Cards JSON file not found: {cards_json_path}")
-        return None
-        
-    try:
-        with open(cards_json_path, 'r', encoding='utf-8') as f:
-            cards_data = json.load(f)
-    except Exception as e:
-        logging.error(f"❌ Failed to load cards data: {e}")
+    for ext in image_extensions:
+        all_image_files.extend(image_dir.glob(ext))
+    
+    if not all_image_files:
+        logging.error(f"❌ No image files found in {image_dir}")
         return None
     
-    if not cards_data:
-        logging.error("❌ No cards data found in JSON file")
+    # Step 2: Validate count matches expected total
+    if len(all_image_files) != expected_total_cards:
+        logging.error(f"❌ Image count mismatch! Found {len(all_image_files)} images, expected {expected_total_cards}")
+        logging.error(f"   Please check MSE export completed properly")
         return None
     
-    # Create deck list in tts-deckconverter format
+    logging.info(f"✅ Found {len(all_image_files)} images matching expected count of {expected_total_cards}")
+    
+    # Step 3: Try to load cards.json for proper card names (optional)
+    cards_data = None
+    cards_json_path = Path(config["aitomaton_config"]["output_dir"]) / config_name / f"{config_name}_cards.json"
+    
+    if cards_json_path.exists():
+        try:
+            with open(cards_json_path, 'r', encoding='utf-8') as f:
+                cards_data = json.load(f)
+            logging.info(f"✅ Loaded cards.json with {len(cards_data)} cards for name matching")
+        except Exception as e:
+            logging.warning(f"⚠️  Could not load cards.json: {e}")
+            logging.warning("   Will use image filenames as card names")
+    else:
+        logging.info(f"ℹ️  cards.json not found at {cards_json_path}")
+        logging.info("   Will use image filenames as card names")
+    
+    # Step 4: Create deck list entries
     deck_list_lines = []
-    missing_images = []
     
-    # Define deck list file location early
-    deck_list_file = output_dir / f"{config_name}_deck.txt"
-    
-    for card in cards_data:
-        card_name = card.get("name", "Unnamed Card")
-        sanitized_name = sanitize_filename(card_name)
+    for image_file in sorted(all_image_files):
+        # Get the base filename without extension
+        image_name = image_file.stem
+        card_name = image_name  # Default: use filename as card name
         
-        # Look for image file with the card name
-        # Try multiple possible filename formats
-        possible_names = [
-            f"{card_name}.png",
-            f"{card_name}.jpg",
-            f"{sanitized_name}.png",  # Add sanitized version
-            f"{sanitized_name}.jpg",  # Add sanitized version
-            f"{card.get('id', card_name)}.png",
-            f"{card.get('id', card_name)}.jpg"
-        ]
+        # Step 5: If we have cards.json, try to match proper card names
+        if cards_data:
+            # Try to find a matching card by comparing sanitized names
+            for card in cards_data:
+                card_json_name = card.get("name", "")
+                sanitized_card_name = sanitize_filename(card_json_name)
+                
+                # Match if the sanitized names are the same
+                if sanitized_card_name == image_name:
+                    card_name = card_json_name  # Use the proper card name from JSON
+                    break
         
-        image_path = None
-        for possible_name in possible_names:
-            potential_path = image_dir / possible_name
-            if potential_path.exists():
-                image_path = potential_path
-                break
-        
-        if image_path:
-            # Use just the filename for tts-deckconverter
-            # We'll run the converter from the images directory
-            # Use the same sanitization as MSE export to ensure filename match
-            file_safe_name = sanitize_filename(card_name)
-            deck_list_lines.append(f"1 {file_safe_name}.png ({card_name})")
-        else:
-            missing_images.append(card_name)
-            logging.warning(f"⚠️  Image not found for card: {card_name}")
-    
-    if missing_images:
-        logging.warning(f"⚠️  {len(missing_images)} cards missing images: {missing_images[:5]}{'...' if len(missing_images) > 5 else ''}")
+        # Add to deck list (format: "1 filename.ext (Card Name)")
+        deck_list_lines.append(f"1 {image_file.name} ({card_name})")
     
     if not deck_list_lines:
-        logging.error("❌ No card images found for deck list")
+        logging.error("❌ No valid deck list entries created")
         return None
     
-    # Save deck list file
+    # Step 6: Save deck list file
+    deck_list_file = output_dir / f"{config_name}_deck.txt"
     
     try:
         with open(deck_list_file, 'w', encoding='utf-8') as f:
@@ -278,6 +284,17 @@ def create_tts_deck_list(config: Dict[str, Any], config_path: str,
         
         logging.info(f"📝 Created deck list: {deck_list_file}")
         logging.info(f"📊 Deck contains {len(deck_list_lines)} cards")
+        
+        if cards_data:
+            logging.info("✅ Used proper card names from cards.json")
+        else:
+            logging.info("ℹ️  Used image filenames as card names")
+        
+        return deck_list_file
+        
+    except Exception as e:
+        logging.error(f"❌ Failed to save deck list: {e}")
+        return None
         
         return deck_list_file
         
@@ -306,6 +323,22 @@ def convert_to_tts_deck(deck_list_file: Path, output_dir: Path,
     """
     # Get tts-deckconverter path from environment or use default
     tts_converter_path = os.getenv("TTS_DECKCONVERTER_PATH", "tts-deckconverter")
+    
+    # Extract config information for template naming
+    config_name = None
+    image_format = "png"  # Default format if not specified in config
+    if config_path:
+        config_name = Path(config_path).stem
+        # Handle batch mode virtual config names like "testPack2-1" -> "testPack2"  
+        if '-' in config_name and config_name.split('-')[-1].isdigit():
+            config_name = '-'.join(config_name.split('-')[:-1])
+    else:
+        # Fallback to directory structure if config_path not provided
+        config_name = Path(output_dir).parent.name
+    
+    # Get the image format from config
+    if config and 'tts_export' in config:
+        image_format = config['tts_export'].get('image_format', 'png')
     
     # Check if tts-deckconverter is available
     # If it's just a command name, try to find it in PATH using 'which' or 'where'
@@ -373,43 +406,65 @@ def convert_to_tts_deck(deck_list_file: Path, output_dir: Path,
             elif temp_deck_list.exists():
                 logging.debug(f"🧹 Cleanup disabled - preserving temporary deck list: {temp_deck_list}")
             
-            # Rename template file to desired format immediately after creation
+            # Rename template files to desired format immediately after creation
+            # Support multiple templates for large decks (>70 cards) that tts-deckconverter splits
             template_files = list(output_dir.glob("*Template*.jpg"))
             if template_files:
-                old_template = template_files[0]
-                logging.info(f"🔍 Found template file: {old_template}")
+                logging.info(f"🔍 Found {len(template_files)} template file(s): {[f.name for f in template_files]}")
                 
-                # Get config name more robustly - use config_path stem instead of directory structure
-                # This handles both normal mode and batch mode correctly
-                if config_path:
-                    config_name = Path(config_path).stem
-                    
-                    # Handle batch mode virtual config names like "testPack2-1" -> "testPack2"  
-                    if '-' in config_name and config_name.split('-')[-1].isdigit():
-                        config_name = '-'.join(config_name.split('-')[:-1])
-                else:
-                    # Fallback to directory structure if config_path not provided
-                    config_name = Path(output_dir).parent.name
-                
-                image_format = config['tts_export']['image_format']
-                
-                new_template_name = f"{config_name}-decksheet.{image_format}"
-                new_template_path = output_dir / new_template_name
-                
-                logging.info(f"🔄 Attempting to rename: {old_template.name} → {new_template_name}")
-                
-                try:
-                    old_template.rename(new_template_path)
-                    logging.info(f"✅ Successfully renamed template: {old_template.name} → {new_template_name}")
-                    
-                    # Verify the file exists with new name
-                    if new_template_path.exists():
-                        logging.info(f"✅ Verified new file exists: {new_template_path}")
+                # Handle single template or multiple templates
+                renamed_templates = []
+                for i, old_template in enumerate(sorted(template_files, key=lambda x: x.name)):
+                    # Determine correct mapping based on tts-deckconverter naming convention
+                    # "Template.jpg" = first template (cards 1-70)
+                    # "Template 2.jpg" = second template (cards 71-90)
+                    # etc.
+                    if 'Template 2' in old_template.name:
+                        template_number = 2
+                    elif 'Template 3' in old_template.name:
+                        template_number = 3
+                    elif 'Template 4' in old_template.name:
+                        template_number = 4
+                    elif 'Template.' in old_template.name:
+                        template_number = 1
                     else:
-                        logging.error(f"❌ New file does not exist after rename: {new_template_path}")
+                        # Fallback to sequential numbering
+                        template_number = i + 1
+                    
+                    # Use configured image format
+                    if len(template_files) == 1:
+                        # Single template - use original naming scheme
+                        new_template_name = f"{config_name}-decksheet.{image_format}"
+                    else:
+                        # Multiple templates - use correct template numbers
+                        new_template_name = f"{config_name}-decksheet-{template_number}.{image_format}"
+                    
+                    new_template_path = output_dir / new_template_name
+                    
+                    logging.info(f"🔄 Attempting to rename: {old_template.name} → {new_template_name}")
+                    
+                    try:
+                        # Remove existing file if it exists to avoid conflicts
+                        if new_template_path.exists():
+                            new_template_path.unlink()
+                            logging.info(f"🗑️  Removed existing file: {new_template_name}")
                         
-                except Exception as e:
-                    logging.error(f"❌ Could not rename template file: {e}")
+                        old_template.rename(new_template_path)
+                        logging.info(f"✅ Successfully renamed template: {old_template.name} → {new_template_name}")
+                        renamed_templates.append((template_number, new_template_path))
+                        
+                        # Verify the file exists with new name
+                        if new_template_path.exists():
+                            logging.info(f"✅ Verified new file exists: {new_template_path}")
+                        else:
+                            logging.error(f"❌ New file does not exist after rename: {new_template_path}")
+                            
+                    except Exception as e:
+                        logging.error(f"❌ Could not rename template file {old_template.name}: {e}")
+                
+                # Sort templates by their number for correct order
+                renamed_templates.sort(key=lambda x: x[0])
+                template_files = [path for _, path in renamed_templates]
             else:
                 logging.warning("⚠️  No template file found to rename")
             
@@ -421,17 +476,26 @@ def convert_to_tts_deck(deck_list_file: Path, output_dir: Path,
             
             # Look for generated TTS files
             tts_files = list(output_dir.glob("*.json"))
-            template_files = list(output_dir.glob("*Template*.jpg"))
+            # Look for renamed template files using configured extension
+            template_files = list(output_dir.glob(f"{config_name}-decksheet*.{image_format}"))
             
             if tts_files:
                 logging.info(f"📊 Generated TTS files: {[f.name for f in tts_files]}")
             
             if template_files:
-                logging.info(f"🖼️  Generated template image: {[f.name for f in template_files]}")
-                logging.info("📋 MANUAL UPLOAD REQUIRED:")
-                logging.info("   1. Upload the template image to an image hosting service (e.g., Imgur)")
-                logging.info("   2. Edit the .json file and replace the local 'FaceURL' path with the uploaded URL")
-                logging.info("   3. Import the edited .json file into Tabletop Simulator")
+                logging.info(f"🖼️  Generated template image(s): {[f.name for f in template_files]}")
+                
+                if len(template_files) == 1:
+                    logging.info("📋 MANUAL UPLOAD REQUIRED:")
+                    logging.info("   1. Upload the template image to an image hosting service (e.g., Imgur)")
+                    logging.info("   2. Edit the .json file and replace the local 'FaceURL' path with the uploaded URL")
+                    logging.info("   3. Import the edited .json file into Tabletop Simulator")
+                else:
+                    logging.info("📋 MANUAL UPLOAD REQUIRED (MULTI-TEMPLATE DECK):")
+                    logging.info(f"   1. Upload all {len(template_files)} template images to an image hosting service (e.g., Imgur)")
+                    logging.info("   2. Edit the .json file(s) and replace the local 'FaceURL' paths with the uploaded URLs")
+                    logging.info("   3. Ensure template URLs match the correct deck objects in TTS")
+                    logging.info("   4. Import the edited .json file(s) into Tabletop Simulator")
             
             # Clean up unwanted nested directories created by tts-deckconverter
             import shutil
@@ -728,8 +792,8 @@ def main():
 
 def _fix_tts_urls(output_dir: Path):
     """
-    Fix file URLs in TTS JSON files to use proper file:// format
-    and add custom cardback URL
+    Fix file URLs in TTS JSON files to use proper file:// format,
+    update filenames to match renamed templates, and add custom cardback URL
     
     Args:
         output_dir: Directory containing generated TTS files
@@ -747,6 +811,24 @@ def _fix_tts_urls(output_dir: Path):
     else:
         logging.warning(f"⚠️  Cardback not found: {cardback_path}")
     
+    # Find renamed template files
+    template_files = list(output_dir.glob("*-decksheet*.png")) + list(output_dir.glob("*-decksheet*.jpg"))
+    template_map = {}
+    
+    for template_file in template_files:
+        # Extract template number from filename (e.g., testBigDeck3-decksheet-1.png -> 1)
+        if '-decksheet-' in template_file.name:
+            # Multi-template case
+            parts = template_file.stem.split('-decksheet-')
+            if len(parts) == 2 and parts[1].isdigit():
+                template_num = int(parts[1])
+                template_map[template_num] = template_file
+        elif template_file.name.endswith('-decksheet.png') or template_file.name.endswith('-decksheet.jpg'):
+            # Single template case
+            template_map[1] = template_file
+    
+    logging.info(f"🔍 Found renamed templates: {template_map}")
+    
     for json_file in output_dir.glob("*.json"):
         try:
             # Read the JSON file
@@ -760,6 +842,33 @@ def _fix_tts_urls(output_dir: Path):
             def fix_urls_recursive(obj, path=""):
                 nonlocal modified
                 if isinstance(obj, dict):
+                    # Check if we're in a CustomDeck structure
+                    if 'CustomDeck' in obj:
+                        custom_deck = obj['CustomDeck']
+                        for deck_id, deck_info in custom_deck.items():
+                            if 'FaceURL' in deck_info:
+                                try:
+                                    deck_num = int(deck_id)
+                                    if deck_num in template_map:
+                                        # Update to use renamed template file
+                                        renamed_template = template_map[deck_num]
+                                        new_url = f"file:///{str(renamed_template.absolute()).replace('/', '\\\\')}"
+                                        deck_info['FaceURL'] = new_url
+                                        modified = True
+                                        logging.info(f"🔗 Updated CustomDeck {deck_id} FaceURL to renamed template: {renamed_template.name}")
+                                    else:
+                                        logging.warning(f"⚠️  No renamed template found for CustomDeck {deck_id}")
+                                except ValueError:
+                                    logging.warning(f"⚠️  Invalid CustomDeck ID: {deck_id}")
+                            
+                            # Handle BackURL
+                            if 'BackURL' in deck_info:
+                                if not deck_info['BackURL'] and cardback_url:
+                                    deck_info['BackURL'] = cardback_url
+                                    modified = True
+                                    logging.info(f"🎨 Added cardback URL to CustomDeck {deck_id}")
+                    
+                    # Continue with general URL fixing
                     for key, value in obj.items():
                         if key in ['FaceURL', 'BackURL'] and isinstance(value, str):
                             # Handle FaceURL fixes
@@ -1027,6 +1136,10 @@ def _organize_with_imgbb_upload(output_dir: Path, deck_name: str, config: Dict[s
     """
     import json
     
+    # Get image format from config
+    tts_config = config.get('tts_export', {})
+    image_format = tts_config.get('image_format', 'png')
+    
     # Get ImgBB API key
     imgbb_key = os.getenv('IMGBB_KEY')
     if not imgbb_key:
@@ -1038,21 +1151,31 @@ def _organize_with_imgbb_upload(output_dir: Path, deck_name: str, config: Dict[s
     
     logging.info("🌐 Uploading images to ImgBB...")
     
-    # Find template file (now using new naming convention)
-    template_files = list(output_dir.glob("*-decksheet.*"))
+    # Find template files using configured image format
+    template_files = list(output_dir.glob(f"*-decksheet*.{image_format}"))
     if not template_files:
         # Fallback to old naming if new naming not found
         template_files = list(output_dir.glob("*Template*.jpg"))
     
-    face_url = None
+    # Upload all template files
+    template_urls = []
     if template_files:
-        template_file = template_files[0]
-        face_url = upload_image_to_imgbb(template_file, imgbb_key)
-        if not face_url:
-            logging.error("❌ Failed to upload template image")
-            return
+        logging.info(f"📤 Uploading {len(template_files)} template file(s) to ImgBB...")
+        for i, template_file in enumerate(sorted(template_files)):
+            logging.info(f"📤 Uploading template {i+1}/{len(template_files)}: {template_file.name}")
+            face_url = upload_image_to_imgbb(template_file, imgbb_key)
+            if face_url:
+                template_urls.append(face_url)
+                logging.info(f"✅ Template {i+1} uploaded successfully")
+            else:
+                logging.error(f"❌ Failed to upload template {i+1}: {template_file.name}")
+                return
     else:
-        logging.error("❌ No template file found")
+        logging.error("❌ No template files found")
+        return
+    
+    if len(template_urls) != len(template_files):
+        logging.error(f"❌ Upload mismatch: {len(template_files)} files, {len(template_urls)} successful uploads")
         return
     
     # Upload cardback
@@ -1071,42 +1194,73 @@ def _organize_with_imgbb_upload(output_dir: Path, deck_name: str, config: Dict[s
     # Update JSON files with web URLs
     json_files = list(output_dir.glob("*.json"))
     if json_files:
-        json_file = json_files[0]
+        logging.info(f"📝 Updating {len(json_files)} JSON file(s) with uploaded URLs...")
         
-        try:
-            with open(json_file, 'r', encoding='utf-8') as f:
-                data = json.load(f)
-            
-            def update_to_web_urls(obj):
-                if isinstance(obj, dict):
-                    for key, value in obj.items():
-                        if key == 'FaceURL' and isinstance(value, str):
-                            obj[key] = face_url
-                            logging.info(f"🔗 Updated FaceURL: {face_url}")
-                        elif key == 'BackURL' and isinstance(value, str):
-                            obj[key] = back_url
-                            logging.info(f"🔗 Updated BackURL: {back_url}")
-                        else:
-                            update_to_web_urls(value)
-                elif isinstance(obj, list):
-                    for item in obj:
-                        update_to_web_urls(item)
-            
-            update_to_web_urls(data)
-            
-            # Write back the updated JSON
-            with open(json_file, 'w', encoding='utf-8') as f:
-                json.dump(data, f, indent=2)
-            
-            logging.info(f"✅ Updated {json_file.name} with web URLs")
-            logging.info("🎉 TTS deck ready with online images!")
-            logging.info(f"📋 Deck file: {json_file}")
-            logging.info("🎮 Import this JSON file directly into Tabletop Simulator!")
-            
-        except Exception as e:
-            logging.error(f"❌ Could not update {json_file.name}: {e}")
+        for json_file in json_files:
+            try:
+                with open(json_file, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                
+                def update_to_web_urls_smart(obj, inside_custom_deck=False):
+                    if isinstance(obj, dict):
+                        # Look for CustomDeck structure and update FaceURLs correctly
+                        if 'CustomDeck' in obj and not inside_custom_deck:
+                            custom_deck = obj['CustomDeck']
+                            for deck_id, deck_info in custom_deck.items():
+                                if 'FaceURL' in deck_info:
+                                    # Map deck IDs to correct template URLs
+                                    # CustomDeck "1" = first 70 cards = template 1
+                                    # CustomDeck "2" = next 20 cards = template 2, etc.
+                                    try:
+                                        deck_num = int(deck_id)
+                                        if deck_num <= len(template_urls):
+                                            # Use correct template order: deck 1 -> template 1, deck 2 -> template 2
+                                            template_url = template_urls[deck_num - 1]
+                                            deck_info['FaceURL'] = template_url
+                                            logging.info(f"🔗 Updated CustomDeck {deck_id} FaceURL: {template_url}")
+                                        else:
+                                            logging.warning(f"⚠️  No template URL available for CustomDeck {deck_id}")
+                                    except (ValueError, IndexError) as e:
+                                        logging.warning(f"⚠️  Could not map CustomDeck {deck_id}: {e}")
+                                
+                                if 'BackURL' in deck_info and back_url:
+                                    deck_info['BackURL'] = back_url
+                                    logging.info(f"🔗 Updated CustomDeck {deck_id} BackURL")
+                        
+                        # Always recurse through ALL objects to handle nested CustomDecks
+                        for key, value in obj.items():
+                            if key == 'CustomDeck':
+                                # Recurse into CustomDeck with flag set
+                                update_to_web_urls_smart(value, inside_custom_deck=True)
+                            elif key == 'FaceURL' and isinstance(value, str) and template_urls and not inside_custom_deck:
+                                # Fallback: use first template URL only if not already inside a CustomDeck object
+                                obj[key] = template_urls[0]
+                                logging.info(f"🔗 Updated FaceURL (fallback): {template_urls[0]}")
+                            elif key == 'BackURL' and isinstance(value, str) and back_url and not inside_custom_deck:
+                                obj[key] = back_url
+                                logging.info(f"🔗 Updated BackURL: {back_url}")
+                            else:
+                                update_to_web_urls_smart(value, inside_custom_deck)
+                    elif isinstance(obj, list):
+                        for item in obj:
+                            update_to_web_urls_smart(item, inside_custom_deck)
+                
+                update_to_web_urls_smart(data)
+                
+                # Write back the updated JSON
+                with open(json_file, 'w', encoding='utf-8') as f:
+                    json.dump(data, f, indent=2)
+                
+                logging.info(f"✅ Updated {json_file.name} with web URLs")
+                
+            except Exception as e:
+                logging.error(f"❌ Failed to update {json_file.name}: {e}")
+        
+        logging.info("🎉 TTS deck ready with online images!")
+        logging.info(f"📋 Deck files: {[f.name for f in json_files]}")
+        logging.info("🎮 Import these JSON files directly into Tabletop Simulator!")
     else:
-        logging.error("❌ No JSON file found to update")
+        logging.error("❌ No JSON files found to update")
 
 
 def _organize_with_local_files(output_dir: Path, deck_name: str, config: Dict[str, Any]):
@@ -1117,6 +1271,10 @@ def _organize_with_local_files(output_dir: Path, deck_name: str, config: Dict[st
     import shutil
     import os
     
+    # Get image format from config
+    tts_config = config.get('tts_export', {})
+    image_format = tts_config.get('image_format', 'png')
+    
     # Get TTS Saved Objects path from environment
     tts_path = os.getenv('TTS_SAVEDOBJS_PATH')
     if not tts_path:
@@ -1124,14 +1282,14 @@ def _organize_with_local_files(output_dir: Path, deck_name: str, config: Dict[st
         logging.info("💡 To auto-copy to TTS, set TTS_SAVEDOBJS_PATH environment variable to:")
         logging.info("   Windows: %USERPROFILE%/Documents/My Games/Tabletop Simulator/Saves/Saved Objects")
         logging.info("   Example: TTS_SAVEDOBJS_PATH=\"C:/Users/YourName/Documents/My Games/Tabletop Simulator/Saves/Saved Objects\"")
-        _organize_local_relative(output_dir, deck_name)
+        _organize_local_relative(output_dir, deck_name, config)
         return
     
     tts_base_path = Path(tts_path)
     if not tts_base_path.exists():
         logging.error(f"❌ TTS_SAVEDOBJS_PATH does not exist: {tts_base_path}")
         logging.info("💡 Please check your TTS_SAVEDOBJS_PATH environment variable")
-        _organize_local_relative(output_dir, deck_name)
+        _organize_local_relative(output_dir, deck_name, config)
         return
     
     # Create Merlin's Aitomaton directory in TTS Saved Objects
@@ -1142,23 +1300,25 @@ def _organize_with_local_files(output_dir: Path, deck_name: str, config: Dict[st
     logging.info(f"📁 TTS Saved Objects path: {tts_base_path}")
     logging.info(f"📁 Merlin's Aitomaton directory: {merlin_dir}")
     
-    # Find and copy template file (now using new naming convention)
-    template_files = list(output_dir.glob("*-decksheet.*"))
+    # Find and copy template files using configured image format
+    template_files = list(output_dir.glob(f"*-decksheet*.{image_format}"))
     if not template_files:
         # Fallback to old naming if new naming not found
         template_files = list(output_dir.glob("*Template*.jpg"))
     
-    template_dest = None
+    template_dests = []
     if template_files:
-        old_template = template_files[0]
-        template_dest = deck_sheets_dir / old_template.name  # Keep the new name
-        
-        try:
-            shutil.copy2(old_template, template_dest)
-            logging.info(f"📁 Copied template: {template_dest.name}")
-        except Exception as e:
-            logging.error(f"❌ Could not copy template: {e}")
-            return
+        logging.info(f"📁 Copying {len(template_files)} template file(s) to TTS...")
+        for i, template_file in enumerate(sorted(template_files)):
+            template_dest = deck_sheets_dir / template_file.name  # Keep the new name
+            
+            try:
+                shutil.copy2(template_file, template_dest)
+                template_dests.append(template_dest)
+                logging.info(f"📁 Copied template {i+1}/{len(template_files)}: {template_dest.name}")
+            except Exception as e:
+                logging.error(f"❌ Could not copy template {template_file.name}: {e}")
+                return
     else:
         logging.error("❌ No template file found")
         return
@@ -1172,77 +1332,128 @@ def _organize_with_local_files(output_dir: Path, deck_name: str, config: Dict[st
         shutil.copy2(cardback_path, cardback_dest)
         logging.info(f"📁 Copied cardback: {cardback_dest}")
     
-    # Copy and update JSON file
+    # Copy and update JSON files
     json_files = list(output_dir.glob("*.json"))
     if json_files:
-        json_file = json_files[0]
-        json_dest = merlin_dir / f"{deck_name}.json"
+        logging.info(f"📝 Processing {len(json_files)} JSON file(s)...")
         
-        try:
-            with open(json_file, 'r', encoding='utf-8') as f:
-                data = json.load(f)
+        for json_file in json_files:
+            # Create output filename
+            if len(json_files) == 1:
+                json_dest = merlin_dir / f"{deck_name}.json"
+            else:
+                json_dest = merlin_dir / f"{deck_name}_{json_file.stem}.json"
             
-            # Update URLs to point to TTS Saved Objects absolute paths
-            def update_to_tts_paths(obj):
-                if isinstance(obj, dict):
-                    for key, value in obj.items():
-                        if key == 'FaceURL' and isinstance(value, str) and template_dest:
-                            # Use file:// URL with Windows backslashes
-                            abs_path = str(template_dest.absolute()).replace('/', '\\')
-                            obj[key] = f"file:///{abs_path}"
-                            logging.info(f"🔗 Updated FaceURL: {obj[key]}")
-                        elif key == 'BackURL' and isinstance(value, str) and cardback_dest:
-                            # Use file:// URL with Windows backslashes  
-                            abs_path = str(cardback_dest.absolute()).replace('/', '\\')
-                            obj[key] = f"file:///{abs_path}"
-                            logging.info(f"🔗 Updated BackURL: {obj[key]}")
-                        else:
-                            update_to_tts_paths(value)
-                elif isinstance(obj, list):
-                    for item in obj:
-                        update_to_tts_paths(item)
-            
-            update_to_tts_paths(data)
-            
-            # Write to TTS Saved Objects location
-            with open(json_dest, 'w', encoding='utf-8') as f:
-                json.dump(data, f, indent=2)
-            
-            logging.info(f"✅ Created TTS deck: {json_dest}")
-            
-        except Exception as e:
-            logging.error(f"❌ Could not create TTS deck file: {e}")
-            return
+            try:
+                with open(json_file, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                
+                # Track which template to use for each deck object
+                template_index = 0
+                
+                # Update URLs to point to TTS Saved Objects absolute paths
+                def update_to_tts_paths(obj, inside_custom_deck=False):
+                    nonlocal template_index
+                    if isinstance(obj, dict):
+                        # Look for CustomDeck structure and update FaceURLs correctly
+                        if 'CustomDeck' in obj and not inside_custom_deck:
+                            custom_deck = obj['CustomDeck']
+                            for deck_id, deck_info in custom_deck.items():
+                                if 'FaceURL' in deck_info and template_dests:
+                                    # Map deck IDs to correct template files
+                                    try:
+                                        deck_num = int(deck_id)
+                                        if deck_num <= len(template_dests):
+                                            current_template = template_dests[deck_num - 1]
+                                            abs_path = str(current_template.absolute()).replace('/', '\\')
+                                            deck_info['FaceURL'] = f"file:///{abs_path}"
+                                            logging.info(f"🔗 Updated CustomDeck {deck_id} FaceURL: {deck_info['FaceURL']}")
+                                        else:
+                                            logging.warning(f"⚠️  No template file available for CustomDeck {deck_id}")
+                                    except (ValueError, IndexError) as e:
+                                        logging.warning(f"⚠️  Could not map CustomDeck {deck_id}: {e}")
+                                
+                                if 'BackURL' in deck_info and cardback_dest:
+                                    abs_path = str(cardback_dest.absolute()).replace('/', '\\')
+                                    deck_info['BackURL'] = f"file:///{abs_path}"
+                                    logging.info(f"🔗 Updated CustomDeck {deck_id} BackURL")
+                        
+                        # Always recurse through ALL objects to handle nested CustomDecks
+                        for key, value in obj.items():
+                            if key == 'CustomDeck':
+                                # Recurse into CustomDeck with flag set
+                                update_to_tts_paths(value, inside_custom_deck=True)
+                            elif key == 'FaceURL' and isinstance(value, str) and template_dests and not inside_custom_deck:
+                                # Fallback: use first template only if not already inside a CustomDeck object
+                                current_template = template_dests[0]
+                                abs_path = str(current_template.absolute()).replace('/', '\\')
+                                obj[key] = f"file:///{abs_path}"
+                                logging.info(f"🔗 Updated FaceURL (fallback): {obj[key]}")
+                            elif key == 'BackURL' and isinstance(value, str) and cardback_dest and not inside_custom_deck:
+                                abs_path = str(cardback_dest.absolute()).replace('/', '\\')
+                                obj[key] = f"file:///{abs_path}"
+                                logging.info(f"🔗 Updated BackURL: {obj[key]}")
+                            else:
+                                update_to_tts_paths(value, inside_custom_deck)
+                    elif isinstance(obj, list):
+                        for item in obj:
+                            update_to_tts_paths(item, inside_custom_deck)
+                
+                update_to_tts_paths(data)
+                
+                # Write to TTS Saved Objects location
+                with open(json_dest, 'w', encoding='utf-8') as f:
+                    json.dump(data, f, indent=2)
+                
+                logging.info(f"✅ Created TTS deck: {json_dest.name}")
+                
+            except Exception as e:
+                logging.error(f"❌ Could not create TTS deck file from {json_file.name}: {e}")
+                return
     
     logging.info("🎉 TTS files successfully copied to Saved Objects!")
-    logging.info(f"📍 Deck location: {json_dest}")
+    logging.info(f"📍 Deck location: {merlin_dir}")
     logging.info("🎮 The deck is now ready to load in Tabletop Simulator!")
 
 
-def _organize_local_relative(output_dir: Path, deck_name: str):
+def _organize_local_relative(output_dir: Path, deck_name: str, config: Dict[str, Any]):
     """
     Fallback: Organize files locally with relative paths when TTS_SAVEDOBJS_PATH is not set
     """
     import json
     import shutil
     
+    # Get image format from config
+    tts_config = config.get('tts_export', {})
+    image_format = tts_config.get('image_format', 'png')
+    
     # Create local deck_sheets directory
     deck_sheets_dir = output_dir / "deck_sheets"
     deck_sheets_dir.mkdir(exist_ok=True)
     
-    # Find and move template file
-    template_files = list(output_dir.glob("*Template*.jpg"))
+    # Find and copy template files using configured image format
+    template_files = list(output_dir.glob(f"*-decksheet*.{image_format}"))
+    if not template_files:
+        # Fallback to old naming if new naming not found
+        template_files = list(output_dir.glob("*Template*.jpg"))
+    
+    new_templates = []
     if template_files:
-        old_template = template_files[0]
-        new_template = deck_sheets_dir / f"{deck_name}.png"
-        
-        try:
-            shutil.copy2(old_template, new_template)
-            old_template.unlink()  # Remove original
-            logging.info(f"📁 Moved template: {new_template.name}")
-        except Exception as e:
-            logging.warning(f"⚠️  Could not move template: {e}")
-            return
+        logging.info(f"📁 Moving {len(template_files)} template file(s) locally...")
+        for i, template_file in enumerate(sorted(template_files)):
+            if len(template_files) == 1:
+                new_template = deck_sheets_dir / f"{deck_name}.png"
+            else:
+                new_template = deck_sheets_dir / f"{deck_name}_template_{i+1}.png"
+            
+            try:
+                shutil.copy2(template_file, new_template)
+                template_file.unlink()  # Remove original
+                new_templates.append(new_template)
+                logging.info(f"📁 Moved template {i+1}/{len(template_files)}: {new_template.name}")
+            except Exception as e:
+                logging.warning(f"⚠️  Could not move template {template_file.name}: {e}")
+                return
     
     # Copy cardback locally
     workspace_dir = Path(__file__).parent.parent
@@ -1253,23 +1464,52 @@ def _organize_local_relative(output_dir: Path, deck_name: str):
         logging.info(f"� Copied cardback: {portable_cardback.name}")
     
     # Update JSON files to use relative paths
+    template_index = 0
     for json_file in output_dir.glob("*.json"):
         try:
             with open(json_file, 'r', encoding='utf-8') as f:
                 data = json.load(f)
             
-            def update_to_relative_paths(obj):
+            def update_to_relative_paths(obj, inside_custom_deck=False):
                 if isinstance(obj, dict):
+                    # Look for CustomDeck structure and update FaceURLs correctly
+                    if 'CustomDeck' in obj and not inside_custom_deck:
+                        custom_deck = obj['CustomDeck']
+                        for deck_id, deck_info in custom_deck.items():
+                            if 'FaceURL' in deck_info and new_templates:
+                                # Map deck IDs to correct template files
+                                try:
+                                    deck_num = int(deck_id)
+                                    if deck_num <= len(new_templates):
+                                        current_template = new_templates[deck_num - 1]
+                                        deck_info['FaceURL'] = f"deck_sheets/{current_template.name}"
+                                        logging.info(f"🔗 Updated CustomDeck {deck_id} FaceURL: {deck_info['FaceURL']}")
+                                    else:
+                                        logging.warning(f"⚠️  No template file available for CustomDeck {deck_id}")
+                                except (ValueError, IndexError) as e:
+                                    logging.warning(f"⚠️  Could not map CustomDeck {deck_id}: {e}")
+                            
+                            if 'BackURL' in deck_info:
+                                deck_info['BackURL'] = "deck_sheets/cardback.png"
+                                logging.info(f"🔗 Updated CustomDeck {deck_id} BackURL")
+                    
+                    # Always recurse through ALL objects to handle nested CustomDecks
                     for key, value in obj.items():
-                        if key == 'FaceURL' and isinstance(value, str):
-                            obj[key] = f"deck_sheets/{deck_name}.png"
-                        elif key == 'BackURL' and isinstance(value, str):
+                        if key == 'CustomDeck':
+                            # Recurse into CustomDeck with flag set
+                            update_to_relative_paths(value, inside_custom_deck=True)
+                        elif key == 'FaceURL' and isinstance(value, str) and new_templates and not inside_custom_deck:
+                            # Fallback: use first template only if not already inside a CustomDeck object
+                            obj[key] = f"deck_sheets/{new_templates[0].name}"
+                            logging.info(f"🔗 Updated FaceURL (fallback): {obj[key]}")
+                        elif key == 'BackURL' and isinstance(value, str) and not inside_custom_deck:
                             obj[key] = "deck_sheets/cardback.png"
+                            logging.info(f"🔗 Updated BackURL: {obj[key]}")
                         else:
-                            update_to_relative_paths(value)
+                            update_to_relative_paths(value, inside_custom_deck)
                 elif isinstance(obj, list):
                     for item in obj:
-                        update_to_relative_paths(item)
+                        update_to_relative_paths(item, inside_custom_deck)
             
             update_to_relative_paths(data)
             
