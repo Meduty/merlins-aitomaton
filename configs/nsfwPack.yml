@@ -1,0 +1,374 @@
+aitomaton_config:
+  total_cards: 15
+  image_mode: "localSD" 
+
+http_config:
+  timeout: 120
+  retries: 6
+  retry_delay: 30
+  polling_interval: 1
+
+set_params:
+  set: "Temptations of the Unknown"
+  themes:
+    - "Seductive elf courtesans"
+    - "Forbidden forest revels"
+    - "Midnight rituals of pleasure"
+    - "Decadent highborn elves"
+    - "Lust-drunk moonlit feasts"
+    - "Sinful druidic rites"
+    - "Scantily clad warriors"
+    - "Elves of indulgence and excess"
+    - "Entangling vines and forbidden fruit"
+    - "Wicked fae temptresses"
+    - "Nude elven bodies"
+    - "Erotic encounters"
+    - "Sensual bondage"
+    - "Explicit magical orgies"
+    - "Elven seduction and penetration"
+    - "Cum-covered elves"
+    - "Intimate elven moments"
+    - "Satanic rites and sacrifices"
+    - "Dark elven pleasures"
+    - "Satanic elf worship"
+    - "Satanic rituals of lust"
+    - "Satanic seduction"
+    - "Satanic orgies"
+    - "Satanic possession"
+    - "Satanic corruption"
+    - "Satanic temptation"
+    - "Satanic ecstasy"
+    - "Satanic debauchery"
+    - "Satanic indulgence"
+    - "Satanic excess"
+    - "Satanic hedonism"
+
+skeleton_params:
+  types_mode: normal # normal | play
+  power_level: 9
+  standard_deviation_powerLevel: 0.5
+  power_level_rarity_skew: 0.2
+  wildcard_supertype: true
+  fixed_amount_themes: 1 # if not zero, will select a fixed amount of themes from the available ones instead of mutating them randomly
+  mutation_chance_per_theme: 12.5 # Chance to mutate each theme, ignored if fixed_amount_themes is not zero
+  colors: ["red", "black", "green", "colorless"]
+  colors_weights:
+    red: 40
+    black: 25
+    green: 25
+    colorless: 10
+  function_tags:
+    ramp or mana fixing: 15
+    draw or card advantage: 5
+    removal or control: 10
+    lust: 15
+    cum counter: 20
+    seduction: 20
+    penetration: 15
+    incest: 10
+    mind control: 10
+    insanity: 10
+    corruption: 10
+    board wipe or mass removal: 5
+    activated ability: 5
+    Flying or other evasion: 5
+    simple or straightforward: 10
+  tags_maximum: 3 # Default is null, which means no limit
+
+
+SD_config:
+  max_tag_weight: 2.5
+  lora_weight_standard_deviation: 0.5
+  apply_lora_chance: 25
+  special_tags:
+    Fantasy World:
+      weight: 1.2
+      chance: 100
+    NSFW:
+      weight: 2
+      chance: 50
+    Gore:
+      weight: 2
+      chance: 25
+    Porn:
+      weight: 2
+      chance: 50
+    Hentai:
+      weight: 2
+      chance: 50
+    Boobies:
+      weight: 2
+      chance: 25
+    Ass:
+      weight: 2
+      chance: 25
+    Tits:
+      weight: 2
+      chance: 25
+    Sexy:
+      weight: 2
+      chance: 25
+    Nude:
+      weight: 2
+      chance: 25
+    Ecchi:
+      weight: 2
+      chance: 25
+    Erotic:
+      weight: 2
+      chance: 50
+    Sexy Girls:
+      weight: 2
+      chance: 25
+    Sextoys:
+      weight: 2
+      chance: 10
+    Futanari:
+      weight: 2
+      chance: 10
+    Ahegao:
+      weight: 2
+      chance: 10
+    Tentacles:
+      weight: 2
+      chance: 10
+    Creampie:
+      weight: 2
+      chance: 1
+    Lewd:
+      weight: 2
+      chance: 25
+    Sensual:
+      weight: 2
+      chance: 25
+    Pleasure:
+      weight: 2
+      chance: 20
+    Seduction:
+      weight: 2
+      chance: 20
+    Intimate:
+      weight: 2
+    Cum and sperm:
+      weight: 2
+      chance: 15
+    lust:
+      weight: 2
+      chance: 25
+    sex:
+      weight: 2
+      chance: 10
+    vaginal:
+      weight: 2
+      chance: 10
+    missionary position:
+      weight: 2
+      chance: 10
+    doggy style:
+      weight: 2
+      chance: 10
+    cowgirl position:
+      weight: 2
+      chance: 10
+    reverse cowgirl:
+      weight: 2
+      chance: 10
+    standing sex:
+      weight: 2
+      chance: 10
+    riding:
+      weight: 2
+      chance: 10
+    prone bone:
+      weight: 2
+      chance: 10
+    anal:
+      weight: 2
+      chance: 10
+    blowjob:
+      weight: 2
+      chance: 10
+    cum covered:
+      weight: 2
+      chance: 10
+    cum in mouth:
+      weight: 2
+      chance: 10
+    cum on face:
+      weight: 2
+      chance: 10
+    mating ritual:
+      weight: 2
+      chance: 5
+    mating press:
+      weight: 2
+      chance: 5
+
+
+  image_options:
+        # FLUX model - Fast generation with good quality
+    - name: FLUX
+      weight: 2.0
+      option_params:
+        model: FLUX1DEV_HYPERNF4_FLUX1DEVBNB_FLUX1DEVHYPERNF4
+        loras:
+          FantasyWorldPonyV2: 0.1
+          fantasyV1.1: 0.1
+          dungeons_and_dragons_xl_v3: 0.1
+          Dark_Fantasy_1.5_IL: 0.1
+        steps: 24
+        cfg_scale: 1
+        distilled_cfg_scale: 3.5
+        width: 1024
+        height: 748
+        sampler_name: Euler
+        scheduler: Simple
+        seed: -1
+        n_iter: 1
+        batch_size: 1
+    
+    # Illustrious model - High quality anime/illustration style
+    - name: PILLU
+      weight: 1.0
+      option_params:
+        model: PREFECT_ILLUSTRIOUS_XL_V20P
+        loras:
+          FantasyWorldPonyV2: 0.1
+          fantasyV1.1: 0.1
+          dungeons_and_dragons_xl_v3: 0.1
+          Dark_Fantasy_1.5_IL: 0.85
+        steps: 96
+        cfg_scale: 5
+        sampler_name: "DPM++ 2M SDE"
+        scheduler: Simple
+        width: 1024
+        height: 748
+        seed: -1
+        n_iter: 1
+        batch_size: 1
+    
+    # Pony model - Versatile fantasy art generation
+    - name: PEPONY
+      weight: 0.5
+      option_params:
+        model: PREFECT_PONY_XL_V50
+        loras:
+          FantasyWorldPonyV2: 0.85
+          fantasyV1.1: 0.1
+          dungeons_and_dragons_xl_v3: 0.1
+          Dark_Fantasy_1.5_IL: 0.1
+        steps: 96
+        cfg_scale: 5
+        sampler_name: "DPM++ 2M SDE"
+        scheduler: Simple
+        width: 1024
+        height: 748
+        seed: -1
+        n_iter: 1
+        batch_size: 1
+        negative_prompt: "blurry, low quality, watermark, text, signature, cropped, extra limbs, disfigured, bad anatomy"
+    
+    # Real Dream model - Realistic fantasy art
+    - name: REDREAM
+      weight: 1.0
+      option_params:
+        model: REAL_DREAM_SDXL_PONY15
+        loras:
+          FantasyWorldPonyV2: 0.1
+          fantasyV1.1: 0.85
+          dungeons_and_dragons_xl_v3: 0.1
+          Dark_Fantasy_1.5_IL: 0.1
+        steps: 96
+        cfg_scale: 5
+        sampler_name: "DPM++ 2M SDE"
+        scheduler: Simple
+        width: 1024
+        height: 748
+        seed: -1
+        n_iter: 1
+        batch_size: 1
+        negative_prompt: "blurry, low quality, watermark, text, signature, cropped, extra limbs, disfigured, bad anatomy"
+    
+    # Realism Yogi model - Photorealistic style
+    - name: REALISM_YOGI
+      weight: 0.5
+      option_params:
+        model: REALISM_BY_STABLE_YOGI_V40FP16
+        loras:
+          FantasyWorldPonyV2: 0.1
+          fantasyV1.1: 0.1
+          dungeons_and_dragons_xl_v3: 0.1
+          Dark_Fantasy_1.5_IL: 0.85
+        steps: 96
+        cfg_scale: 5
+        sampler_name: "DPM++ 2M SDE"
+        scheduler: Simple
+        width: 1024
+        height: 748
+        seed: -1
+        n_iter: 1
+        batch_size: 1
+        negative_prompt: "blurry, low quality, watermark, text, signature, cropped, extra limbs, disfigured, bad anatomy"
+    
+    # Unstable Diffusers model - Enhanced D&D style
+    - name: UNSTABLE_DIFFUSERS
+      weight: 2.0
+      option_params:
+        model: SDXL_UNSTABLE_DIFFUSERS_V9_DIVINITYMACHINEVAE
+        loras:
+          FantasyWorldPonyV2: 0.1
+          fantasyV1.1: 0.1
+          dungeons_and_dragons_xl_v3: 0.85
+          Dark_Fantasy_1.5_IL: 0.1
+        steps: 96
+        cfg_scale: 5
+        sampler_name: "DPM++ 2M SDE"
+        scheduler: Simple
+        width: 1024
+        height: 748
+        seed: -1
+        n_iter: 1
+        batch_size: 1
+        negative_prompt: "blurry, low quality, watermark, text, signature, cropped, extra limbs, disfigured, bad anatomy"
+    
+    # NSFW model - Adult content (adjust weights/remove as needed)
+    - name: WAI_NSFW_ILLUSTRIOUS
+      weight: 0.1  # Low weight by default
+      option_params:
+        model: WAI_NSFW_ILLUSTRIOUS_V110
+        loras:
+          FantasyWorldPonyV2: 0.85
+          fantasyV1.1: 0.1
+          dungeons_and_dragons_xl_v3: 0.1
+          Dark_Fantasy_1.5_IL: 0.1
+        steps: 96
+        cfg_scale: 5
+        sampler_name: "DPM++ 2M SDE"
+        scheduler: Simple
+        width: 1024
+        height: 748
+        seed: -1
+        n_iter: 1
+        batch_size: 1
+        negative_prompt: "blurry, low quality, watermark, text, signature, cropped, extra limbs, disfigured, bad anatomy"
+
+    - name: WAI_NSFW_ILLUSTRIOUS2
+      weight: 2  # Low weight by default
+      option_params:
+        model: WAI_NSFW_ILLUSTRIOUS_V140
+        loras:
+          FantasyWorldPonyV2: 0.85
+          fantasyV1.1: 0.1
+          dungeons_and_dragons_xl_v3: 0.1
+          Dark_Fantasy_1.5_IL: 0.1
+        steps: 96
+        cfg_scale: 7
+        sampler_name: "Euler a"
+        scheduler: Simple
+        width: 1024
+        height: 748
+        seed: -1
+        n_iter: 1
+        batch_size: 1
+        negative_prompt: "blurry, low quality, watermark, text, signature, cropped, extra limbs, disfigured, bad anatomy"
+

@@ -1,0 +1,58 @@
+aitomaton_config:
+  total_cards: 60
+  image_mode: "none" 
+
+api_params:
+  generate_image_prompt: true
+
+set_params:
+  set: "Goblin Road Rage"
+  themes:
+    - "Goblin vehicles"
+    - "Mad Max chaos"
+    - "Scrap metal machines"
+    - "Desert raiders"
+    - "Explosive mayhem"
+    - "Ramshackle convoys"
+    - "Speed and recklessness"
+    - "Jury-rigged engines"
+    - "Wasteland survival"
+    - "Tribal goblin gangs"
+
+skeleton_params:
+  types_mode: play # normal | play
+  power_level: 10
+  standard_deviation_powerLevel: 0.5
+  power_level_rarity_skew: 0.2
+  wildcard_supertype: true
+  fixed_amount_themes: 1 # if not zero, will select a fixed amount of themes from the available ones instead of mutating them randomly
+  mutation_chance_per_theme: 12.5 # Chance to mutate each theme, ignored if fixed_amount_themes is not zero
+  colors: ["red", "black", "green", "colorless"]
+  colors_weights:
+    red: 25
+    black: 25
+    green: 25
+    colorless: 25
+  card_types_color_weights:
+    _all:
+      creature: 40
+      land: 30
+      basic land: 14
+      artifact vehicle: 15
+    colorless:
+      creature: 10
+      artifact vehicle: 50
+      land: 6
+  function_tags:
+    ramp or mana fixing: 15
+    draw or card advantage: 5
+    removal or control: 10
+    pilot: 15
+    speed: 20
+    speed counter: 20
+    vehicle: 15
+    board wipe or mass removal: 5
+    activated ability: 5
+    Flying or other evasion: 5
+    simple or straightforward: 10
+  tags_maximum: 3 # Default is null, which means no limit

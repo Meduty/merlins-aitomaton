@@ -16,9 +16,9 @@ tts_export:
   copy_to_savedobj: true
 
 http_config:
-  timeout: 60
+  timeout: 180
   retries: 3
-  retry_delay: 10
+  retry_delay: 30
   polling_interval: 1
 
 api_params:
@@ -30,7 +30,7 @@ api_params:
     imagen-4-fast: 1
     stable-diffusion-3.5-medium: 1
     black-forest-labs-flux-schnell: 1
-  generate_image_prompt: false
+  generate_image_prompt: true
   creative: false
   include_explanation: false
   model: "gpt-41" #
@@ -96,7 +96,7 @@ skeleton_params:
   canonical_card_types:
     - "creature"
     - "artifact creature"
-    - "vehicle"
+    - "artifact vehicle"
     - "planeswalker"
     - "instant"
     - "sorcery"
@@ -114,7 +114,7 @@ skeleton_params:
           # Slight bump to creature share to top of white's typical range; instant trimmed.
           creature: 51
           artifact creature: 0.9 
-          vehicle: 0.1
+          artifact vehicle: 0.1
           planeswalker: 1
           instant: 9
           sorcery: 9
@@ -129,7 +129,7 @@ skeleton_params:
           # Lower creature share; shift weight into instants/sorceries; slight enchantment trim.
           creature: 40
           artifact creature: 0.9
-          vehicle: 0.1
+          artifact vehicle: 0.1
           planeswalker: 1
           instant: 18
           sorcery: 15
@@ -143,7 +143,7 @@ skeleton_params:
         black:
           creature: 48
           artifact creature: 0.9
-          vehicle: 0.1
+          artifact vehicle: 0.1
           planeswalker: 1
           instant: 10
           sorcery: 13
@@ -158,7 +158,7 @@ skeleton_params:
           # Shift a little from creatures into burn (instants/sorceries).
           creature: 45
           artifact creature: 0.9
-          vehicle: 0.1
+          artifact vehicle: 0.1
           planeswalker: 1
           instant: 14
           sorcery: 17
@@ -172,7 +172,7 @@ skeleton_params:
         green:
           creature: 55
           artifact creature: 0.9
-          vehicle: 0.1
+          artifact vehicle: 0.1
           planeswalker: 1
           instant: 6
           sorcery: 9
@@ -187,7 +187,7 @@ skeleton_params:
           # Moderate artifact saturation; spread a little into other minor types & lands.
           creature: 4
           artifact creature: 0.9
-          vehicle: 0.1
+          artifact vehicle: 0.1
           planeswalker: 1
           instant: 1
           sorcery: 1
@@ -202,89 +202,89 @@ skeleton_params:
         # PLAY mode: tuned to approximate a 40-card Limited deck heuristic inside a monocolor slice.
         # Approx targets: Lands ~40%, Creatures (incl artifact creature) ~30–42 depending on color, remainder spells.
         white:
-          creature: 36.5
+          creature: 35.5
           artifact creature: 0.9
-          vehicle: 0.1
+          artifact vehicle: 0.1
           planeswalker: 0.4
-          instant: 8.5
-          sorcery: 6.6
+          instant: 7.5
+          sorcery: 5.6
           enchantment: 5
           saga: 0.6
           battle: 0.4
-          land: 24
+          land: 27
           basic land: 16
           artifact: 0.6
           kindred: 0.4
         blue:
-          creature: 31
+          creature: 29
           artifact creature: 0.9
-          vehicle: 0.1
+          artifact vehicle: 0.1
           planeswalker: 0.5
           instant: 13.5
           sorcery: 9
           enchantment: 3
           saga: 0.5
           battle: 0.5
-          land: 24
+          land: 26
           basic land: 16
           artifact: 0.5
           kindred: 0.5
         black:
-          creature: 37
+          creature: 36
           artifact creature: 0.9
-          vehicle: 0.1
+          artifact vehicle: 0.1
           planeswalker: 0.4
-          instant: 9
+          instant: 8
           sorcery: 9
           enchantment: 2
           saga: 0.6
           battle: 0.6
-          land: 23
+          land: 25
           basic land: 16
           artifact: 0.7
           kindred: 0.7
         red:
           creature: 35
           artifact creature: 0.9
-          vehicle: 0.1
+          artifact vehicle: 0.1
           planeswalker: 0.4
           instant: 12
-          sorcery: 10
+          sorcery: 9
           enchantment: 1
           saga: 0.4
           battle: 0.4
-          land: 23
+          land: 24
           basic land: 16
           artifact: 0.4
           kindred: 0.4
         green:
-          creature: 41
+          creature: 40
           artifact creature: 0.9
-          vehicle: 0.1
+          artifact vehicle: 0.1
           planeswalker: 0.4
-          instant: 5
-          sorcery: 6
+          instant: 4
+          sorcery: 5
           enchantment: 5
           saga: 0.6
           battle: 0.6
-          land: 23
+          land: 26
           basic land: 16
           artifact: 0.7
           kindred: 0.7
         colorless:
           # Colorless in deck context: small share; lands + utility artifacts.
           creature: 2
-          artifact creature: 9
-          vehicle: 1
+          artifact creature: 24
+          artifact vehicle: 1
           planeswalker: 0.3
           instant: 2.5
           sorcery: 2.5
           enchantment: 1.5
           saga: 1.2
           battle: 0.8
-          land: 24
-          basic land: 16
-          artifact: 33
+          land: 14
+          basic land: 1
+          artifact: 43
           kindred: 6.2
   # User overlays (applied AFTER selecting per-mode baselines). Optional.
   # _default applies to ALL colors; per-color keys override after that.
@@ -421,7 +421,7 @@ SD_config:
           fantasyV1.1: 0.1
           dungeons_and_dragons_xl_v3: 0.1
           Dark_Fantasy_1.5_IL: 0.85
-        steps: 128
+        steps: 64
         cfg_scale: 5
         sampler_name: "DPM++ 2M SDE"
         scheduler: Simple
@@ -441,7 +441,7 @@ SD_config:
           fantasyV1.1: 0.1
           dungeons_and_dragons_xl_v3: 0.1
           Dark_Fantasy_1.5_IL: 0.1
-        steps: 128
+        steps: 64
         cfg_scale: 5
         sampler_name: "DPM++ 2M SDE"
         scheduler: Simple
@@ -462,7 +462,7 @@ SD_config:
           fantasyV1.1: 0.85
           dungeons_and_dragons_xl_v3: 0.1
           Dark_Fantasy_1.5_IL: 0.1
-        steps: 128
+        steps: 64
         cfg_scale: 5
         sampler_name: "DPM++ 2M SDE"
         scheduler: Simple
@@ -483,7 +483,7 @@ SD_config:
           fantasyV1.1: 0.1
           dungeons_and_dragons_xl_v3: 0.1
           Dark_Fantasy_1.5_IL: 0.85
-        steps: 128
+        steps: 64
         cfg_scale: 5
         sampler_name: "DPM++ 2M SDE"
         scheduler: Simple
@@ -504,7 +504,7 @@ SD_config:
           fantasyV1.1: 0.1
           dungeons_and_dragons_xl_v3: 0.85
           Dark_Fantasy_1.5_IL: 0.1
-        steps: 128
+        steps: 64
         cfg_scale: 5
         sampler_name: "DPM++ 2M SDE"
         scheduler: Simple
@@ -525,7 +525,7 @@ SD_config:
           fantasyV1.1: 0.1
           dungeons_and_dragons_xl_v3: 0.1
           Dark_Fantasy_1.5_IL: 0.1
-        steps: 128
+        steps: 64
         cfg_scale: 5
         sampler_name: "DPM++ 2M SDE"
         scheduler: Simple
@@ -535,6 +535,28 @@ SD_config:
         n_iter: 1
         batch_size: 1
         negative_prompt: "blurry, low quality, watermark, text, signature, cropped, extra limbs, disfigured, bad anatomy"
+
+    - name: WAI_NSFW_ILLUSTRIOUS2
+      weight: 2  # Low weight by default
+      option_params:
+        model: WAI_NSFW_ILLUSTRIOUS_V140
+        loras:
+          FantasyWorldPonyV2: 0.85
+          fantasyV1.1: 0.1
+          dungeons_and_dragons_xl_v3: 0.1
+          Dark_Fantasy_1.5_IL: 0.1
+        steps: 64
+        cfg_scale: 7
+        sampler_name: "Euler a"
+        scheduler: Simple
+        width: 1024
+        height: 748
+        seed: -1
+        n_iter: 1
+        batch_size: 1
+        negative_prompt: "blurry, low quality, watermark, text, signature, cropped, extra limbs, disfigured, bad anatomy"
+
+
 
 
 # Do not edit

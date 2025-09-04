@@ -1077,7 +1077,7 @@ def generate_card(index, api_params: APIParams, metrics: GenerationMetrics, conf
     metrics.increment_successful()
     
     logging.info(
-        f"[Card #{index+1}] Color: {color_identity.title()}, Rarity: {generated_rarity.title()}, Time: {card_runtime:.2f}s"
+        f"[Card #{index+1}] Color: {color_identity.title()}, Rarity: {generated_rarity.title()}, Time: {card_runtime:.2f}s, Cost: {generated_cost:.4f}"
     )
     time.sleep(sleepy_time)
 

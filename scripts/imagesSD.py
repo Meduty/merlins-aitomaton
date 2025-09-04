@@ -99,6 +99,7 @@ class Model(Enum):
         "sdxlUnstableDiffusers_v9DIVINITYMACHINEVAE" 
     )
     WAI_NSFW_ILLUSTRIOUS_V110 = "waiNSFWIllustrious_v110"
+    WAI_NSFW_ILLUSTRIOUS_V140 = "waiNSFWIllustrious_v140"
 
 
 # pbar helper
@@ -318,7 +319,7 @@ def getCardImage(index: int, card: dict, payload: dict, image_model: Model):
     # Do the actual generation (blocking)
     call_txt2img_api(index, card, **payload)
 
-def get_special_tags(index: int) -> str:
+def get_special_tags(index: int, special_tags: dict) -> str:
     """
     Generate a string of special tags based on the special_tags dictionary.
     Each tag is formatted as (tag:weight) and separated by commas.
@@ -488,7 +489,7 @@ def generate_images_from_dict(
         selected_loras = " ".join([f"<lora:{name}:{weight}>" for name, weight in selected_loras.items()])
         logging.info(f"[Card #{i+1}] Loras: {selected_loras}")
         time.sleep(sleepy_time)
-        option["prompt"] = f"{prompt}, {get_special_tags(i)} {selected_loras}" if use_special_tags else f"{prompt} {selected_loras}"
+        option["prompt"] = f"{prompt}, {get_special_tags(i, special_tags=special_tags)} {selected_loras}" if use_special_tags else f"{prompt} {selected_loras}"
 
         if config["SD_config"].get("randomise_negative_prompt", False):
             negative_prompt = option.get("negative_prompt", "") or ""

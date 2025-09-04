@@ -1,11 +1,8 @@
 aitomaton_config:
-  total_cards: 1 # Overridden if pack_builder is enabled
+  total_cards: 200 # Overridden if pack_builder is enabled
   concurrency: 15
   image_mode: "random" # options: custom, dall-e-2, dall-e-3, localSD, none
 
-tts_export:
-  cleanup: false
-  copy_to_savedobj: true
 
 set_params:
   set: "Merlins Menagerie"
@@ -27,9 +24,12 @@ set_params:
 
 skeleton_params:
   types_mode: play
-  power_level: 10
+  power_level: 9
   standard_deviation_powerLevel: 0.5
   power_level_rarity_skew: 0.2
+  colors: ["red", "blue", "green", "colorless"]
+  colors_weights:
+    colorless: 6
   function_tags:
     ramp or mana fixing: 15
     draw or card advantage: 15
@@ -44,5 +44,5 @@ skeleton_params:
     collection synergy: 15
     archive manipulation: 15
   tags_maximum: 3 # Default is null, which means no limit
-  fixed_amount_themes: 1 # if not zero, will select a fixed amount of themes from the available ones instead of mutating them randomly
-  mutation_chance_per_theme: 11 # Chance to mutate each theme, ignored if fixed_amount_themes is not zero
+  fixed_amount_themes: 0 # if not zero, will select a fixed amount of themes from the available ones instead of mutating them randomly
+  mutation_chance_per_theme: 14 # Chance to mutate each theme, ignored if fixed_amount_themes is not zero

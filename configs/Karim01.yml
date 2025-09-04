@@ -1,0 +1,50 @@
+aitomaton_config:
+  image_mode: "random"
+  total_cards: 60
+
+
+set_params:
+  set: "Haunted Mansion, 80ies Horror"
+  themes:
+    - "Ghosts"
+    - "Jump Scares"
+    - "Cosmic Horror"
+    - "Zombies"
+    - "Classical Horror"
+    - "80ies Horror"
+    - "Monsters"
+    - "Spooky"
+    - "Aliens"
+    - "old horror movie tropes"
+    - "forest horror"
+    - "Teenagers"
+    - "Teenage Horror adventure in the 80s"
+
+skeleton_params:
+  types_mode: play
+  power_level: 8
+  standard_deviation_powerLevel: 0.5
+  power_level_rarity_skew: 0.2
+  colors: ["white", "green", "black", "colorless"]
+  colors_weights:
+    white: 30
+    green: 25
+    black: 25
+    colorless: 20
+  card_types_color_weights:
+    _all:
+      land: 24
+  function_tags:
+    ramp or mana fixing: 15
+    draw or card advantage: 15
+    removal or control: 10
+    board wipe or mass removal: 5
+    activated ability: 5
+    Flying or other evasion: 5
+    simple or straightforward: 10
+    Jump Scare: 25 # Unique: Cards interact based on shared "network" tags or connections
+    From Beyond: 25 # Unique: Provides bonuses for playing multiple cards in a turn
+    Ghostbusting: 25 # Unique: Effects spread to other cards or players under certain conditions
+  tags_maximum: 3 # Default is null, which means no limit
+  fixed_amount_themes: 1 # if not zero, will select a fixed amount of themes from the available ones instead of mutating them randomly
+  mutation_chance_per_theme: 11 # Chance to mutate each theme, ignored if fixed_amount_themes is not zero

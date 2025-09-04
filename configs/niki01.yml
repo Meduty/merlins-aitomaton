@@ -1,0 +1,50 @@
+aitomaton_config:
+  image_mode: "random"
+  total_cards: 60
+
+
+set_params:
+  set: "Finance Bros in another World"
+  themes:
+    - "Finance bros"
+    - "Startup hustle"
+    - "Corporate espionage"
+    - "Urban nightlife"
+    - "Fitness enthusiasts"
+    - "Digital nomads"
+    - "Crypto traders"
+    - "Remote workers"
+    - "Bankers"
+    - "Wall Street"
+    - "Investment moguls"
+    - "Hedge fund managers"
+    - "Venture capitalists"
+
+skeleton_params:
+  types_mode: play
+  power_level: 8
+  standard_deviation_powerLevel: 0.5
+  power_level_rarity_skew: 0.2
+  colors: ["white", "blue", "black", "colorless"]
+  colors_weights:
+    white: 40
+    blue: 25
+    black: 25
+    colorless: 10
+  card_types_color_weights:
+    _all:
+      land: 23
+  function_tags:
+    ramp or mana fixing: 15
+    draw or card advantage: 15
+    removal or control: 10
+    board wipe or mass removal: 5
+    activated ability: 5
+    Flying or other evasion: 5
+    simple or straightforward: 10
+    Investment: 25 # Unique: Cards interact based on shared "network" tags or connections
+    hustle: 25 # Unique: Provides bonuses for playing multiple cards in a turn
+    crypto: 25 # Unique: Effects spread to other cards or players under certain conditions
+  tags_maximum: 3 # Default is null, which means no limit
+  fixed_amount_themes: 1 # if not zero, will select a fixed amount of themes from the available ones instead of mutating them randomly
+  mutation_chance_per_theme: 11 # Chance to mutate each theme, ignored if fixed_amount_themes is not zero

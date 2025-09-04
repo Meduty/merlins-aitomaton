@@ -1,0 +1,119 @@
+aitomaton_config:
+  total_cards: 60
+  image_mode: "localSD" 
+
+http_config:
+  timeout: 120
+  retries: 6
+  retry_delay: 30
+  polling_interval: 1
+
+api_params:
+  generate_image_prompt: true
+
+set_params:
+  set: "Elven Temptations"
+  themes:
+    - "Seductive elf courtesans"
+    - "Forbidden forest revels"
+    - "Midnight rituals of pleasure"
+    - "Decadent highborn elves"
+    - "Lust-drunk moonlit feasts"
+    - "Sinful druidic rites"
+    - "Scantily clad warriors"
+    - "Elves of indulgence and excess"
+    - "Entangling vines and forbidden fruit"
+    - "Wicked fae temptresses"
+
+skeleton_params:
+  types_mode: play # normal | play
+  power_level: 8
+  standard_deviation_powerLevel: 0.5
+  power_level_rarity_skew: 0.2
+  wildcard_supertype: true
+  fixed_amount_themes: 2 # if not zero, will select a fixed amount of themes from the available ones instead of mutating them randomly
+  mutation_chance_per_theme: 12.5 # Chance to mutate each theme, ignored if fixed_amount_themes is not zero
+  colors: ["red", "black", "green", "colorless"]
+  colors_weights:
+    red: 40
+    black: 25
+    green: 25
+    colorless: 10
+  function_tags:
+    ramp or mana fixing: 15
+    draw or card advantage: 5
+    removal or control: 10
+    pilot: 15
+    speed: 20
+    speed counter: 20
+    vehicle: 15
+    board wipe or mass removal: 5
+    activated ability: 5
+    Flying or other evasion: 5
+    simple or straightforward: 10
+  tags_maximum: 3 # Default is null, which means no limit
+
+
+SD_config:
+  max_tag_weight: 2.5
+  lora_weight_standard_deviation: 0.5
+  apply_lora_chance: 25
+  special_tags:
+    Fantasy World:
+      weight: 1.2
+      chance: 100
+    NSFW:
+      weight: 2
+      chance: 50
+    Gore:
+      weight: 2
+      chance: 25
+    Porn:
+      weight: 2
+      chance: 50
+    Hentai:
+      weight: 2
+      chance: 50
+    Boobies:
+      weight: 2
+      chance: 25
+    Ass:
+      weight: 2
+      chance: 25
+    Tits:
+      weight: 2
+      chance: 25
+    Sexy:
+      weight: 2
+      chance: 25
+    Nude:
+      weight: 2
+      chance: 25
+    Ecchi:
+      weight: 2
+      chance: 25
+    Erotic:
+      weight: 2
+      chance: 25
+    Sexy Girls:
+      weight: 2
+      chance: 25
+    Sextoys:
+      weight: 2
+      chance: 25
+    Futanari:
+      weight: 2
+      chance: 25
+    Ahegao:
+      weight: 2
+      chance: 25
+    Tentacles:
+      weight: 2
+      chance: 25
+    Creampie:
+      weight: 2
+      chance: 1
+  image_options:
+    # FLUX model - Fast generation with good quality
+    - name: FLUX
+      weight: 2.0

@@ -5,6 +5,11 @@
 --------------------------------------------------------------------------------
  Exports card images from MSE set files and creates TTS deck files using
  tts-deckconverter utility for use in Tabletop Simulator.
+ 
+ Features robust upload handling with:
+ - Configurable timeout and retry settings from http_config
+ - Exponential backoff retry logic for failed uploads
+ - Comprehensive error handling for network issues
 --------------------------------------------------------------------------------
  Author  : Merlin Duty-Knez
  Date    : August 26, 2025
@@ -19,6 +24,7 @@ import subprocess
 import argparse
 import re
 import requests
+import time
 from pathlib import Path
 from typing import Dict, Any, Optional, List
 
@@ -519,43 +525,101 @@ def convert_to_tts_deck(deck_list_file: Path, output_dir: Path,
         return False
 
 
-def upload_image_to_imgbb(image_path: Path, api_key: str) -> Optional[str]:
+def upload_image_to_imgbb(image_path: Path, api_key: str, config: Optional[Dict[str, Any]] = None) -> Optional[str]:
     """
-    Upload an image to ImgBB and return the direct URL.
+    Upload an image to ImgBB with retry logic and return the direct URL.
     
     Args:
         image_path: Path to the image file to upload
         api_key: ImgBB API key
+        config: Configuration dictionary with http_config settings
         
     Returns:
         Direct URL to the uploaded image, or None if upload failed
     """
-    try:
-        with open(image_path, 'rb') as image_file:
-            files = {'image': image_file}
-            data = {'key': api_key}
+    # Get HTTP config parameters or use defaults
+    if config and "http_config" in config:
+        http_config = config["http_config"]
+        timeout = http_config.get("timeout", 120)
+        max_retries = http_config.get("retries", 3)
+        base_retry_delay = http_config.get("retry_delay", 30)
+    else:
+        timeout = 120
+        max_retries = 3
+        base_retry_delay = 30
+    
+    for attempt in range(max_retries + 1):
+        try:
+            logging.debug(f"🔄 Uploading {image_path.name} (attempt {attempt + 1}/{max_retries + 1})")
             
-            response = requests.post(
-                'https://api.imgbb.com/1/upload',
-                files=files,
-                data=data,
-                timeout=30
-            )
-            
-            if response.status_code == 200:
-                result = response.json()
-                if result.get('success'):
-                    # Get the direct URL to the image
-                    url = result['data']['url']
-                    logging.info(f"✅ Uploaded {image_path.name}: {url}")
-                    return url
-                else:
-                    logging.error(f"❌ ImgBB upload failed: {result.get('error', 'Unknown error')}")
-            else:
-                logging.error(f"❌ ImgBB upload failed with status {response.status_code}: {response.text}")
+            with open(image_path, 'rb') as image_file:
+                files = {'image': image_file}
+                data = {'key': api_key}
                 
-    except Exception as e:
-        logging.error(f"❌ Error uploading {image_path.name} to ImgBB: {e}")
+                response = requests.post(
+                    'https://api.imgbb.com/1/upload',
+                    files=files,
+                    data=data,
+                    timeout=timeout
+                )
+                
+                if response.status_code == 200:
+                    result = response.json()
+                    if result.get('success'):
+                        # Get the direct URL to the image
+                        url = result['data']['url']
+                        logging.info(f"✅ Uploaded {image_path.name}")
+                        logging.debug(f"📎 URL: {url}")
+                        return url
+                    else:
+                        error_msg = result.get('error', {}).get('message', 'Unknown error')
+                        logging.warning(f"⚠️  ImgBB upload failed (attempt {attempt + 1}): {error_msg}")
+                        if attempt < max_retries:
+                            retry_delay = base_retry_delay * (2 ** attempt)  # Exponential backoff
+                            logging.info(f"🔄 Retrying in {retry_delay}s...")
+                            time.sleep(retry_delay)
+                            continue
+                        else:
+                            logging.error(f"❌ ImgBB upload failed after {max_retries + 1} attempts: {error_msg}")
+                else:
+                    logging.warning(f"⚠️  ImgBB upload failed with status {response.status_code} (attempt {attempt + 1}): {response.text}")
+                    if attempt < max_retries:
+                        retry_delay = base_retry_delay * (2 ** attempt)  # Exponential backoff
+                        logging.info(f"🔄 Retrying in {retry_delay}s...")
+                        time.sleep(retry_delay)
+                        continue
+                    else:
+                        logging.error(f"❌ ImgBB upload failed after {max_retries + 1} attempts with status {response.status_code}")
+                        
+        except requests.exceptions.Timeout:
+            logging.warning(f"⚠️  Upload timeout for {image_path.name} (attempt {attempt + 1}) after {timeout}s")
+            if attempt < max_retries:
+                retry_delay = base_retry_delay * (2 ** attempt)
+                logging.info(f"🔄 Retrying in {retry_delay}s...")
+                time.sleep(retry_delay)
+                continue
+            else:
+                logging.error(f"❌ Upload failed after {max_retries + 1} timeout attempts")
+                
+        except requests.exceptions.ConnectionError as e:
+            logging.warning(f"⚠️  Connection error uploading {image_path.name} (attempt {attempt + 1}): {e}")
+            if attempt < max_retries:
+                retry_delay = base_retry_delay * (2 ** attempt)
+                logging.info(f"🔄 Retrying in {retry_delay}s...")
+                time.sleep(retry_delay)
+                continue
+            else:
+                logging.error(f"❌ Upload failed after {max_retries + 1} connection attempts")
+                
+        except Exception as e:
+            logging.warning(f"⚠️  Error uploading {image_path.name} (attempt {attempt + 1}): {e}")
+            if attempt < max_retries:
+                retry_delay = base_retry_delay * (2 ** attempt)
+                logging.info(f"🔄 Retrying in {retry_delay}s...")
+                time.sleep(retry_delay)
+                continue
+            else:
+                logging.error(f"❌ Upload failed after {max_retries + 1} attempts: {e}")
     
     return None
 
@@ -1160,13 +1224,13 @@ def _organize_with_imgbb_upload(output_dir: Path, deck_name: str, config: Dict[s
     # Upload all template files
     template_urls = []
     if template_files:
-        logging.info(f"📤 Uploading {len(template_files)} template file(s) to ImgBB...")
+        logging.info(f"🌐 Uploading {len(template_files)} template file(s) to ImgBB...")
         for i, template_file in enumerate(sorted(template_files)):
-            logging.info(f"📤 Uploading template {i+1}/{len(template_files)}: {template_file.name}")
-            face_url = upload_image_to_imgbb(template_file, imgbb_key)
+            logging.debug(f"📤 Uploading template {i+1}/{len(template_files)}: {template_file.name}")
+            face_url = upload_image_to_imgbb(template_file, imgbb_key, config)
             if face_url:
                 template_urls.append(face_url)
-                logging.info(f"✅ Template {i+1} uploaded successfully")
+                logging.debug(f"✅ Template {i+1} uploaded successfully")
             else:
                 logging.error(f"❌ Failed to upload template {i+1}: {template_file.name}")
                 return
@@ -1183,13 +1247,16 @@ def _organize_with_imgbb_upload(output_dir: Path, deck_name: str, config: Dict[s
     cardback_path = workspace_dir / "media" / "MerlinsAitomatonCB.png"
     back_url = None
     if cardback_path.exists():
-        back_url = upload_image_to_imgbb(cardback_path, imgbb_key)
+        back_url = upload_image_to_imgbb(cardback_path, imgbb_key, config)
         if not back_url:
             logging.error("❌ Failed to upload cardback image")
             return
     else:
         logging.error(f"❌ Cardback not found: {cardback_path}")
         return
+    
+    # All uploads completed successfully
+    logging.info(f"✅ Successfully uploaded {len(template_urls)} template(s) + 1 cardback to ImgBB")
     
     # Update JSON files with web URLs
     json_files = list(output_dir.glob("*.json"))

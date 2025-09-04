@@ -1,7 +1,11 @@
 aitomaton_config:
   total_cards: 60
-  concurrency: 1
-  sleepy_time: 0.5
+  concurrency: 60
+  image_mode: "random" 
+
+api_params:
+  generate_image_prompt: true
+
 set_params:
   set: "Goblin Road Rage"
   themes:
@@ -16,47 +20,30 @@ set_params:
     - "Wasteland survival"
     - "Tribal goblin gangs"
 
-api_params:
-  image_model: "none" # options: dall-e-2, dall-e-3, none
-  model: "gpt-41"
-
-
-mtgcg_mse_config:
-  image_method: "localSD" # options: none, localSD, download
-
 skeleton_params:
   types_mode: play # normal | play
-  power_level: 8
+  power_level: 10
   standard_deviation_powerLevel: 0.5
   power_level_rarity_skew: 0.2
   wildcard_supertype: true
-  fixed_amount_themes: 2 # if not zero, will select a fixed amount of themes from the available ones instead of mutating them randomly
+  fixed_amount_themes: 1 # if not zero, will select a fixed amount of themes from the available ones instead of mutating them randomly
   mutation_chance_per_theme: 12.5 # Chance to mutate each theme, ignored if fixed_amount_themes is not zero
   colors: ["red", "black", "green", "colorless"]
   colors_weights:
-    red: 40
+    red: 25
     black: 25
     green: 25
-    colorless: 10
-  card_types:
-    - "creature"
-    - "artifact creature"
-    - "planeswalker"
-    - "instant"
-    - "sorcery"
-    - "enchantment"
-    - "saga"
-    - "battle"
-    - "land"
-    - "basic land"
-    - "artifact"
-    - "kindred"
-    - "artifact creature vehicle"
+    colorless: 15
   card_types_color_weights:
     _all:
-      "artifact creature vehicle": 10
+      creature: 30
+      land: 30
+      basic land: 10
+      artifact vehicle: 20
     colorless:
-      "artifact creature vehicle": 30
+      creature: 20
+      artifact vehicle: 50
+      land: 6
   function_tags:
     ramp or mana fixing: 15
     draw or card advantage: 5

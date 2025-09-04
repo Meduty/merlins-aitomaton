@@ -1,4 +1,5 @@
 aitomaton_config:
+  total_cards: 15
   image_mode: "localSD"
 
 set_params:
@@ -24,7 +25,7 @@ set_params:
     - "Vloggers"
 
 skeleton_params:
-  power_level: 10
+  power_level: 9
   standard_deviation_powerLevel: 0.5
   power_level_rarity_skew: 0.2
   function_tags:
