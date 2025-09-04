@@ -1,6 +1,6 @@
 # Merlin's Aitomaton 🎯
 
-**Merlin's Aitomaton** is a comprehensive AI-powered Magic: The Gathering (MTG) card generation system. It creates custom MTG cards using OpenAI GPT models, exports sets compatible with Magic Set Editor (MSE), generates AI artwork via Stable Diffusion, and **exports ready-to-play decks for Tabletop Simulator (TTS)**. The system features an interactive orchestrator with clean progress visualization, configurable pack builder for realistic booster packs, and robust error handling.
+**Merlin's Aitomaton** is a comprehensive AI-powered Magic: The Gathering (MTG) play testing card generation system. It creates custom MTG cards using OpenAI GPT models, exports sets compatible with Magic Set Editor (MSE), generates AI artwork via Stable Diffusion, and **exports ready-to-play decks for Tabletop Simulator (TTS)**. The system features an interactive orchestrator with clean progress visualization, configurable pack builder for realistic booster packs, and robust error handling. 
 
 ## 📋 Table of Contents
 
@@ -663,4 +663,16 @@ MIT License. See [LICENSE](LICENSE) for details.
 - **TTS Integration:** tts-deckconverter utility, ImgBB hosting service
 - **Threading & Concurrency:** Python threading with safety locks
 - **Configuration System:** YAML-based with strict validation
+
+DISCLAIMER
+
+This project is not affiliated with, endorsed, sponsored, or specifically
+approved by Wizards of the Coast LLC. Magic: The Gathering, and all related
+names, logos, and distinctive likenesses are the property of Wizards of the
+Coast.
+
+This software is provided solely for educational and personal, non-commercial
+use. Users are responsible for ensuring that their use of this software
+complies with applicable laws, terms of service, and intellectual property
+rights.
 
