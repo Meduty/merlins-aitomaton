@@ -54,21 +54,42 @@ def sanitize_filename(name: str) -> str:
     sanitized = re.sub(r'\s+', ' ', sanitized).strip()
     return sanitized
 
-# Setup logging
-def setup_logging(verbose: bool = False):
-    """Configure logging based on verbose flag."""
-    if verbose:
+# Setup logging - controlled by parameters instead of environment variables
+def setup_logging(verbose=False, silent=False):
+    """Setup logging with 3-tier system: silent (ERROR), verbose (DEBUG), normal (INFO)."""
+    if silent:
+        # Silent mode: ERROR only
+        logging.basicConfig(
+            level=logging.ERROR,
+            format="%(message)s",
+            force=True
+        )
+    elif verbose:
+        # Verbose mode: DEBUG with timestamps
         logging.basicConfig(
             level=logging.DEBUG,
             format="%(asctime)s - %(levelname)s - %(message)s",
             force=True
         )
     else:
+        # Normal mode: INFO with clean format
         logging.basicConfig(
             level=logging.INFO,
             format="%(message)s",
             force=True
         )
+
+# Legacy environment-based setup for backwards compatibility
+def setup_logging_from_env():
+    """Setup logging based on environment variable (legacy)."""
+    verbose = os.environ.get("MERLIN_VERBOSE", "1") == "1"
+    
+    if verbose:
+        setup_logging(verbose=True, silent=False)
+    else:
+        setup_logging(verbose=False, silent=False)
+
+# Don't call setup_logging() at import time - let it be called when needed
 
 
 def find_mse_set_file(config: Dict[str, Any], config_path: str) -> Optional[Path]:
@@ -101,7 +122,9 @@ def find_mse_set_file(config: Dict[str, Any], config_path: str) -> Optional[Path
 
 def export_card_images_with_mse(config: Dict[str, Any], config_path: str, 
                                output_format: str = "png", 
-                               output_dir: Optional[str] = None) -> bool:
+                               output_dir: Optional[str] = None,
+                               verbose: bool = False,
+                               silent: bool = False) -> bool:
     """
     Export card images from MSE set file using Magic Set Editor command line.
     
@@ -114,6 +137,9 @@ def export_card_images_with_mse(config: Dict[str, Any], config_path: str,
     Returns:
         True if export successful, False otherwise
     """
+    # Setup logging with passed parameters
+    setup_logging(verbose=verbose, silent=silent)
+    
     # Get MSE executable path from environment
     mse_exe = os.getenv("MSE_PATH")
     if not mse_exe:
@@ -663,7 +689,9 @@ def check_tts_environment():
 
 def export_complete_tts_deck(config: Dict[str, Any], config_path: str, 
                             output_dir: Optional[str] = None,
-                            deck_name: Optional[str] = None) -> bool:
+                            deck_name: Optional[str] = None,
+                            verbose: bool = False,
+                            silent: bool = False) -> bool:
     """
     Complete TTS export pipeline: export images, create deck list, and convert to TTS format.
     
@@ -677,6 +705,9 @@ def export_complete_tts_deck(config: Dict[str, Any], config_path: str,
         True if complete export successful, False otherwise
     """
     config_name = Path(config_path).stem
+    
+    # Setup logging with passed parameters
+    setup_logging(verbose=verbose, silent=silent)
     
     # Check TTS environment setup
     check_tts_environment()
@@ -811,11 +842,16 @@ def main():
         action="store_true",
         help="Enable verbose logging"
     )
+    parser.add_argument(
+        "--silent",
+        action="store_true",
+        help="Enable silent logging (errors only)"
+    )
     
     args = parser.parse_args()
     
-    # Setup logging
-    setup_logging(args.verbose)
+    # Setup logging using new parameter approach
+    setup_logging(verbose=args.verbose, silent=args.silent)
     
     try:
         # Load configuration
@@ -1599,12 +1635,12 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Export TTS deck from configuration")
     parser.add_argument("config_file", help="Path to configuration file")
     parser.add_argument("--verbose", action="store_true", help="Enable verbose logging")
+    parser.add_argument("--silent", action="store_true", help="Enable silent logging (errors only)")
     
     args = parser.parse_args()
     
-    # Set up logging
-    level = logging.DEBUG if args.verbose else logging.INFO
-    logging.basicConfig(level=level, format='%(asctime)s - %(levelname)s - %(message)s')
+    # Set up logging using the standardized function
+    setup_logging(verbose=args.verbose, silent=args.silent)
     
     try:
         # Load configuration with proper defaults merging

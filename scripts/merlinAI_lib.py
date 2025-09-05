@@ -10,7 +10,17 @@ import yaml
 
 import logging
 
+import os
+
+import argparse
+
 from pathlib import Path
+
+# Import config_manager for loading configs
+try:
+    from scripts import config_manager
+except ImportError:
+    import config_manager
 
 _EPS = 1e-12
 
@@ -22,6 +32,46 @@ CANONICAL_COLOR_ORDER = ["white", "blue", "black", "red", "green", "colorless"]
 
 
 STRICT = True 
+
+# Logging setup - respect orchestrator's verbose setting
+def setup_logging(verbose=True, silent=False):
+    """Setup logging based on verbose and silent parameters.
+    
+    Args:
+        verbose: If True, show DEBUG level with timestamps; if False, show INFO level
+        silent: If True, only show ERROR level and above (overrides verbose)
+    """
+    if silent:
+        logging.basicConfig(
+            level=logging.ERROR,
+            format="%(message)s",
+            force=True
+        )
+    elif verbose:
+        logging.basicConfig(
+            level=logging.DEBUG,
+            format="%(asctime)s - %(levelname)s - %(message)s",
+            force=True
+        )
+    else:
+        # INFO level for normal user-facing information
+        logging.basicConfig(
+            level=logging.INFO,
+            format="%(message)s",
+            force=True
+        )
+
+def setup_logging_from_env():
+    """Setup logging based on environment variable from orchestrator (for consistency with other scripts)."""
+    verbose = os.environ.get("MERLIN_VERBOSE", "1") == "1"
+    setup_logging(verbose=verbose, silent=False)
+
+def setup_logging_for_orchestrator(verbose=False, silent=False):
+    """Setup logging based on orchestrator parameters (preferred method)."""
+    setup_logging(verbose=verbose, silent=silent)
+
+# Don't call setup_logging() at import time - let it be called when needed
+# The orchestrator will set MERLIN_VERBOSE environment variable for consistent logging
 
 def truncated_normal_random(mean: float, sd=0.35, low=0.0, high=1.0):
     """
@@ -88,24 +138,26 @@ def check_mutation(mutation_chance) -> bool:
 
 # ========= CLI: Check & Normalize Config =========
 
-def check_and_normalize_config(config_path: str, save: bool = False, total: float = 100.0, *, verbose: bool = True):
+def check_and_normalize_config(config_path: str, save: bool = False, total: float = 100.0, *, verbose: bool = True, silent: bool = False):
     """Enhanced normalization/validation with raw + merged phases and silent mode.
 
     Args:
         config_path: path to user config
         save: write normalized file
         total: target sum (usually 100)
-        verbose: if False, suppress prints and just return normalized structure or None on error
+        verbose: if False, suppress debug output; if True, show debug details
+        silent: if True, suppress all output except errors
     """
+    # Setup logging based on parameters - silent overrides verbose
+    setup_logging(verbose=verbose, silent=silent)
+    
     path = Path(config_path)
     if not path.exists():
-        if verbose:
-            print(f"❌ Config file not found: {path}")
+        logging.error(f"❌ Config file not found: {path}")
         return None
     defaults_path = path.parent / "DEFAULTSCONFIG.yml"
     if not defaults_path.exists():
-        if verbose:
-            print(f"❌ DEFAULTSCONFIG.yml not found at: {defaults_path}")
+        logging.error(f"❌ DEFAULTSCONFIG.yml not found at: {defaults_path}")
         return None
 
     # Load raw user (pre-merge) for raw-specific validation
@@ -123,92 +175,89 @@ def check_and_normalize_config(config_path: str, save: bool = False, total: floa
     # Raw validation (omission awareness)
     raw_issues = _validate_raw_user_config_structure(raw_user)
     
-    if verbose:
-        print("=" * 80)
-        print("🔍 CONFIGURATION VALIDATION & NORMALIZATION")
-        print("=" * 80)
-        print("\n📋 Validating user configuration structure (raw before merge)...")
-        print("-" * 40)
-        raw_stop = _print_validation_results(raw_issues)
-    else:
-        raw_stop = any("❌" in x for x in raw_issues)
+    logging.info("=" * 80)
+    logging.info("🔍 CONFIGURATION VALIDATION & NORMALIZATION")
+    logging.info("=" * 80)
+    logging.info("")
+    logging.info("📋 Validating user configuration structure (raw before merge)...")
+    logging.info("-" * 40)
+    raw_stop = _print_validation_results(raw_issues)
     
     if raw_stop:
-        if verbose:
-            print("\n" + "=" * 80)
+        logging.info("")
+        logging.info("=" * 80)
         return None
 
     # Merged validation (structure)
-    if verbose:
-        print("\n📋 Validating merged configuration structure...")
-        print("-" * 40)
+    logging.info("")
+    logging.info("📋 Validating merged configuration structure...")
+    logging.info("-" * 40)
     merged_structure_issues = _validate_user_config_structure(config)
-    stop_early = _print_validation_results(merged_structure_issues) if verbose else any("❌" in x for x in merged_structure_issues)
+    stop_early = _print_validation_results(merged_structure_issues)
     if stop_early:
-        if verbose:
-            print("\n" + "=" * 80)
+        logging.info("")
+        logging.info("=" * 80)
         return None
 
     # Options validation (before normalization)
-    if verbose:
-        print("\n📋 Validating configuration options...")
-        print("-" * 40)
+    logging.info("")
+    logging.info("📋 Validating configuration options...")
+    logging.info("-" * 40)
     options_issues = _validate_options_against_whitelist(config)
-    options_stop = _print_validation_results(options_issues) if verbose else any("❌" in x for x in options_issues)
+    options_stop = _print_validation_results(options_issues)
     if options_stop:
-        if verbose:
-            print("\n" + "=" * 80)
+        logging.info("")
+        logging.info("=" * 80)
         return None
 
     # Integrity validation
-    if verbose:
-        print("\n📋 Validating merged configuration...")
-        print("-" * 40)
+    logging.info("")
+    logging.info("📋 Validating merged configuration...")
+    logging.info("-" * 40)
     integrity_issues = _validate_config_integrity(config, defaults)
-    stop = _print_validation_results(integrity_issues) if verbose else any("❌" in x for x in integrity_issues)
+    stop = _print_validation_results(integrity_issues)
     if stop:
-        if verbose:
-            print("\n" + "=" * 80)
+        logging.info("")
+        logging.info("=" * 80)
         return None
 
-    if verbose:
-        print("\n📊 WEIGHT NORMALIZATION")
-        print("-" * 40)
+    logging.info("")
+    logging.info("📊 WEIGHT NORMALIZATION")
+    logging.info("-" * 40)
     
     try:
         fixed = _normalize_all_weights_with_diffs(config, defaults, total=total, verbose=verbose)
     except ValueError as e:
         # Critical validation error occurred during normalization
-        if verbose:
-            print(str(e))
-            print("\n" + "=" * 80)
+        logging.error(str(e))
+        logging.info("")
+        logging.info("=" * 80)
         return None
 
     # Final validation
-    if verbose:
-        print("\n📋 Final validation after normalization...")
-        print("-" * 40)
+    logging.info("")
+    logging.info("📋 Final validation after normalization...")
+    logging.info("-" * 40)
     final_issues = _validate_final_config(fixed)
-    final_stop = _print_validation_results(final_issues) if verbose else any("❌" in x for x in final_issues)
+    final_stop = _print_validation_results(final_issues)
     if final_stop:
-        if verbose:
-            print("\n" + "=" * 80)
+        logging.info("")
+        logging.info("=" * 80)
         return None
 
     if save:
         with open(path, 'w') as outf:
             yaml.safe_dump(fixed, outf, sort_keys=False)
-        if verbose:
-            print("\n✅ CONFIGURATION SAVED")
-            print("-" * 30)
-            print(f"Normalized config saved to {path}")
+        logging.info("")
+        logging.info("✅ CONFIGURATION SAVED")
+        logging.info("-" * 30)
+        logging.info(f"Normalized config saved to {path}")
     else:
-        if verbose:
-            print("\n💾 CONFIGURATION NOT SAVED")
-            print("-" * 30)
-            print("Normalization complete. Use --save to overwrite the file.")
-    if verbose:
-        print("=" * 80)
+        logging.info("")
+        logging.info("💾 CONFIGURATION NOT SAVED")
+        logging.info("-" * 30)
+        logging.info("Normalization complete. Use --save to overwrite the file.")
+    logging.info("=" * 80)
     return fixed
 
 
@@ -302,14 +351,12 @@ def _normalize_all_weights_with_diffs(config: dict, defaults: dict, total: float
             # Log the transformations for user visibility
             new_image_model = config["api_params"]["image_model"]
             new_image_method = config["mtgcg_mse_config"]["image_method"]
-            if verbose:
-                print(f"📸 image_mode='{image_mode}' → image_model: '{original_image_model}' → '{new_image_model}', image_method: '{original_image_method}' → '{new_image_method}'")
+            logging.info(f"📸 image_mode='{image_mode}' → image_model: '{original_image_model}' → '{new_image_model}', image_method: '{original_image_method}' → '{new_image_method}'")
         else:
             # Invalid image_mode - this is a critical error
             supported_modes = ", ".join(mode_transformations.keys())
             error_msg = f"❌ CRITICAL: Invalid image_mode '{image_mode}'. Allowed options: {supported_modes}"
-            if verbose:
-                print(error_msg)
+            logging.error(error_msg)
             raise ValueError(error_msg)
 
     if config["pack_builder"]["enabled"]:
@@ -317,7 +364,7 @@ def _normalize_all_weights_with_diffs(config: dict, defaults: dict, total: float
         for slot in config["pack_builder"]["pack"]:
             countsum += slot["count"]
         if countsum != total_cards:
-            print(f"⚠️  WARNING: Updating total_cards from {total_cards} to {countsum} based on pack_builder counts.\n")
+            logging.warning(f"Updating total_cards from {total_cards} to {countsum} based on pack_builder counts")
             total_cards = countsum
             config["aitomaton_config"]["total_cards"] = total_cards
 
@@ -334,7 +381,7 @@ def _normalize_all_weights_with_diffs(config: dict, defaults: dict, total: float
         if key not in sp:
             sp[key] = value
     if not isinstance(sp, dict):
-        print("⚠️  'skeleton_params' missing or not a dict; nothing to do.")
+        logging.warning("'skeleton_params' missing or not a dict; nothing to do")
         return config
 
     colors = sp.get("colors", default_sp.get("colors", []))
@@ -346,7 +393,7 @@ def _normalize_all_weights_with_diffs(config: dict, defaults: dict, total: float
         rarities = list(rarities_weights.keys())
     else:
         # This should not happen if DEFAULTSCONFIG.yml is properly structured
-        print("⚠️  rarities_weights not found or not a dict - configuration may be incomplete")
+        logging.warning("rarities_weights not found or not a dict - configuration may be incomplete")
         rarities = []
     
     # Always use canonical_card_types from defaults as the authoritative list
@@ -356,23 +403,19 @@ def _normalize_all_weights_with_diffs(config: dict, defaults: dict, total: float
     # Update the user config to have the complete card_types list
     if card_types and card_types != sp.get("card_types"):
         sp["card_types"] = list(card_types)
-        if verbose:
-            print("ℹ️  CARD TYPES UPDATED")
-            print("   " + "─" * 40)
-            print("   Updated 'skeleton_params.card_types' to use complete canonical list.")
+        logging.info("Updated 'skeleton_params.card_types' to use complete canonical list")
 
     # ---- colors_weights (dict preferred; list accepted) ----
     if "colors_weights" in sp:
         cw = sp["colors_weights"]
         if isinstance(cw, list):
             if not colors:
-                print("⚠️  colors_weights is a list but 'colors' is missing; cannot label — leaving as list.")
+                logging.warning("colors_weights is a list but 'colors' is missing; cannot label — leaving as list")
                 sp["colors_weights"] = _fix_length_and_normalize_list(
                     key="skeleton_params.colors_weights", lst=cw, labels=None, total=total
                 )
             else:
-                if verbose:
-                    print("ℹ️  Converting colors_weights list -> dict using 'colors' labels.")
+                logging.debug("Converting colors_weights list -> dict using 'colors' labels")
                 labeled = _list_to_labeled_dict(cw, colors)
                 sp["colors_weights"] = _normalize_dict_with_diffs(
                     key="skeleton_params.colors_weights", d=labeled, total=total
@@ -387,20 +430,19 @@ def _normalize_all_weights_with_diffs(config: dict, defaults: dict, total: float
             # ensure WUBRG order on save
             sp["colors_weights"] = _reorder_color_dict(normalized)
         else:
-            print("ℹ️  skeleton_params.colors_weights is neither list nor dict; skipping.")
+            logging.debug("skeleton_params.colors_weights is neither list nor dict; skipping")
 
     # ---- rarities_weights (dict preferred; list accepted) ----
     if "rarities_weights" in sp:
         rw = sp["rarities_weights"]
         if isinstance(rw, list):
             if not rarities:
-                print("⚠️  rarities_weights is a list but 'rarities' is missing; cannot label — leaving as list.")
+                logging.warning("rarities_weights is a list but 'rarities' is missing; cannot label — leaving as list")
                 sp["rarities_weights"] = _fix_length_and_normalize_list(
                     key="skeleton_params.rarities_weights", lst=rw, labels=None, total=total
                 )
             else:
-                if verbose:
-                    print("ℹ️  Converting rarities_weights list -> dict using 'rarities' labels.")
+                logging.debug("Converting rarities_weights list -> dict using 'rarities' labels")
                 labeled = _list_to_labeled_dict(rw, rarities)
                 sp["rarities_weights"] = _normalize_dict_with_diffs(
                     key="skeleton_params.rarities_weights", d=labeled, total=total
@@ -413,28 +455,28 @@ def _normalize_all_weights_with_diffs(config: dict, defaults: dict, total: float
              )
 
         else:
-            print("ℹ️  skeleton_params.rarities_weights is neither list nor dict; skipping.")
+            logging.debug("skeleton_params.rarities_weights is neither list nor dict; skipping")
 
     # ---- NEW SCHEMA: card_types_color_defaults + user_overlays ----
     # Build per-color type weight maps from baselines (mode-specific) then apply overlays
     color_defaults_root = sp.get("card_types_color_defaults") or default_sp.get("card_types_color_defaults")
     if not color_defaults_root:
-        print("❌ Missing 'card_types_color_defaults' in skeleton_params.")
+        logging.error("Missing 'card_types_color_defaults' in skeleton_params")
         return config
     types_mode = sp.get("types_mode", "normal")
     if types_mode not in color_defaults_root:
-        print(f"❌ Mode '{types_mode}' not found under card_types_color_defaults.")
+        logging.error(f"Mode '{types_mode}' not found under card_types_color_defaults")
         return config
     mode_defaults = color_defaults_root[types_mode]
     # Validate presence of all colors
     missing_colors = [c for c in colors if c not in mode_defaults]
     if missing_colors:
-        print(f"❌ Mode '{types_mode}' missing color baselines: {missing_colors}")
+        logging.error(f"Mode '{types_mode}' missing color baselines: {missing_colors}")
         return config
     # New overlay mechanism: user supplies skeleton_params.card_types_color_weights with per-color partial overrides.
     user_color_overrides = sp.get("card_types_color_weights", {})
     if user_color_overrides and not isinstance(user_color_overrides, dict):
-        print("⚠️  Ignoring non-dict card_types_color_weights (expected mapping of colors → type weights)")
+        logging.warning("Ignoring non-dict card_types_color_weights (expected mapping of colors → type weights)")
         user_color_overrides = {}
     # Support special '_all' key for global type overrides across every color
     global_all_overrides = {}
@@ -442,50 +484,44 @@ def _normalize_all_weights_with_diffs(config: dict, defaults: dict, total: float
         if isinstance(user_color_overrides["_all"], dict):
             global_all_overrides = user_color_overrides["_all"]
         else:
-            print("⚠️  Ignoring non-dict _all in card_types_color_weights")
+            logging.warning("Ignoring non-dict _all in card_types_color_weights")
         # remove to avoid treating as color name
         user_color_overrides = {k: v for k, v in user_color_overrides.items() if k != "_all"}
     
     # Analyze and report user's configuration intent
-    if verbose:
-        print(f"\n🎯 USER CONFIGURATION ANALYSIS (mode: {types_mode})")
-        print("─" * 60)
+    logging.info("")
+    logging.info(f"USER CONFIGURATION ANALYSIS (mode: {types_mode})")
     
     if global_all_overrides:
         global_keys = sorted(global_all_overrides.keys())
-        print(f"🌐 Global overrides (_all) detected for: {', '.join(global_keys)}")
+        logging.info(f"🌐 Global overrides (_all) detected for: {', '.join(global_keys)}")
         for k, v in sorted(global_all_overrides.items()):
-            print(f"   • {k}: {v} (applies to ALL colors)")
+            logging.info(f"   • {k}: {v} (applies to ALL colors)")
     else:
-        if verbose:
-            print("🌐 No global overrides (_all) found")
+        logging.debug("🌐 No global overrides (_all) found")
     
     if user_color_overrides:
-        print(f"🎨 Per-color overrides detected:")
+        logging.info(f"🎨 Per-color overrides detected:")
         for color in sorted(user_color_overrides.keys()):
             if color in colors and isinstance(user_color_overrides[color], dict):
                 override_keys = sorted(user_color_overrides[color].keys())
-                print(f"   • {color}: {', '.join(override_keys)}")
+                logging.info(f"   • {color}: {', '.join(override_keys)}")
                 for k, v in sorted(user_color_overrides[color].items()):
-                    print(f"     - {k}: {v}")
+                    logging.debug(f"     - {k}: {v}")
     else:
-        if verbose:
-            print("🎨 No per-color overrides found")
+        logging.debug("🎨 No per-color overrides found")
     
-    if verbose:
-        print(f"📊 Using baseline weights from mode '{types_mode}' and applying overlays...")
-        print("─" * 60)
+    logging.info(f"📊 Using baseline weights from mode '{types_mode}' and applying overlays...")
         
     # Prepare final structure similar to old card_types_weights
     final_weights: dict[str, dict[str, float]] = {}
-    if verbose:
-        print("\n📊 BUILDING TYPE WEIGHTS FROM BASELINES")
+    logging.debug("BUILDING TYPE WEIGHTS FROM BASELINES")
     for color in colors:
         baseline = dict(mode_defaults[color])
         # Normalize baseline if it does not sum to total
         b_sum = sum(float(v) for v in baseline.values())
         if b_sum <= 0:
-            print(f"⚠️  Baseline for {color} sums to {b_sum}. Using uniform distribution.")
+            logging.warning(f"Baseline for {color} sums to {b_sum}. Using uniform distribution")
             baseline = {t: total / len(card_types) for t in card_types}
             b_sum = total
         # Scale baseline to total exactly
@@ -495,7 +531,7 @@ def _normalize_all_weights_with_diffs(config: dict, defaults: dict, total: float
                 if STRICT:
                     baseline.pop(k)
                 else:
-                    print(f"⚠️  {color} baseline has unknown type '{k}', keeping (STRICT off)")
+                    logging.warning(f"{color} baseline has unknown type '{k}', keeping (STRICT off)")
         baseline = {k: float(baseline.get(k, 0.0)) * scale for k in card_types}
         row = dict(baseline)
         provenance_steps: list[str] = ["baseline"]
@@ -509,27 +545,27 @@ def _normalize_all_weights_with_diffs(config: dict, defaults: dict, total: float
                     row[k] = float(v)
                     applied_all_keys.append(k)
                 except Exception:
-                    print(f"⚠️  _all: non-numeric override {k}={v!r} skipped")
+                    logging.warning(f"_all: non-numeric override {k}={v!r} skipped")
             if applied_all_keys:
                 provenance_steps.append(f"_all({len(applied_all_keys)})")
         overrides = user_color_overrides.get(color, {}) if color in user_color_overrides else {}
         if overrides and not isinstance(overrides, dict):
-            print(f"⚠️  Ignoring non-dict override for color {color}")
+            logging.warning(f"Ignoring non-dict override for color {color}")
             overrides = {}
         # Apply overrides (absolute replacement of those type weights)
         applied_keys = []
         for k, v in overrides.items():
             if k not in card_types:
                 if STRICT:
-                    print(f"⚠️  {color}: dropping unknown type '{k}' in override")
+                    logging.warning(f"{color}: dropping unknown type '{k}' in override")
                 else:
-                    print(f"⚠️  {color}: unknown type '{k}' kept (STRICT off)")
+                    logging.warning(f"{color}: unknown type '{k}' kept (STRICT off)")
                 continue
             try:
                 row[k] = float(v)
                 applied_keys.append(k)
             except Exception:
-                print(f"⚠️  {color}: non-numeric override {k}={v!r} skipped")
+                logging.warning(f"{color}: non-numeric override {k}={v!r} skipped")
         if applied_keys:
             provenance_steps.append(f"color({len(applied_keys)})")
         # Adjust remaining to keep total 100: proportionally scale non-overridden types
@@ -545,8 +581,7 @@ def _normalize_all_weights_with_diffs(config: dict, defaults: dict, total: float
                 )
                 final_weights[color] = row
                 provenance_steps.append("normalize(all)")
-                if verbose:
-                    print(f"🔧 {color}: {' → '.join(provenance_steps)} → sum=100.0")
+                logging.debug(f"🔧 {color}: {' → '.join(provenance_steps)} → sum=100.0")
             else:
                 # Compute factor so that overridden values remain fixed
                 remaining_target = total - sum(row[k] for k in applied_keys + applied_all_keys)
@@ -557,8 +592,7 @@ def _normalize_all_weights_with_diffs(config: dict, defaults: dict, total: float
                     )
                     final_weights[color] = row
                     provenance_steps.append("normalize(exceeded)")
-                    if verbose:
-                        print(f"⚠️  {color}: {' → '.join(provenance_steps)} → sum=100.0 (exceeded)")
+                    logging.warning(f"{color}: {' → '.join(provenance_steps)} → sum=100.0 (exceeded)")
                 else:
                     scale_factor = remaining_target / current_adjustable_sum if current_adjustable_sum > 0 else 0.0
                     for k in adjustable:
@@ -585,8 +619,7 @@ def _normalize_all_weights_with_diffs(config: dict, defaults: dict, total: float
                         if adjustable:
                             largest = max(adjustable, key=lambda k: rounded[k])
                             rounded[largest] = round(rounded[largest] + residual, 1)
-                    if verbose:
-                        print(f"🔧 {color}: {' → '.join(provenance_steps)} → sum={sum(rounded.values()):.1f}")
+                    logging.debug(f"🔧 {color}: {' → '.join(provenance_steps)} → sum={sum(rounded.values()):.1f}")
 
         else:
             rounded = {k: round(v, 1) for k, v in row.items()}
@@ -596,15 +629,15 @@ def _normalize_all_weights_with_diffs(config: dict, defaults: dict, total: float
                 residual = round(total - r_sum, 10)
                 largest_key = max(rounded, key=lambda k: rounded[k])
                 rounded[largest_key] = round(rounded[largest_key] + residual, 1)
-            if verbose:
-                print(f"🔧 {color}: {' → '.join(provenance_steps)} (unchanged) → sum={sum(rounded.values()):.1f}")
+            logging.debug(f"🔧 {color}: {' → '.join(provenance_steps)} (unchanged) → sum={sum(rounded.values()):.1f}")
 
     # Store back in legacy key for runtime compatibility
     sp["card_types_weights"] = final_weights
 
     # Display final type weights as a pretty table
-    if verbose:
-        _print_type_weights_table(final_weights, card_types)
+    logging.info("")
+    logging.info("Final type weights table:")
+    _print_type_weights_table(final_weights, card_types)
 
     return config
 
@@ -616,8 +649,7 @@ def _print_type_weights_table(final_weights: dict, card_types: list[str]) -> Non
     if not final_weights or not card_types:
         return
     
-    print("\n📊 FINAL TYPE WEIGHTS TABLE")
-    print("─" * 120)
+    logging.info("FINAL TYPE WEIGHTS TABLE")
     
     # Get all colors in consistent order
     colors = list(final_weights.keys())
@@ -642,8 +674,7 @@ def _print_type_weights_table(final_weights: dict, card_types: list[str]) -> Non
     for card_type in card_types:
         header += f"{card_type[:8]:>{type_col_width}}"  # Truncate long type names
     header += f"{'TOTAL':>{type_col_width}}"
-    print(header)
-    print("─" * len(header))
+    logging.info(header)
     
     # Print each color row
     for color in colors:
@@ -659,11 +690,11 @@ def _print_type_weights_table(final_weights: dict, card_types: list[str]) -> Non
         if abs(color_total - 100.0) > 0.1:
             total_str += "⚠️"
         row += f"{total_str:>{type_col_width}}"
-        print(row)
+        logging.info(row)
     
-    print("─" * len(header))
-    print("\n� This table shows the final type distribution that will be used for card generation.")
-    print("   Colors with totals ≠ 100.0 are marked with ⚠️")
+    logging.info("")
+    logging.info("This table shows the final type distribution that will be used for card generation")
+    logging.info("Colors with totals ≠ 100.0 are marked with ⚠️")
 
 
 def _handle_unknown_keys(d: dict, allowed: set | None, where: str, noun: str = "keys") -> dict:
@@ -679,10 +710,10 @@ def _handle_unknown_keys(d: dict, allowed: set | None, where: str, noun: str = "
     if not unknown:
         return d
     if STRICT:
-        print(f"⚠️  {where}: dropping unknown {noun}: {sorted(unknown)}")
+        logging.warning(f"{where}: dropping unknown {noun}: {sorted(unknown)}")
         return {k: v for k, v in d.items() if k in allowed}
     else:
-        print(f"⚠️  {where}: found {noun} outside the allowed set; keeping them: {sorted(unknown)}")
+        logging.warning(f"{where}: found {noun} outside the allowed set; keeping them: {sorted(unknown)}")
         return d
 
 def _list_to_labeled_dict(values: list, labels: list[str]) -> dict:
@@ -694,7 +725,7 @@ def _list_to_labeled_dict(values: list, labels: list[str]) -> dict:
 def _fix_length_and_normalize_list(key: str, lst, labels: list[str] | None, total: float):
     """Pad/truncate to match labels length (if provided), then normalize and print diffs."""
     if not isinstance(lst, list):
-        print(f"ℹ️  {key} is not a list, skipping length check and normalization.")
+        logging.debug(f"{key} is not a list, skipping length check and normalization")
         return lst
 
     original = list(lst)
@@ -704,15 +735,15 @@ def _fix_length_and_normalize_list(key: str, lst, labels: list[str] | None, tota
         n = len(lst)
         if n != n_target:
             if n > n_target:
-                print(f"⚠️  {key} has length {n} > {n_target} (labels). Truncating extra entries.")
+                logging.warning(f"{key} has length {n} > {n_target} (labels). Truncating extra entries")
                 lst = lst[:n_target]
             else:
-                print(f"⚠️  {key} has length {n} < {n_target} (labels). Padding with zeros.")
+                logging.warning(f"{key} has length {n} < {n_target} (labels). Padding with zeros")
                 lst = lst + [0.0] * (n_target - n)
 
     s = sum(lst)
     if s == 0:
-        print(f"⚠️  {key} sums to 0 — leaving values unchanged.")
+        logging.warning(f"{key} sums to 0 — leaving values unchanged")
         return lst
 
     factor = total / s
@@ -724,7 +755,7 @@ def _fix_length_and_normalize_list(key: str, lst, labels: list[str] | None, tota
 def _normalize_dict_with_diffs(key: str, d: dict, total: float):
     """Normalize dict values to sum=total and print per-key diffs."""
     if not isinstance(d, dict):
-        print(f"ℹ️  {key} is not a dict, skipping.")
+        logging.debug(f"{key} is not a dict, skipping")
         return d
 
     original = dict(d)
@@ -735,11 +766,11 @@ def _normalize_dict_with_diffs(key: str, d: dict, total: float):
         try:
             numeric[k] = float(v)
         except Exception:
-            print(f"⚠️  Skipping non-numeric value for {key}[{k!r}]: {v!r}")
+            logging.warning(f"Skipping non-numeric value for {key}[{k!r}]: {v!r}")
 
     s = sum(numeric.values())
     if s == 0:
-        print(f"⚠️  {key} sums to 0 — leaving values unchanged.")
+        logging.warning(f"{key} sums to 0 — leaving values unchanged")
         return d
 
     factor = total / s
@@ -756,17 +787,16 @@ def _print_list_diff(
     *,
     total: float = 100.0,
 ):
-    print(f"\n� NORMALIZING: {key}")
-    print("   " + "─" * 50)
-    print(f"   Sum: {round(sum(before), 6)} → {total}")
+    logging.debug(f"NORMALIZING: {key}")
+    logging.debug(f"   Sum: {round(sum(before), 6)} → {total}")
     if labels and len(labels) == len(after):
         for name, b, a in zip(labels, before, after):
             if _changed(b, a):
-                print(f"   • {name:>15}: {b:>6.1f}  →  {a:>6.1f}")
+                logging.debug(f"   • {name:>15}: {b:>6.1f}  →  {a:>6.1f}")
     else:
         for i, (b, a) in enumerate(zip(before, after)):
             if _changed(b, a):
-                print(f"   • idx {i:>2}: {b:>6.1f}  →  {a:>6.1f}")
+                logging.debug(f"   • idx {i:>2}: {b:>6.1f}  →  {a:>6.1f}")
                 
 def _print_dict_diff(
     key: str,
@@ -776,9 +806,8 @@ def _print_dict_diff(
     total: float = 100.0,
 ):
     before_sum = round(sum(v for v in before.values() if isinstance(v, (int, float))), 6)
-    print(f"\n📏 NORMALIZING: {key}")
-    print("   " + "─" * 50)
-    print(f"   Sum: {before_sum} → {total}")
+    logging.debug(f"NORMALIZING: {key}")
+    logging.debug(f"   Sum: {before_sum} → {total}")
     all_keys = set(before.keys()) | set(after.keys())
 
     # If the dict looks like colors → use WUBRG order
@@ -793,9 +822,9 @@ def _print_dict_diff(
         a = after.get(k, 0.0)
         if _changed(b, a):
             any_changed = True
-            print(f"   • {k:>20}: {b:>6.1f}  →  {a:>6.1f}")
+            logging.debug(f"   • {k:>20}: {b:>6.1f}  →  {a:>6.1f}")
     if not any_changed:
-        print("   • (no per-item changes)")
+        logging.debug("   • (no per-item changes)")
 
 def _changed(a, b, eps: float = 1e-9) -> bool:
     try:
@@ -812,9 +841,8 @@ def _print_smart_partial_result(
     total: float = 100.0,
 ):
     """Print detailed breakdown showing: User Set → Defaults Applied → Final Value."""
-    print(f"\n🔄 SMART PARTIAL LOGIC: {key}")
-    print("   " + "─" * 60)
-    print(f"   Target sum: {total:.1f}")
+    logging.debug(f"SMART PARTIAL LOGIC: {key}")
+    logging.debug(f"   Target sum: {total:.1f}")
     
     all_keys = set(user_values.keys()) | set(final_values.keys())
     if default_values:
@@ -840,15 +868,15 @@ def _print_smart_partial_result(
         if user_val is not None and user_val != 0:
             preserved_keys.append((k, final_val))
             if default_values:
-                print(f"   • {k:>20}: {user_val:>6.1f} (user) → {'-':>8} (unused) → {final_val:>6.1f} (preserved)")
+                logging.debug(f"   • {k:>20}: {user_val:>6.1f} (user) → {'-':>8} (unused) → {final_val:>6.1f} (preserved)")
             else:
-                print(f"   • {k:>20}: {final_val:<8.1f} (preserved)")
+                logging.debug(f"   • {k:>20}: {final_val:<8.1f} (preserved)")
         elif final_val > 0:
             filled_keys.append((k, final_val))
             if default_values:
-                print(f"   • {k:>20}: {'-':>6} (user) → {default_val:>6.1f} (default) → {final_val:>6.1f} (filled)")
+                logging.debug(f"   • {k:>20}: {'-':>6} (user) → {default_val:>6.1f} (default) → {final_val:>6.1f} (filled)")
             else:
-                print(f"   • {k:>20}: {final_val:<8.1f} (filled)")
+                logging.debug(f"   • {k:>20}: {final_val:<8.1f} (filled)")
     
     # Show zero values user explicitly set
     for k in ordered:
@@ -858,23 +886,21 @@ def _print_smart_partial_result(
         if user_val == 0 and k in user_values:  # User explicitly set to 0
             if default_values:
                 default_val = default_values.get(k, 0.0)
-                print(f"   • {k:>20}: {user_val:>6.1f} (user) → {'-':>8} (overridden) → {final_val:>6.1f} (zeroed)")
+                logging.debug(f"   • {k:>20}: {user_val:>6.1f} (user) → {'-':>8} (overridden) → {final_val:>6.1f} (zeroed)")
             else:
-                print(f"   • {k:>20}: {final_val:<8.1f} (user set to 0)")
+                logging.debug(f"   • {k:>20}: {final_val:<8.1f} (user set to 0)")
     
     # Summary
     preserved_sum = sum(val for _, val in preserved_keys)
     filled_sum = sum(val for _, val in filled_keys)
-    print(f"   " + "─" * 60)
-    print(f"   📊 Summary: {preserved_sum:.1f} preserved + {filled_sum:.1f} filled = {total:.1f}")
+    logging.debug(f"   📊 Summary: {preserved_sum:.1f} preserved + {filled_sum:.1f} filled = {total:.1f}")
 
 def _print_types_mode_overlay(types_mode: str, base_defaults: dict, profile_weights: dict, final_weights: dict, total: float = 100.0):
     """
     Display the types_mode profile overlay process showing how base defaults are overlaid with profile weights.
     """
-    print(f"\n🔄 TYPES_MODE PROFILE OVERLAY: {types_mode}")
-    print("   " + "─" * 64)
-    print(f"   Base (_default) → Profile (_{types_mode}Defaults) → Result")
+    logging.debug(f"TYPES_MODE PROFILE OVERLAY: {types_mode}")
+    logging.debug(f"   Base (_default) → Profile (_{types_mode}Defaults) → Result")
     
     # Get all types from any of the dicts
     all_types = set(base_defaults.keys()) | set(profile_weights.keys()) | set(final_weights.keys())
@@ -886,22 +912,21 @@ def _print_types_mode_overlay(types_mode: str, base_defaults: dict, profile_weig
         
         if profile_val is not None:
             # Profile provided this type
-            print(f"   • {card_type:>18}: {base_val:>6.1f} (base) → {profile_val:>6.1f} (profile) → {final_val:>6.1f} (result)")
+            logging.debug(f"   • {card_type:>18}: {base_val:>6.1f} (base) → {profile_val:>6.1f} (profile) → {final_val:>6.1f} (result)")
         else:
             # Type filled from base with scaling
             if base_val > 0 and final_val != base_val:
-                print(f"   • {card_type:>18}: {base_val:>6.1f} (base) →      - (scaled)  → {final_val:>6.1f} (result)")
+                logging.debug(f"   • {card_type:>18}: {base_val:>6.1f} (base) →      - (scaled)  → {final_val:>6.1f} (result)")
             elif base_val > 0:
-                print(f"   • {card_type:>18}: {base_val:>6.1f} (base) →      - (kept)    → {final_val:>6.1f} (result)")
+                logging.debug(f"   • {card_type:>18}: {base_val:>6.1f} (base) →      - (kept)    → {final_val:>6.1f} (result)")
             else:
-                print(f"   • {card_type:>18}: {base_val:>6.1f} (base) →      - (unused)  → {final_val:>6.1f} (result)")
+                logging.debug(f"   • {card_type:>18}: {base_val:>6.1f} (base) →      - (unused)  → {final_val:>6.1f} (result)")
     
-    print("   " + "─" * 64)
     base_sum = sum(base_defaults.values())
     profile_sum = sum(v for v in profile_weights.values() if v is not None)
     final_sum = sum(final_weights.values())
     scaling_sum = final_sum - profile_sum
-    print(f"   📊 Summary: {base_sum:.1f} (base) → {profile_sum:.1f} (profile) + {scaling_sum:.1f} (scaled) = {final_sum:.1f}")
+    logging.debug(f"   📊 Summary: {base_sum:.1f} (base) → {profile_sum:.1f} (profile) + {scaling_sum:.1f} (scaled) = {final_sum:.1f}")
 
 def _derive_card_types(ctw: dict) -> list[str]:
     """
@@ -1300,7 +1325,7 @@ def _print_validation_results(issues: list[str]):
     Returns True if there are critical errors that should stop execution.
     """
     if not issues:
-        print("✅ No issues found - configuration is valid!")
+        logging.info("✅ No issues found - configuration is valid!")
         return False
     
     errors = [issue for issue in issues if "❌ ERROR:" in issue or "❌ CRITICAL:" in issue]
@@ -1308,56 +1333,61 @@ def _print_validation_results(issues: list[str]):
     info_messages = [issue for issue in issues if "ℹ️  INFO:" in issue]
     
     if errors:
-        print(f"\n❌ CRITICAL ERRORS DETECTED ({len(errors)}):")
-        print("   " + "─" * 60)
+        logging.error(f"")
+        logging.error(f"❌ CRITICAL ERRORS DETECTED ({len(errors)}):")
+        logging.error("   " + "─" * 60)
         for error in errors:
-            print(f"   {error}")
+            logging.error(f"   {error}")
         
-        print(f"\n🛠️  HOW TO FIX CRITICAL ERRORS:")
-        print("   " + "─" * 30)
+        logging.info(f"")
+        logging.info(f"🛠️  HOW TO FIX CRITICAL ERRORS:")
+        logging.info("   " + "─" * 30)
         
         for error in errors:
             if "types_mode" in error and "references missing profile" in error:
-                print("   • Missing Profile Error:")
-                print("     - Check your types_mode value in skeleton_params")
-                print("     - For 'square' mode, ensure '_squareDefaults' exists in card_types_weights")
-                print("     - For custom modes, create '_<mode>Defaults' profile")
-                print()
+                logging.info("   • Missing Profile Error:")
+                logging.info("     - Check your types_mode value in skeleton_params")
+                logging.info("     - For 'square' mode, ensure '_squareDefaults' exists in card_types_weights")
+                logging.info("     - For custom modes, create '_<mode>Defaults' profile")
+                logging.info("")
             elif "Invalid types_mode" in error:
-                print("   • Invalid types_mode:")
-                print("     - Use 'normal' for standard play-ready generation")
-                print("     - Use 'square' for cube-optimized generation")
-                print("     - Check for typos in your types_mode value")
-                print()
+                logging.info("   • Invalid types_mode:")
+                logging.info("     - Use 'normal' for standard play-ready generation")
+                logging.info("     - Use 'square' for cube-optimized generation")
+                logging.info("     - Check for typos in your types_mode value")
+                logging.info("")
             elif "sums to 0" in error and "_default" in error:
-                print("   • Zero-sum Card Types:")
-                print("     - _default profile cannot have all zero weights")
-                print("     - Provide at least some positive card type weights")
-                print("     - Partial overrides are OK - missing types will be filled automatically")
-                print()
+                logging.info("   • Zero-sum Card Types:")
+                logging.info("     - _default profile cannot have all zero weights")
+                logging.info("     - Provide at least some positive card type weights")
+                logging.info("     - Partial overrides are OK - missing types will be filled automatically")
+                logging.info("")
     
     if warnings:
-        print(f"\n⚠️  WARNINGS ({len(warnings)}):")
-        print("   " + "─" * 50)
+        logging.warning(f"")
+        logging.warning(f"⚠️  WARNINGS ({len(warnings)}):")
+        logging.warning("   " + "─" * 50)
         for warning in warnings:
-            print(f"   {warning}")
+            logging.warning(f"   {warning}")
     
     if info_messages:
-        print(f"\nℹ️  INFORMATION ({len(info_messages)}):")
-        print("   " + "─" * 50)
+        logging.info(f"")
+        logging.info(f"ℹ️  INFORMATION ({len(info_messages)}):")
+        logging.info("   " + "─" * 50)
         for info in info_messages:
-            print(f"   {info}")
+            logging.info(f"   {info}")
     
     # Summary and decision
     if errors:
-        print(f"\n🚨 VALIDATION FAILED: {len(errors)} critical error(s) must be fixed before proceeding!")
-        print("   Configuration processing has been STOPPED.")
+        logging.critical(f"")
+        logging.critical(f"🚨 VALIDATION FAILED: {len(errors)} critical error(s) must be fixed before proceeding!")
+        logging.critical("   Configuration processing has been STOPPED.")
         return True
     elif warnings:
-        print(f"\n💡 VALIDATION PASSED: {len(warnings)} warning(s) found - continuing with processing.")
+        logging.info(f"\n💡 VALIDATION PASSED: {len(warnings)} warning(s) found - continuing with processing.")
         return False
     else:
-        print(f"\n✅ VALIDATION PASSED: Configuration is clean!")
+        logging.info(f"\n✅ VALIDATION PASSED: Configuration is clean!")
         return False
 
 # ---------- CLI entrypoint ----------
@@ -1366,6 +1396,11 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Normalize and sanity-check config.yaml weights for readability")
     parser.add_argument("config_path", help="Path to config.yaml")
     parser.add_argument("--save", action="store_true", help="Overwrite the config file with normalized values")
+    parser.add_argument("--verbose", "-v", action="store_true", help="Enable verbose logging")
+    parser.add_argument("--silent", "-s", action="store_true", help="Silent mode (errors only)")
     args = parser.parse_args()
 
-    check_and_normalize_config(args.config_path, save=args.save)
+    # Setup logging with proper levels - silent overrides verbose
+    setup_logging(verbose=args.verbose, silent=args.silent)
+    
+    check_and_normalize_config(args.config_path, save=args.save, verbose=args.verbose, silent=args.silent)

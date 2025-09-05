@@ -49,23 +49,42 @@ load_dotenv()
 
 import os
 
-# Logging setup - respect orchestrator's verbose setting
-def setup_logging():
-    """Setup logging based on environment variable from orchestrator."""
-    verbose = os.environ.get("MERLIN_VERBOSE", "1") == "1"
-    if verbose:
+# Logging setup - accept parameters from orchestrator
+def setup_logging(verbose=False, silent=False):
+    """Setup logging based on parameters from orchestrator."""
+    if silent:
+        # Silent mode: ERROR only, clean format
+        logging.basicConfig(
+            level=logging.ERROR,
+            format="%(message)s",
+            force=True
+        )
+    elif verbose:
+        # Verbose mode: DEBUG with timestamps
         logging.basicConfig(
             level=logging.DEBUG, 
             format="%(asctime)s - %(levelname)s - %(message)s",
             force=True
         )
     else:
-        # Suppress all logs except errors in quiet mode
+        # Normal mode: INFO with clean format
         logging.basicConfig(
             level=logging.INFO,
             format="%(message)s",
             force=True
         )
+
+# Legacy environment-based setup for backwards compatibility
+def setup_logging_from_env():
+    """Setup logging based on environment variable (legacy)."""
+    log_level = os.environ.get("MERLIN_LOG_LEVEL", "normal")
+    
+    if log_level == "verbose":
+        setup_logging(verbose=True, silent=False)
+    elif log_level == "silent":
+        setup_logging(verbose=False, silent=True)
+    else:
+        setup_logging(verbose=False, silent=False)
 
 # Don't call setup_logging() at import time - let it be called when needed
 
@@ -1191,19 +1210,21 @@ def card_worker(card_queue, pbar, api_params, skeleton_params, metrics, config, 
             time.sleep(sleepy_time)
 
 
-def generate_cards(config: Dict[str, Any], config_name: str) -> Dict[str, Any]:
+def generate_cards(config: Dict[str, Any], config_name: str, verbose: bool = False, silent: bool = False) -> Dict[str, Any]:
     """
     Generate cards using the provided normalized configuration.
     
     Args:
         config: Normalized configuration dictionary
         config_name: Name for output files (e.g., 'merlinSquare01')
+        verbose: Enable verbose logging with timestamps
+        silent: Enable silent logging (errors only)
         
     Returns:
         Dict containing generation metrics and results
     """
-    # Setup logging based on orchestrator's verbose setting
-    setup_logging()
+    # Setup logging with passed parameters
+    setup_logging(verbose=verbose, silent=silent)
     
     # Extract configuration values
     total_cards = config["aitomaton_config"]["total_cards"]

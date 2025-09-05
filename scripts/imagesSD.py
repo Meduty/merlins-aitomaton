@@ -34,23 +34,40 @@ load_dotenv()
 
 from openai import OpenAI
 
-# Logging setup - respect orchestrator's verbose setting
-def setup_logging():
-    """Setup logging based on environment variable from orchestrator."""
-    verbose = os.environ.get("MERLIN_VERBOSE", "1") == "1"
-    if verbose:
+# Logging setup - controlled by parameters instead of environment variables
+def setup_logging(verbose=False, silent=False):
+    """Setup logging with 3-tier system: silent (ERROR), verbose (DEBUG), normal (INFO)."""
+    if silent:
+        # Silent mode: ERROR only
+        logging.basicConfig(
+            level=logging.ERROR,
+            format="%(message)s",
+            force=True
+        )
+    elif verbose:
+        # Verbose mode: DEBUG with timestamps
         logging.basicConfig(
             level=logging.DEBUG,
             format="%(asctime)s - %(levelname)s - %(message)s",
             force=True
         )
     else:
-        # Suppress all logs except errors in quiet mode
+        # Normal mode: INFO with clean format
         logging.basicConfig(
             level=logging.INFO,
             format="%(message)s",
             force=True
         )
+
+# Legacy environment-based setup for backwards compatibility
+def setup_logging_from_env():
+    """Setup logging based on environment variable (legacy)."""
+    verbose = os.environ.get("MERLIN_VERBOSE", "1") == "1"
+    
+    if verbose:
+        setup_logging(verbose=True, silent=False)
+    else:
+        setup_logging(verbose=False, silent=False)
 
 # Don't call setup_logging() at import time - let it be called when needed
 

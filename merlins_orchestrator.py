@@ -34,18 +34,25 @@ from scripts.metrics import GenerationMetrics  # type: ignore
 from scripts.merlinAI_lib import check_and_normalize_config  # type: ignore
 
 
-# Setup logging (will be configured based on verbose flag)
-def setup_logging(verbose: bool = False):
-    """Configure logging based on verbose flag."""
-    if verbose:
-        # Verbose mode: show all logs including debug
+# Setup logging (will be configured based on verbose/silent flags)
+def setup_logging(verbose: bool = False, silent: bool = False):
+    """Configure logging with 3-tier system: silent (ERROR), verbose (DEBUG), normal (INFO)."""
+    if silent:
+        # Silent mode: ERROR only
+        logging.basicConfig(
+            level=logging.ERROR,
+            format="%(message)s",
+            force=True
+        )
+    elif verbose:
+        # Verbose mode: DEBUG with timestamps
         logging.basicConfig(
             level=logging.DEBUG,
             format="%(asctime)s - %(levelname)s - %(message)s",
             force=True
         )
     else:
-        # Normal mode: show info, warnings, and errors (user-facing messages)
+        # Normal mode: INFO with clean format
         logging.basicConfig(
             level=logging.INFO,
             format="%(message)s",  # Clean format for user messages
@@ -56,7 +63,7 @@ def setup_logging(verbose: bool = False):
 class MerlinsAitomaton:
     """Main orchestrator class for the MTG card generation pipeline."""
 
-    def __init__(self, config_path: str | None, verbose: bool = False):
+    def __init__(self, config_path: str | None, verbose: bool = False, silent: bool = False):
         """Initialize orchestrator with configuration.
 
         Auto-resolution if config missing:
@@ -68,6 +75,7 @@ class MerlinsAitomaton:
         self.project_root = Path(__file__).parent
         self.configs_dir = self.project_root / 'configs'
         self.verbose = verbose
+        self.silent = silent
         self.config_path: Optional[str] = self._resolve_config_path(config_path)
         self.defaults_only = self.config_path is None
         self._ephemeral_config: Optional[Path] = None
@@ -192,14 +200,8 @@ class MerlinsAitomaton:
             return None
         
         try:
-            # Use check_and_normalize_config but capture output instead of printing
-            # Temporarily redirect stdout to suppress print statements
-            import io
-            import contextlib
-            
-            f = io.StringIO()
-            with contextlib.redirect_stdout(f):
-                result = check_and_normalize_config(self.config_path, save=False)
+            # Use check_and_normalize_config with silent=True for loading without output
+            result = check_and_normalize_config(self.config_path, save=False, verbose=False, silent=True)
             
             return result
                 
@@ -224,7 +226,7 @@ class MerlinsAitomaton:
             
             # Run the full configuration check and normalize with save option
             # This will validate, normalize weights, and show detailed analysis
-            result = check_and_normalize_config(self.config_path, save=save)
+            result = check_and_normalize_config(self.config_path, save=save, verbose=self.verbose)
             
             if result is None:
                 logging.critical("\n❌ CRITICAL ERROR: Configuration validation failed!")
@@ -242,13 +244,6 @@ class MerlinsAitomaton:
             logging.error(f"❌ Configuration validation failed: {e}")
             logging.error("Cannot proceed with invalid configuration!")
             sys.exit(1)
-    
-    def _get_subprocess_env(self) -> Dict[str, str]:
-        """Get environment variables for subprocesses."""
-        env = os.environ.copy()
-        # Pass verbose flag to subprocesses
-        env["MERLIN_VERBOSE"] = "1" if self.verbose else "0"
-        return env
     
     def display_config_summary(self):
         """Display a summary of the current configuration."""
@@ -313,10 +308,6 @@ class MerlinsAitomaton:
         logging.info("\n🎲 RUNNING CARD GENERATION...")
         
         try:
-            # Set environment variable BEFORE importing to control logging
-            os.environ['MERLIN_VERBOSE'] = "1" if self.verbose else "0"
-            os.environ['MERLIN_ORCHESTRATED'] = '1'
-            
             # Import the generation function
             from scripts.square_generator import generate_cards
             
@@ -346,7 +337,7 @@ class MerlinsAitomaton:
             config_name = Path(self.config_path).stem
             
             # Call the generation function directly with normalized config
-            result = generate_cards(config, config_name)
+            result = generate_cards(config, config_name, verbose=self.verbose, silent=self.silent)
             
             logging.info("✅ Card generation completed successfully!")
             if self.verbose:
@@ -372,7 +363,7 @@ class MerlinsAitomaton:
                 logging.debug(f"Running MSE conversion with processed config")
             
             # Pass the already processed config directly
-            main_with_config(self.config_path, self.config)
+            main_with_config(self.config_path, self.config, verbose=self.verbose, silent=self.silent)
             
             logging.info("✅ MSE conversion + image handling completed successfully!")
             return True
@@ -402,7 +393,9 @@ class MerlinsAitomaton:
                 success = export_complete_tts_deck(
                     config=self.config,
                     config_path=self.config_path,
-                    output_dir=output_dir
+                    output_dir=output_dir,
+                    verbose=self.verbose,
+                    silent=self.silent
                 )
             else:
                 # Import and call image export only 
@@ -415,7 +408,9 @@ class MerlinsAitomaton:
                     config=self.config,
                     config_path=self.config_path,
                     output_format=export_format,
-                    output_dir=output_dir
+                    output_dir=output_dir,
+                    verbose=self.verbose,
+                    silent=self.silent
                 )
             
             if success:
@@ -654,8 +649,7 @@ class MerlinsAitomaton:
             iteration_config["aitomaton_config"]["output_dir"] = str(batch_output_dir)
             
             try:
-                # Set environment variables for this iteration
-                os.environ['MERLIN_VERBOSE'] = "1" if self.verbose else "0"
+                # Set environment variables for this iteration (non-logging ones)
                 os.environ['MERLIN_ORCHESTRATED'] = '1'
                 os.environ['MERLIN_BATCH_ITERATION'] = str(i)
                 
@@ -684,7 +678,7 @@ class MerlinsAitomaton:
                                 logging.info(f"📦 Pack builder enabled but no pack definition found - using total_cards setting")
                     
                     # Generate cards with iteration-specific config
-                    result = generate_cards(iteration_config, f"{config_name}-{i}")
+                    result = generate_cards(iteration_config, f"{config_name}-{i}", verbose=self.verbose, silent=self.silent)
                     if not result:
                         iteration_success = False
                         logging.error(f"❌ Card generation failed for iteration {i}")
@@ -852,6 +846,12 @@ Examples:
     )
     
     parser.add_argument(
+        "--silent", "-s",
+        action="store_true",
+        help="Enable silent logging (errors only)"
+    )
+    
+    parser.add_argument(
         "-y", "--yes",
         action="store_true",
         help="Run full pipeline (equivalent to --module cards mse tts)"
@@ -886,8 +886,8 @@ Examples:
     if args.batch and args.check:
         parser.error("--batch and --check cannot be used together")
     
-    # Setup logging based on verbose flag
-    setup_logging(verbose=args.verbose)
+    # Setup logging based on verbose/silent flags
+    setup_logging(verbose=args.verbose, silent=args.silent)
     
     # Initialize orchestrator
     if args.list_configs:
@@ -910,7 +910,7 @@ Examples:
             # No config specified, need to prompt for one
             logging.info("🔄 BATCH MODE: No config specified, selecting configuration...")
             # Create a temporary orchestrator just to resolve config path
-            temp_orchestrator = MerlinsAitomaton(None, verbose=args.verbose)
+            temp_orchestrator = MerlinsAitomaton(None, verbose=args.verbose, silent=args.silent)
             if temp_orchestrator.defaults_only:
                 logging.error("❌ Batch mode requires a specific configuration file")
                 logging.error("   Please specify a config file or ensure config files exist in configs/")
@@ -921,11 +921,11 @@ Examples:
             selected_config = args.config
         
         # Create orchestrator with selected config
-        orchestrator = MerlinsAitomaton(selected_config, verbose=args.verbose)
+        orchestrator = MerlinsAitomaton(selected_config, verbose=args.verbose, silent=args.silent)
         orchestrator.batch_mode(args.batch, args.module)
         return
 
-    orchestrator = MerlinsAitomaton(args.config, verbose=args.verbose)
+    orchestrator = MerlinsAitomaton(args.config, verbose=args.verbose, silent=args.silent)
     
     # Run in appropriate mode
     if args.check:

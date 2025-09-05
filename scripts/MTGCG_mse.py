@@ -49,18 +49,25 @@ from tqdm.contrib.logging import logging_redirect_tqdm
 
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-# Logging setup - respect orchestrator's verbose setting
-def setup_logging():
-    """Setup logging based on environment variable from orchestrator."""
-    verbose = os.environ.get("MERLIN_VERBOSE", "1") == "1"
-    if verbose:
+# Logging setup - accept parameters from orchestrator
+def setup_logging(verbose=False, silent=False):
+    """Setup logging based on parameters from orchestrator."""
+    if silent:
+        # Silent mode: ERROR only, clean format
+        logging.basicConfig(
+            level=logging.ERROR,
+            format="%(message)s",
+            force=True
+        )
+    elif verbose:
+        # Verbose mode: DEBUG with timestamps
         logging.basicConfig(
             level=logging.DEBUG,
             format="%(asctime)s - %(levelname)s - %(message)s",
             force=True
         )
     else:
-        # Suppress all logs except errors in quiet mode
+        # Normal mode: INFO with clean format
         logging.basicConfig(
             level=logging.INFO,
             format="%(message)s",
@@ -451,9 +458,12 @@ def export_to_zip(output_text, cards, image_method="download", output_dir="outpu
         logging.warning(f"Failed to clean up temporary directory {output_dir}: {e}")
 
 
-def main_with_config(config_path=None, config=None):
+def main_with_config(config_path=None, config=None, verbose=False, silent=False):
     """Main function that loads config and runs the MSE conversion."""
     global max_retries, retry_delay, timeout, image_method, model_swap_chance, sleepy_time, concurrency
+    
+    # Setup logging with passed parameters
+    setup_logging(verbose=verbose, silent=silent)
     
     if config_path is None:
         config_path = "configs/user.yml"
