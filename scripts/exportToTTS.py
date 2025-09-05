@@ -59,13 +59,13 @@ def setup_logging(verbose: bool = False):
     """Configure logging based on verbose flag."""
     if verbose:
         logging.basicConfig(
-            level=logging.INFO,
+            level=logging.DEBUG,
             format="%(asctime)s - %(levelname)s - %(message)s",
             force=True
         )
     else:
         logging.basicConfig(
-            level=logging.ERROR,
+            level=logging.INFO,
             format="%(message)s",
             force=True
         )
@@ -155,9 +155,9 @@ def export_card_images_with_mse(config: Dict[str, Any], config_path: str,
     ]
     
     logging.info(f"🖼️  Exporting card images from: {mse_set_file}")
-    logging.info(f"📁 Output directory: {export_output_dir}")
-    logging.info(f"🎨 Format: {output_format}")
-    logging.info(f"🔧 MSE Command: {' '.join(cmd)}")
+    logging.debug(f"📁 Output directory: {export_output_dir}")
+    logging.debug(f"🎨 Format: {output_format}")
+    logging.debug(f"🔧 MSE Command: {' '.join(cmd)}")
     
     try:
         # Run MSE command from the output directory
@@ -177,7 +177,7 @@ def export_card_images_with_mse(config: Dict[str, Any], config_path: str,
             
             # Count exported files
             exported_files = list(export_output_dir.glob(f"*.{output_format}"))
-            logging.info(f"📊 Exported {len(exported_files)} card images")
+            logging.debug(f"📊 Exported {len(exported_files)} card images")
             
             return True
         else:
@@ -185,7 +185,7 @@ def export_card_images_with_mse(config: Dict[str, Any], config_path: str,
             if result.stderr:
                 logging.error(f"   Error output: {result.stderr}")
             if result.stdout:
-                logging.info(f"   Output: {result.stdout}")
+                logging.debug(f"   Output: {result.stdout}")
             return False
             
     except FileNotFoundError:
@@ -246,13 +246,13 @@ def create_tts_deck_list(config: Dict[str, Any], config_path: str,
         try:
             with open(cards_json_path, 'r', encoding='utf-8') as f:
                 cards_data = json.load(f)
-            logging.info(f"✅ Loaded cards.json with {len(cards_data)} cards for name matching")
+            logging.debug(f"✅ Loaded cards.json with {len(cards_data)} cards for name matching")
         except Exception as e:
             logging.warning(f"⚠️  Could not load cards.json: {e}")
             logging.warning("   Will use image filenames as card names")
     else:
-        logging.info(f"ℹ️  cards.json not found at {cards_json_path}")
-        logging.info("   Will use image filenames as card names")
+        logging.debug(f"ℹ️  cards.json not found at {cards_json_path}")
+        logging.debug("   Will use image filenames as card names")
     
     # Step 4: Create deck list entries
     deck_list_lines = []
@@ -289,12 +289,12 @@ def create_tts_deck_list(config: Dict[str, Any], config_path: str,
             f.write('\n'.join(deck_list_lines))
         
         logging.info(f"📝 Created deck list: {deck_list_file}")
-        logging.info(f"📊 Deck contains {len(deck_list_lines)} cards")
+        logging.debug(f"📊 Deck contains {len(deck_list_lines)} cards")
         
         if cards_data:
-            logging.info("✅ Used proper card names from cards.json")
+            logging.debug("✅ Used proper card names from cards.json")
         else:
-            logging.info("ℹ️  Used image filenames as card names")
+            logging.debug("ℹ️  Used image filenames as card names")
         
         return deck_list_file
         
@@ -387,10 +387,10 @@ def convert_to_tts_deck(deck_list_file: Path, output_dir: Path,
     ]
     
     logging.info(f"🔧 Converting to TTS format with local template...")
-    logging.info(f"📁 Deck list: {temp_deck_list}")
-    logging.info(f"📁 Output directory: {output_dir}")
-    logging.info(f"🎮 Deck name: {deck_name}")
-    logging.info(f"🔧 Command: {' '.join(cmd)}")
+    logging.debug(f"📁 Deck list: {temp_deck_list}")
+    logging.debug(f"📁 Output directory: {output_dir}")
+    logging.debug(f"🎮 Deck name: {deck_name}")
+    logging.debug(f"🔧 Command: {' '.join(cmd)}")
     
     try:
         result = subprocess.run(
@@ -416,7 +416,7 @@ def convert_to_tts_deck(deck_list_file: Path, output_dir: Path,
             # Support multiple templates for large decks (>70 cards) that tts-deckconverter splits
             template_files = list(output_dir.glob("*Template*.jpg"))
             if template_files:
-                logging.info(f"🔍 Found {len(template_files)} template file(s): {[f.name for f in template_files]}")
+                logging.debug(f"🔍 Found {len(template_files)} template file(s): {[f.name for f in template_files]}")
                 
                 # Handle single template or multiple templates
                 renamed_templates = []
@@ -447,21 +447,21 @@ def convert_to_tts_deck(deck_list_file: Path, output_dir: Path,
                     
                     new_template_path = output_dir / new_template_name
                     
-                    logging.info(f"🔄 Attempting to rename: {old_template.name} → {new_template_name}")
+                    logging.debug(f"🔄 Attempting to rename: {old_template.name} → {new_template_name}")
                     
                     try:
                         # Remove existing file if it exists to avoid conflicts
                         if new_template_path.exists():
                             new_template_path.unlink()
-                            logging.info(f"🗑️  Removed existing file: {new_template_name}")
+                            logging.debug(f"🗑️  Removed existing file: {new_template_name}")
                         
                         old_template.rename(new_template_path)
-                        logging.info(f"✅ Successfully renamed template: {old_template.name} → {new_template_name}")
+                        logging.debug(f"✅ Successfully renamed template: {old_template.name} → {new_template_name}")
                         renamed_templates.append((template_number, new_template_path))
                         
                         # Verify the file exists with new name
                         if new_template_path.exists():
-                            logging.info(f"✅ Verified new file exists: {new_template_path}")
+                            logging.debug(f"✅ Verified new file exists: {new_template_path}")
                         else:
                             logging.error(f"❌ New file does not exist after rename: {new_template_path}")
                             
@@ -486,10 +486,10 @@ def convert_to_tts_deck(deck_list_file: Path, output_dir: Path,
             template_files = list(output_dir.glob(f"{config_name}-decksheet*.{image_format}"))
             
             if tts_files:
-                logging.info(f"📊 Generated TTS files: {[f.name for f in tts_files]}")
+                logging.debug(f"📊 Generated TTS files: {[f.name for f in tts_files]}")
             
             if template_files:
-                logging.info(f"🖼️  Generated template image(s): {[f.name for f in template_files]}")
+                logging.debug(f"🖼️  Generated template image(s): {[f.name for f in template_files]}")
                 
                 if len(template_files) == 1:
                     logging.info("📋 MANUAL UPLOAD REQUIRED:")
@@ -507,9 +507,9 @@ def convert_to_tts_deck(deck_list_file: Path, output_dir: Path,
             import shutil
             nested_output_dir = output_dir / "output"
             if nested_output_dir.exists():
-                logging.info("🧹 Cleaning up nested output directories...")
+                logging.debug("🧹 Cleaning up nested output directories...")
                 shutil.rmtree(nested_output_dir)
-                logging.info("✅ Cleanup completed")
+                logging.debug("✅ Cleanup completed")
             
             return True
         else:
@@ -517,7 +517,7 @@ def convert_to_tts_deck(deck_list_file: Path, output_dir: Path,
             if result.stderr:
                 logging.error(f"   Error output: {result.stderr}")
             if result.stdout:
-                logging.info(f"   Output: {result.stdout}")
+                logging.debug(f"   Output: {result.stdout}")
             return False
             
     except Exception as e:
@@ -568,7 +568,7 @@ def upload_image_to_imgbb(image_path: Path, api_key: str, config: Optional[Dict[
                     if result.get('success'):
                         # Get the direct URL to the image
                         url = result['data']['url']
-                        logging.info(f"✅ Uploaded {image_path.name}")
+                        logging.debug(f"✅ Uploaded {image_path.name}")
                         logging.debug(f"📎 URL: {url}")
                         return url
                     else:
@@ -576,7 +576,7 @@ def upload_image_to_imgbb(image_path: Path, api_key: str, config: Optional[Dict[
                         logging.warning(f"⚠️  ImgBB upload failed (attempt {attempt + 1}): {error_msg}")
                         if attempt < max_retries:
                             retry_delay = base_retry_delay * (2 ** attempt)  # Exponential backoff
-                            logging.info(f"🔄 Retrying in {retry_delay}s...")
+                            logging.debug(f"🔄 Retrying in {retry_delay}s...")
                             time.sleep(retry_delay)
                             continue
                         else:
@@ -585,7 +585,7 @@ def upload_image_to_imgbb(image_path: Path, api_key: str, config: Optional[Dict[
                     logging.warning(f"⚠️  ImgBB upload failed with status {response.status_code} (attempt {attempt + 1}): {response.text}")
                     if attempt < max_retries:
                         retry_delay = base_retry_delay * (2 ** attempt)  # Exponential backoff
-                        logging.info(f"🔄 Retrying in {retry_delay}s...")
+                        logging.debug(f"🔄 Retrying in {retry_delay}s...")
                         time.sleep(retry_delay)
                         continue
                     else:
@@ -595,7 +595,7 @@ def upload_image_to_imgbb(image_path: Path, api_key: str, config: Optional[Dict[
             logging.warning(f"⚠️  Upload timeout for {image_path.name} (attempt {attempt + 1}) after {timeout}s")
             if attempt < max_retries:
                 retry_delay = base_retry_delay * (2 ** attempt)
-                logging.info(f"🔄 Retrying in {retry_delay}s...")
+                logging.debug(f"🔄 Retrying in {retry_delay}s...")
                 time.sleep(retry_delay)
                 continue
             else:
@@ -605,7 +605,7 @@ def upload_image_to_imgbb(image_path: Path, api_key: str, config: Optional[Dict[
             logging.warning(f"⚠️  Connection error uploading {image_path.name} (attempt {attempt + 1}): {e}")
             if attempt < max_retries:
                 retry_delay = base_retry_delay * (2 ** attempt)
-                logging.info(f"🔄 Retrying in {retry_delay}s...")
+                logging.debug(f"🔄 Retrying in {retry_delay}s...")
                 time.sleep(retry_delay)
                 continue
             else:
@@ -615,7 +615,7 @@ def upload_image_to_imgbb(image_path: Path, api_key: str, config: Optional[Dict[
             logging.warning(f"⚠️  Error uploading {image_path.name} (attempt {attempt + 1}): {e}")
             if attempt < max_retries:
                 retry_delay = base_retry_delay * (2 ** attempt)
-                logging.info(f"🔄 Retrying in {retry_delay}s...")
+                logging.debug(f"🔄 Retrying in {retry_delay}s...")
                 time.sleep(retry_delay)
                 continue
             else:
@@ -631,34 +631,34 @@ def check_tts_environment():
     import os
     import platform
     
-    logging.info("🔍 Checking TTS environment setup...")
+    logging.debug("🔍 Checking TTS environment setup...")
     
     # Check for TTS_SAVEDOBJS_PATH
     tts_path = os.getenv('TTS_SAVEDOBJS_PATH')
     if tts_path:
         tts_path_obj = Path(tts_path)
         if tts_path_obj.exists():
-            logging.info(f"✅ TTS_SAVEDOBJS_PATH set and valid: {tts_path}")
+            logging.debug(f"✅ TTS_SAVEDOBJS_PATH set and valid: {tts_path}")
             merlin_dir = tts_path_obj / "Merlin's Aitomaton"
             if merlin_dir.exists():
-                logging.info(f"✅ Merlin's Aitomaton directory exists: {merlin_dir}")
+                logging.debug(f"✅ Merlin's Aitomaton directory exists: {merlin_dir}")
             else:
-                logging.info(f"📁 Merlin's Aitomaton directory will be created: {merlin_dir}")
+                logging.debug(f"📁 Merlin's Aitomaton directory will be created: {merlin_dir}")
         else:
             logging.warning(f"⚠️  TTS_SAVEDOBJS_PATH set but directory doesn't exist: {tts_path}")
     else:
-        logging.info("❌ TTS_SAVEDOBJS_PATH not set - will use local relative paths")
+        logging.debug("❌ TTS_SAVEDOBJS_PATH not set - will use local relative paths")
         
         # Suggest default path based on OS
         if platform.system() == "Windows":
             username = os.getenv('USERNAME', 'YourUsername')
             suggested_path = f"C:/Users/{username}/Documents/My Games/Tabletop Simulator/Saves/Saved Objects"
-            logging.info(f"💡 Suggested Windows path: {suggested_path}")
-            logging.info("💡 To set: set TTS_SAVEDOBJS_PATH=\"path/to/your/tts/saved/objects\"")
+            logging.debug(f"💡 Suggested Windows path: {suggested_path}")
+            logging.debug("💡 To set: set TTS_SAVEDOBJS_PATH=\"path/to/your/tts/saved/objects\"")
         else:
-            logging.info("💡 Please set TTS_SAVEDOBJS_PATH to your TTS Saved Objects folder")
+            logging.debug("💡 Please set TTS_SAVEDOBJS_PATH to your TTS Saved Objects folder")
     
-    logging.info("")
+    logging.debug("")
 
 
 def export_complete_tts_deck(config: Dict[str, Any], config_path: str, 

@@ -51,12 +51,6 @@ skeleton_params:
   wildcard_supertype: true
   fixed_amount_themes: 1 # if not zero, will select a fixed amount of themes from the available ones instead of mutating them randomly
   mutation_chance_per_theme: 12.5 # Chance to mutate each theme, ignored if fixed_amount_themes is not zero
-  colors: ["red", "black", "green", "colorless"]
-  colors_weights:
-    red: 40
-    black: 25
-    green: 25
-    colorless: 10
   function_tags:
     ramp or mana fixing: 15
     draw or card advantage: 5
@@ -149,6 +143,7 @@ SD_config:
       chance: 20
     Intimate:
       weight: 2
+      chance: 20
     Cum and sperm:
       weight: 2
       chance: 15
@@ -202,7 +197,7 @@ SD_config:
       chance: 5
     mating press:
       weight: 2
-      chance: 5
+      chance: 10
 
 
   image_options:

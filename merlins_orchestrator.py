@@ -619,9 +619,13 @@ class MerlinsAitomaton:
             print("\n❌ MODULE PROCESSING FAILED!")
             sys.exit(1)
 
-    def batch_mode(self, batch_count: int):
-        """Run the full pipeline multiple times with numbered outputs."""
+    def batch_mode(self, batch_count: int, steps: Optional[list] = None):
+        """Run the specified pipeline steps multiple times with numbered outputs."""
+        if steps is None:
+            steps = ["cards", "mse", "tts"]  # Default to full pipeline
+            
         print(f"\n🔄 RUNNING BATCH MODE: {batch_count} iterations")
+        print(f"🎯 Pipeline steps: {' -> '.join(steps)}")
         
         config_name = Path(self.config_path).stem
         base_output_dir = Path(self.config["aitomaton_config"]["output_dir"])
@@ -649,56 +653,78 @@ class MerlinsAitomaton:
             iteration_config["aitomaton_config"]["output_dir"] = str(batch_output_dir)
             
             try:
-                # Run card generation with iteration-specific naming
-                print(f"\n🎲 RUNNING CARD GENERATION (iteration {i})...")
-                
                 # Set environment variables for this iteration
                 os.environ['MERLIN_VERBOSE'] = "1" if self.verbose else "0"
                 os.environ['MERLIN_ORCHESTRATED'] = '1'
                 os.environ['MERLIN_BATCH_ITERATION'] = str(i)
                 
-                # Import and run card generation
-                from scripts.square_generator import generate_cards
-                
-                # Handle pack builder override
-                pack_builder = iteration_config["pack_builder"]
-                if pack_builder["enabled"]:
-                    if "pack" in pack_builder and pack_builder["pack"]:
-                        total = sum(slot["count"] for slot in pack_builder["pack"])
-                        iteration_config["aitomaton_config"]["total_cards"] = total
-                        if i == 1:  # Only show this message once
-                            print(f"📦 Pack builder enabled: generating {total} cards per iteration")
-                    else:
-                        if i == 1:  # Only show this message once
-                            print(f"📦 Pack builder enabled but no pack definition found - using total_cards setting")
-                
-                # Generate cards with iteration-specific config
-                result = generate_cards(iteration_config, f"{config_name}-{i}")
-                
-                # Run MSE conversion with iteration-specific naming
-                print(f"\n📋 RUNNING MSE CONVERSION (iteration {i})...")
-                from scripts.MTGCG_mse import main_with_config
-                
                 # Create a virtual config path for iteration-specific naming
                 iteration_config_path = f"configs/{config_name}-{i}.yml"
-                main_with_config(iteration_config_path, iteration_config)
                 
-                # Run TTS export for this iteration
-                print(f"\n🎮 RUNNING COMPLETE TTS EXPORT (iteration {i})...")
+                iteration_success = True
                 
-                # Use the normal TTS export directory structure - don't override output_dir
-                # This ensures proper cleanup and consistent file organization
-                from scripts.exportToTTS import export_complete_tts_deck
-                success = export_complete_tts_deck(
-                    config=iteration_config,
-                    config_path=iteration_config_path  # Use iteration-specific config path
-                )
+                # Run only the specified steps in order
+                if "cards" in steps:
+                    print(f"\n🎲 RUNNING CARD GENERATION (iteration {i})...")
+                    
+                    # Import and run card generation
+                    from scripts.square_generator import generate_cards
+                    
+                    # Handle pack builder override
+                    pack_builder = iteration_config["pack_builder"]
+                    if pack_builder["enabled"]:
+                        if "pack" in pack_builder and pack_builder["pack"]:
+                            total = sum(slot["count"] for slot in pack_builder["pack"])
+                            iteration_config["aitomaton_config"]["total_cards"] = total
+                            if i == 1:  # Only show this message once
+                                print(f"📦 Pack builder enabled: generating {total} cards per iteration")
+                        else:
+                            if i == 1:  # Only show this message once
+                                print(f"📦 Pack builder enabled but no pack definition found - using total_cards setting")
+                    
+                    # Generate cards with iteration-specific config
+                    result = generate_cards(iteration_config, f"{config_name}-{i}")
+                    if not result:
+                        iteration_success = False
+                        print(f"❌ Card generation failed for iteration {i}")
                 
-                if not success:
-                    print(f"⚠️ Complete TTS export failed for iteration {i}, but continuing...")
+                if "mse" in steps and iteration_success:
+                    print(f"\n📋 RUNNING MSE CONVERSION (iteration {i})...")
+                    from scripts.MTGCG_mse import main_with_config
+                    
+                    try:
+                        main_with_config(iteration_config_path, iteration_config)
+                    except Exception as e:
+                        iteration_success = False
+                        print(f"❌ MSE conversion failed for iteration {i}: {e}")
                 
-                successes += 1
-                print(f"✅ Iteration {i} completed successfully!")
+                if "tts" in steps and iteration_success:
+                    print(f"\n🎮 RUNNING COMPLETE TTS EXPORT (iteration {i})...")
+                    
+                    # Use the normal TTS export directory structure - don't override output_dir
+                    # This ensures proper cleanup and consistent file organization
+                    from scripts.exportToTTS import export_complete_tts_deck
+                    tts_success = export_complete_tts_deck(
+                        config=iteration_config,
+                        config_path=iteration_config_path  # Use iteration-specific config path
+                    )
+                    
+                    if not tts_success:
+                        iteration_success = False
+                        print(f"❌ Complete TTS export failed for iteration {i}")
+                
+                # Note: 'images' step is handled within MTGCG_mse.py based on config
+                if "images" in steps:
+                    if i == 1:  # Only show this message once
+                        print("ℹ️  Images are handled automatically by the MSE conversion step")
+                        print("   Configure 'mtgcg_mse_config.image_method' in your config file")
+                
+                if iteration_success:
+                    successes += 1
+                    print(f"✅ Iteration {i} completed successfully!")
+                else:
+                    failures += 1
+                    print(f"❌ Iteration {i} failed!")
                 
             except Exception as e:
                 failures += 1
@@ -787,6 +813,8 @@ Examples:
   %(prog)s my_config.yml --module mse         # Use custom config, run MSE only
   %(prog)s my_config.yml --batch 5            # Run full pipeline 5 times with numbered outputs
   %(prog)s --batch 3                          # Interactive config selection, then run 3 times
+  %(prog)s my_config.yml --batch 5 --module cards    # Generate cards only, 5 times
+  %(prog)s my_config.yml --batch 3 --module mse tts  # MSE + TTS export, 3 times
   %(prog)s my_config.yml --check             # Check config without running
   %(prog)s my_config.yml --check --save      # Check config and save normalized values
         """
@@ -813,7 +841,7 @@ Examples:
         "--batch",
         type=int,
         metavar="N",
-        help="Run the full pipeline N times with numbered outputs (non-interactive)"
+        help="Run the pipeline N times with numbered outputs (use with --module to specify steps)"
     )
     
     parser.add_argument(
@@ -854,9 +882,6 @@ Examples:
     if args.save and not args.check:
         parser.error("--save can only be used with --check")
     
-    if args.batch and args.module is not None:
-        parser.error("--batch and --module cannot be used together")
-    
     if args.batch and args.check:
         parser.error("--batch and --check cannot be used together")
     
@@ -896,7 +921,7 @@ Examples:
         
         # Create orchestrator with selected config
         orchestrator = MerlinsAitomaton(selected_config, verbose=args.verbose)
-        orchestrator.batch_mode(args.batch)
+        orchestrator.batch_mode(args.batch, args.module)
         return
 
     orchestrator = MerlinsAitomaton(args.config, verbose=args.verbose)

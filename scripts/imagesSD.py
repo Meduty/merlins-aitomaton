@@ -40,14 +40,14 @@ def setup_logging():
     verbose = os.environ.get("MERLIN_VERBOSE", "1") == "1"
     if verbose:
         logging.basicConfig(
-            level=logging.INFO,
+            level=logging.DEBUG,
             format="%(asctime)s - %(levelname)s - %(message)s",
             force=True
         )
     else:
         # Suppress all logs except errors in quiet mode
         logging.basicConfig(
-            level=logging.WARNING,
+            level=logging.INFO,
             format="%(message)s",
             force=True
         )
@@ -172,7 +172,7 @@ def change_model(model: Model):
 
     try:
         response = call_api("sdapi/v1/options", **payload)
-        logging.info(f"Model changed to {model.value}: {response}")
+        logging.debug(f"Model changed to {model.value}: {response}")
         time.sleep(sleepy_time)
         return response
     except Exception as e:
@@ -219,7 +219,7 @@ def get_SD_prompt(index, card, ai: OpenAI, sd_model="" ,model_str="gpt-5") -> st
     This function extracts relevant information from the card and fetches a SD prompt from ChatGPT Overlord.
     """
 
-    logging.info(f"[Card #{index+1}] Generating SD prompt for {card['name']}...")
+    logging.debug(f"[Card #{index+1}] Generating SD prompt for {card['name']}...")
     time.sleep(sleepy_time)
 
     name = card.get("name", "Unknown Card")
@@ -284,13 +284,13 @@ def get_SD_prompt(index, card, ai: OpenAI, sd_model="" ,model_str="gpt-5") -> st
                 prompt = response.model_dump()["output"][1]["content"][0]["text"]
             case _:
                 prompt = ""
-        logging.info(
+        logging.debug(
             f"[Card #{index+1}] Overlord says: {prompt[:60]} ... {prompt[-60:]}"
         )  # Log first and last 5 characters of the prompt
         time.sleep(sleepy_time)
 
     else:
-        logging.info(f"[Card #{index+1}] Error:", response.status, response.text)
+        logging.warning(f"[Card #{index+1}] Error:", response.status, response.text)
         time.sleep(sleepy_time)
 
     return prompt
@@ -305,15 +305,15 @@ def getCardImage(index: int, card: dict, payload: dict, image_model: Model):
     req = urllib.request.Request(f"{forge_url_base}/sdapi/v1/options")
     res = urllib.request.urlopen(req)
     res = json.loads(res.read().decode("utf-8"))
-    logging.info(f"[Card #{index+1}] Current model: {res.get('sd_model_checkpoint', 'Unknown')}")
+    logging.debug(f"[Card #{index+1}] Current model: {res.get('sd_model_checkpoint', 'Unknown')}")
     time.sleep(sleepy_time)
 
     if res.get("sd_model_checkpoint") != image_model.value:
-        logging.info(f"[Card #{index+1}] Changing model to {image_model.value} ...")
+        logging.debug(f"[Card #{index+1}] Changing model to {image_model.value} ...")
         time.sleep(sleepy_time)
         change_model(image_model)
     else:
-        logging.info(f"[Card #{index+1}] Model {image_model.value} is already active.")
+        logging.debug(f"[Card #{index+1}] Model {image_model.value} is already active.")
         time.sleep(sleepy_time)
 
     # Do the actual generation (blocking)
@@ -332,7 +332,7 @@ def get_special_tags(index: int, special_tags: dict) -> str:
     all_special_tags = special_tags.keys()
     for tag in all_special_tags:
         if merlinAI_lib.check_mutation(special_tags[tag]["chance"]):
-            logging.info(f"[Card #{i+1}] Adding special tag: {tag}")
+            logging.debug(f"[Card #{i+1}] Adding special tag: {tag}")
             time.sleep(sleepy_time)
             selected_special_tags.append(tag)
             weight = special_tags[tag]["weight"]
@@ -346,7 +346,7 @@ def get_special_tags(index: int, special_tags: dict) -> str:
         special_tags_str = ", ".join(
             [f"({tag}:{weight})" for tag, weight in zip(selected_special_tags, selected_special_tags_weights)]
         )
-        logging.info(f"[Card #{i+1}] Special tags: {special_tags_str}")
+        logging.debug(f"[Card #{i+1}] Special tags: {special_tags_str}")
         time.sleep(sleepy_time)
     else:
         special_tags_str = ""
@@ -458,11 +458,11 @@ def generate_images_from_dict(
     stack_params = selected_opt["option_params"]
 
     for i, card in enumerate(cards_data):
-        logging.info(f"[Card #{i+1}] Generating image for {card['name']} ...")
+        logging.debug(f"[Card #{i+1}] Generating image for {card['name']} ...")
         time.sleep(sleepy_time)
 
         if merlinAI_lib.check_mutation(option_change_chance):
-            logging.info(f"[Card #{i+1}] Changing image generation options randomly.")
+            logging.debug(f"[Card #{i+1}] Changing image generation options randomly.")
             time.sleep(sleepy_time)
             selected_opt = choose_option_by_weight(all_options)
             stack_params = selected_opt["option_params"]
@@ -478,7 +478,7 @@ def generate_images_from_dict(
         # check if loras are enabled
         for lora in loras:
             if merlinAI_lib.check_mutation( apply_lora_chance ):
-                logging.info(f"[Card #{i+1}] Adding Lora: {lora}")
+                logging.debug(f"[Card #{i+1}] Adding Lora: {lora}")
                 time.sleep(sleepy_time)
                 selected_loras[lora] = loras[lora]
 
@@ -487,14 +487,14 @@ def generate_images_from_dict(
                 selected_loras[lora] = round(random.uniform(0, 0.9), 2)
 
         selected_loras = " ".join([f"<lora:{name}:{weight}>" for name, weight in selected_loras.items()])
-        logging.info(f"[Card #{i+1}] Loras: {selected_loras}")
+        logging.debug(f"[Card #{i+1}] Loras: {selected_loras}")
         time.sleep(sleepy_time)
         option["prompt"] = f"{prompt}, {get_special_tags(i, special_tags=special_tags)} {selected_loras}" if use_special_tags else f"{prompt} {selected_loras}"
 
         if config["SD_config"].get("randomise_negative_prompt", False):
             negative_prompt = option.get("negative_prompt", "") or ""
             if (not negative_prompt) or merlinAI_lib.check_mutation(config["SD_config"].get("chance_no_negative_prompt", 50)):
-                logging.info(f"[Card #{i+1}] No negative prompt used.")
+                logging.debug(f"[Card #{i+1}] No negative prompt used.")
                 time.sleep(sleepy_time)
                 option["negative_prompt"] = ""
             else:

@@ -1,0 +1,89 @@
+aitomaton_config:
+  total_cards: 15
+  image_mode: "localSD"
+
+set_params:
+  set: "Cartridge Chronicles"
+  themes:
+    - "8-bit heroes"
+    - "8-bit villains"
+    - "Arcade classics"
+    - "Console warriors"
+    - "Pixel art"
+    - "Retro futurism"
+    - "Pay to win mechanics"
+    - "Rage quitting"
+    - "Easter eggs"
+    - "Cheat codes"
+    - "Speedrunning"
+    - "Retro gaming"
+
+    - "Pokémon nostalgia"
+    - "Pokémon"
+    - "Gym Leader Challenge"
+    - "Pokémon Evolution"
+    - "Pokéball"
+    - "Catch them all"
+    - "Pokémon Arena"
+    - "Wild Pokémon appears"
+    - "Shiny Pokémon"
+    - "Elemental Pokémon"
+    - "Cute and cuddly Pokémon"
+    - "Digimon"
+    - "Monster taming"
+
+    - "Landwirtschaftssimulator"
+    - "Sid Meier's Civilization"
+    - "Farming simulator"
+    - "4X strategy"
+    - "Crop management"
+    - "Animal husbandry"
+    - "Rural life"
+    - "Farm machinery"
+    - "Seasonal cycles"
+    - "Farming and grinding"
+    - "Minecraft"
+    - "Block building"
+    - "Survival mode"
+    - "Agricola"
+
+    - "Pac-Man"
+    - "Tetris"
+    - "Space Invaders"
+    - "Mega Man"
+    - "Street Fighter"
+    - "Snake"
+    - "Need for Speed"
+    - "Gran Turismo"
+    - "Bomberman"
+    - "Minesweeper"
+    - "Arcade"
+    - "Pong"
+    - "Flipper"
+
+skeleton_params:
+  power_level: 9
+  standard_deviation_powerLevel: 0.5
+  power_level_rarity_skew: 0.2
+  function_tags:
+    ramp or mana fixing: 15
+    draw or card advantage: 15
+    removal or control: 10
+    board wipe or mass removal: 5
+    activated ability: 5
+    Flying or other evasion: 5
+    simple or straightforward: 10
+    kill steal: 10
+    evolution: 12 # Unique: Cards interact based on shared "network" tags or connections
+    catch: 12 # Unique: Provides bonuses for playing multiple cards in a turn
+    farming: 6 
+    grinding: 6 # Unique: Effects spread to other cards or players under certain conditions
+    harvest: 12 # Unique: Cards can copy or amplify effects of other cards in play
+    bit counter: 12 # Unique: Temporary bonuses or effects that last only for a turn or phase
+    respawn: 12 # Unique: Triggers powerful effects if certain rare conditions are met
+  tags_maximum: 3 # Default is null, which means no limit
+  fixed_amount_themes: 1 # if not zero, will select a fixed amount of themes from the available ones instead of mutating them randomly
+  mutation_chance_per_theme: 2 # Chance to mutate each theme, ignored if fixed_amount_themes is not zero
+
+pack_builder:
+  enabled: true

@@ -81,9 +81,9 @@ pack_builder:
     {
       "type": "Non-playable",
       "function_tags": {
-        "Fun card": 33,
-        "Non-playable": 33,
-        "Unplayable": 33,
+        "Fun card": 100,
+        "Non-playable": 100,
+        "Unplayable": 100,
         "Player Aid": 33,
         "Token": 33
       },

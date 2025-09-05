@@ -55,14 +55,14 @@ def setup_logging():
     verbose = os.environ.get("MERLIN_VERBOSE", "1") == "1"
     if verbose:
         logging.basicConfig(
-            level=logging.INFO,
+            level=logging.DEBUG,
             format="%(asctime)s - %(levelname)s - %(message)s",
             force=True
         )
     else:
         # Suppress all logs except errors in quiet mode
         logging.basicConfig(
-            level=logging.WARNING,
+            level=logging.INFO,
             format="%(message)s",
             force=True
         )
@@ -159,11 +159,11 @@ def ask_overlord_for_loyalty(index: int, card: dict, ai: OpenAI):
     if response.status == "completed":
         logging.debug(f"[Card #{index+1}] Response from OpenAI: {response.model_dump()}")
         loyalty = response.model_dump()["output"][1]["content"][0]["text"]
-        logging.info(f"[Card #{index+1}] Overlord says Loyalty: {loyalty}")
+        logging.debug(f"[Card #{index+1}] Overlord says Loyalty: {loyalty}")
         time.sleep(sleepy_time)
 
     else:
-        logging.info(f"[Card #{index+1}] Error:{response.status}, {response.text}")
+        logging.warning(f"[Card #{index+1}] Error:{response.status}, {response.text}")
         time.sleep(sleepy_time)
 
     return loyalty
@@ -172,7 +172,7 @@ def card_to_mse_block(index: int, card: dict, ai: OpenAI):
     # Extracting fields from the card JSON
     name = card.get("name", "Unknown Card")
 
-    logging.info(f"[Card #{index+1}] Adding card: {name}")
+    logging.debug(f"[Card #{index+1}] Adding card: {name}")
     time.sleep(sleepy_time)
 
     image_noext = card.get("id", "")
@@ -197,7 +197,7 @@ def card_to_mse_block(index: int, card: dict, ai: OpenAI):
     )
 
     if "Planeswalker" in typeLine and pt == "":
-        logging.info(f"[Card #{index+1}] Found Planeswalker with not P/T -- Interpreting rules text for loyalty counters.")
+        logging.debug(f"[Card #{index+1}] Found Planeswalker with not P/T -- Interpreting rules text for loyalty counters.")
         time.sleep(sleepy_time)
         texts = [
             "{iname} enters the battlefield with {iloyalty} loyalty counters.",
@@ -211,7 +211,7 @@ def card_to_mse_block(index: int, card: dict, ai: OpenAI):
                 text = text.format(iname=name, iloyalty=loyalty)
                 logging.debug(f"[Card #{index+1}] Looking for '{text}' in oracle text ")
                 if text in oracle:
-                    logging.info(
+                    logging.debug(
                         f"[Card #{index+1}] Found '{text}' in oracle text"
                     )
                     time.sleep(sleepy_time)
@@ -224,7 +224,7 @@ def card_to_mse_block(index: int, card: dict, ai: OpenAI):
 
         else:
 
-            logging.info(f"[Card #{index+1}] Could not interpret loyalty from oracle text. Asking AI Overlord instead")
+            logging.debug(f"[Card #{index+1}] Could not interpret loyalty from oracle text. Asking AI Overlord instead")
             time.sleep(sleepy_time)
             pt = ask_overlord_for_loyalty(index, card, ai=ai)
 
@@ -327,7 +327,7 @@ def download_images(cards, output_dir, on_done=None):
     def _worker(i_card):
         i, card = i_card
         name = card.get("name", f"#{i+1}")
-        logging.info(f"[#{i+1}] Downloading image for {name}...")
+        logging.debug(f"[#{i+1}] Downloading image for {name}...")
         try:
             time.sleep(sleepy_time)  # keep your throttle if desired
             image_url = card.get("imageUrl")
@@ -371,18 +371,18 @@ def _move_generated(cards, src_dir: str, dst_dir: str) -> None:
             continue
         try:
             shutil.move(src, dst)
-            logging.info(f"Moved image for {card['name']} to {dst}")
+            logging.debug(f"Moved image for {card['name']} to {dst}")
             time.sleep(sleepy_time)
         except Exception as e:
             logging.error(f"Failed to move image for {card['name']}: {e}")
 
 def _handle_download(cards, output_dir, on_done):
-    logging.info("Using download method for image retrieval.")
+    logging.debug("Using download method for image retrieval.")
     time.sleep(sleepy_time)
     download_images(cards, output_dir, on_done=on_done)
 
 def _handle_localsd(cards, output_dir, on_done, config):
-    logging.info("Using local SD for image generation.")
+    logging.debug("Using local SD for image generation.")
     time.sleep(sleepy_time)
     out_dir = imagesSD.generate_images_from_dict(
         cards,
@@ -393,7 +393,7 @@ def _handle_localsd(cards, output_dir, on_done, config):
     _move_generated(cards, src_dir=out_dir, dst_dir=output_dir)
 
 def _handle_none(cards, output_dir, on_done):
-    logging.info("Skipping image download as per configuration.")
+    logging.debug("Skipping image download as per configuration.")
     time.sleep(sleepy_time)
     # still complete the bar so UX matches "no work to do"
     for _ in cards:
@@ -446,7 +446,7 @@ def export_to_zip(output_text, cards, image_method="download", output_dir="outpu
     # Clean up the mse-out directory after successful zipping
     try:
         shutil.rmtree(output_dir)
-        logging.info(f"Cleaned up temporary directory: {output_dir}")
+        logging.debug(f"Cleaned up temporary directory: {output_dir}")
     except Exception as e:
         logging.warning(f"Failed to clean up temporary directory {output_dir}: {e}")
 
@@ -498,7 +498,7 @@ def main_with_config(config_path=None, config=None):
         
         # Clean up previous mse-out directory to prevent accumulation of old images
         if os.path.exists(mse_outpath):
-            logging.info(f"Cleaning up previous mse-out directory: {mse_outpath}")
+            logging.debug(f"Cleaning up previous mse-out directory: {mse_outpath}")
             shutil.rmtree(mse_outpath)
             time.sleep(sleepy_time)
 
