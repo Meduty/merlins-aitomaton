@@ -38,21 +38,19 @@ from scripts.merlinAI_lib import check_and_normalize_config  # type: ignore
 def setup_logging(verbose: bool = False):
     """Configure logging based on verbose flag."""
     if verbose:
-        # Verbose mode: show all logs
+        # Verbose mode: show all logs including debug
         logging.basicConfig(
-            level=logging.INFO,
+            level=logging.DEBUG,
             format="%(asctime)s - %(levelname)s - %(message)s",
             force=True
         )
     else:
-        # Quiet mode: suppress logs, only show errors and user messages
+        # Normal mode: show info, warnings, and errors (user-facing messages)
         logging.basicConfig(
-            level=logging.ERROR,
-            format="%(message)s",
+            level=logging.INFO,
+            format="%(message)s",  # Clean format for user messages
             force=True
         )
-        # Also suppress logs from sub-modules
-        logging.getLogger().setLevel(logging.ERROR)
 
 
 class MerlinsAitomaton:
@@ -114,9 +112,9 @@ class MerlinsAitomaton:
         if not interactive:
             return candidates[0]  # deterministic
         # Prompt user
-        print("\nAvailable configuration files:")
+        logging.info("\nAvailable configuration files:")
         for idx, path in enumerate(candidates, 1):
-            print(f"  {idx}. {Path(path).name}")
+            logging.info(f"  {idx}. {Path(path).name}")
         while True:
             choice = input(f"Select config [1-{len(candidates)}] or ENTER for 1 (defaults-only type 'd'): ").strip()
             if choice.lower() == 'd':
@@ -127,7 +125,7 @@ class MerlinsAitomaton:
                 i = int(choice)
                 if 1 <= i <= len(candidates):
                     return candidates[i-1]
-            print("Invalid selection, try again.")
+            logging.warning("Invalid selection, try again.")
 
     def _create_ephemeral_defaults_config(self) -> str:
         """Create a minimal ephemeral config file to drive normalization using defaults only."""
@@ -215,30 +213,30 @@ class MerlinsAitomaton:
         defaults_path = config_path.parent / "DEFAULTSCONFIG.yml"
         
         if not defaults_path.exists():
-            print(f"\n❌ CRITICAL ERROR: DEFAULTSCONFIG.yml not found at: {defaults_path}")
-            print("   This file is required for configuration validation and normalization.")
-            print("   Please ensure your config file is in the configs/ directory.")
+            logging.critical(f"\n❌ CRITICAL ERROR: DEFAULTSCONFIG.yml not found at: {defaults_path}")
+            logging.critical("   This file is required for configuration validation and normalization.")
+            logging.critical("   Please ensure your config file is in the configs/ directory.")
             raise FileNotFoundError(f"Required DEFAULTSCONFIG.yml not found at {defaults_path}")
         
         try:
-            print("\n🔍 RUNNING FULL CONFIGURATION CHECK...")
-            print("="*60)
+            logging.info("\n🔍 RUNNING FULL CONFIGURATION CHECK...")
+            logging.info("="*60)
             
             # Run the full configuration check and normalize with save option
             # This will validate, normalize weights, and show detailed analysis
             result = check_and_normalize_config(self.config_path, save=save)
             
             if result is None:
-                print("\n❌ CRITICAL ERROR: Configuration validation failed!")
-                print("   Please fix the errors above and try again.")
+                logging.critical("\n❌ CRITICAL ERROR: Configuration validation failed!")
+                logging.critical("   Please fix the errors above and try again.")
                 raise ValueError("Configuration validation failed")
             
-            print("="*60)
+            logging.info("="*60)
             if save:
-                print("💾 Configuration saved with normalized values")
+                logging.info("💾 Configuration saved with normalized values")
             else:
-                print("📋 Configuration check complete - use --save to write changes")
-            print()  # Add spacing after validation results
+                logging.info("📋 Configuration check complete - use --save to write changes")
+            logging.info("")  # Add spacing after validation results
                 
         except Exception as e:
             logging.error(f"❌ Configuration validation failed: {e}")
@@ -254,32 +252,32 @@ class MerlinsAitomaton:
     
     def display_config_summary(self):
         """Display a summary of the current configuration."""
-        print("\n" + "="*60)
-        print("🔧 CONFIGURATION SUMMARY")
-        print("="*60)
+        logging.info("\n" + "="*60)
+        logging.info("🔧 CONFIGURATION SUMMARY")
+        logging.info("="*60)
         
         # Card generation settings
         aitomaton_config = self.config.get("aitomaton_config", {})  # Updated to use correct key
-        print(f"📊 Total Cards: {aitomaton_config.get('total_cards', 'N/A')}")
-        print(f"🔀 Concurrency: {aitomaton_config.get('concurrency', 'N/A')}")
-        print(f"📁 Output Directory: {aitomaton_config.get('output_dir', 'N/A')}")
+        logging.info(f"📊 Total Cards: {aitomaton_config.get('total_cards', 'N/A')}")
+        logging.info(f"🔀 Concurrency: {aitomaton_config.get('concurrency', 'N/A')}")
+        logging.info(f"📁 Output Directory: {aitomaton_config.get('output_dir', 'N/A')}")
         
         # API settings
         api_params = self.config.get("api_params", {})
-        print(f"🤖 AI Model: {api_params.get('model', 'N/A')}")
-        print(f"🎨 Image Model: {api_params.get('image_model', 'N/A')}")
-        print(f"💡 Generate Image Prompts: {api_params.get('generate_image_prompt', 'N/A')}")
+        logging.info(f"🤖 AI Model: {api_params.get('model', 'N/A')}")
+        logging.info(f"🎨 Image Model: {api_params.get('image_model', 'N/A')}")
+        logging.info(f"💡 Generate Image Prompts: {api_params.get('generate_image_prompt', 'N/A')}")
         
         # MSE/Image settings
         mse_config = self.config.get("mtgcg_mse_config", {})
-        print(f"🖼️ Image Method: {mse_config.get('image_method', 'N/A')}")
+        logging.info(f"🖼️ Image Method: {mse_config.get('image_method', 'N/A')}")
         
         # Set information
         set_params = self.config.get("set_params", {})
-        print(f"🃏 Set Name: {set_params.get('set', 'N/A')}")
-        print(f"🔣 Set Themes: {set_params.get('themes', 'N/A')}")
+        logging.info(f"🃏 Set Name: {set_params.get('set', 'N/A')}")
+        logging.info(f"🔣 Set Themes: {set_params.get('themes', 'N/A')}")
 
-        print("="*60)
+        logging.info("="*60)
     
     def check_prerequisites(self) -> bool:
         """Check if all required environment variables and files are present."""
@@ -312,7 +310,7 @@ class MerlinsAitomaton:
     
     def run_square_generator(self, **overrides) -> bool:
         """Run the card generation step using the normalized config."""
-        print("\n🎲 RUNNING CARD GENERATION...")
+        logging.info("\n🎲 RUNNING CARD GENERATION...")
         
         try:
             # Set environment variable BEFORE importing to control logging
@@ -342,7 +340,7 @@ class MerlinsAitomaton:
                 for slot in pack:
                     total += slot["count"]
                 config["aitomaton_config"]["total_cards"] = total
-                print(f"\n ⚠️ Pack builder enabled: generating {total} cards as per pack configuration")
+                logging.info(f"\n ⚠️ Pack builder enabled: generating {total} cards as per pack configuration")
 
             # Extract config name from the config path
             config_name = Path(self.config_path).stem
@@ -350,14 +348,14 @@ class MerlinsAitomaton:
             # Call the generation function directly with normalized config
             result = generate_cards(config, config_name)
             
-            print("✅ Card generation completed successfully!")
+            logging.info("✅ Card generation completed successfully!")
             if self.verbose:
-                logging.info(f"Generated {result['metrics']['successful']} cards")
-                logging.info(f"Output saved to: {result['output_file']}")
+                logging.debug(f"Generated {result['metrics']['successful']} cards")
+                logging.debug(f"Output saved to: {result['output_file']}")
             return True
             
         except Exception as e:
-            print(f"❌ Card generation failed: {e}")
+            logging.error(f"❌ Card generation failed: {e}")
             if self.verbose:
                 logging.exception("Full error details:")
             return False
@@ -365,40 +363,40 @@ class MerlinsAitomaton:
     def run_mse_conversion(self) -> bool:
         """Run the Magic Set Editor conversion step (includes image handling)."""
         current_image_method = self.config.get("mtgcg_mse_config", {}).get("image_method", "download")
-        print(f"\n📋 RUNNING MSE CONVERSION + IMAGES (method: {current_image_method})...")
+        logging.info(f"\n📋 RUNNING MSE CONVERSION + IMAGES (method: {current_image_method})...")
         
         try:
             # Import and call MTGCG_mse function directly with orchestrator-processed config
             from scripts.MTGCG_mse import main_with_config
             if self.verbose:
-                logging.info(f"Running MSE conversion with processed config")
+                logging.debug(f"Running MSE conversion with processed config")
             
             # Pass the already processed config directly
             main_with_config(self.config_path, self.config)
             
-            print("✅ MSE conversion + image handling completed successfully!")
+            logging.info("✅ MSE conversion + image handling completed successfully!")
             return True
             
         except subprocess.CalledProcessError as e:
-            print(f"❌ MSE conversion failed with exit code {e.returncode}")
+            logging.error(f"❌ MSE conversion failed with exit code {e.returncode}")
             return False
         except Exception as e:
-            print(f"❌ Unexpected error during MSE conversion: {e}")
+            logging.error(f"❌ Unexpected error during MSE conversion: {e}")
             return False
     
     def run_tts_export(self, export_format: str = "png", output_dir: Optional[str] = None, mode: str = "complete") -> bool:
         """Run the TTS (Tabletop Simulator) export step."""
         if mode == "complete":
-            print(f"\n🎮 RUNNING COMPLETE TTS EXPORT...")
+            logging.info(f"\n🎮 RUNNING COMPLETE TTS EXPORT...")
         else:
-            print(f"\n🖼️ RUNNING TTS IMAGE EXPORT (format: {export_format})...")
+            logging.info(f"\n🖼️ RUNNING TTS IMAGE EXPORT (format: {export_format})...")
         
         try:
             if mode == "complete":
                 # Import and call complete TTS export with orchestrator-processed config  
                 from scripts.exportToTTS import export_complete_tts_deck
                 if self.verbose:
-                    logging.info(f"Running complete TTS export with processed config")
+                    logging.debug(f"Running complete TTS export with processed config")
                 
                 # Pass the already processed config directly
                 success = export_complete_tts_deck(
@@ -410,7 +408,7 @@ class MerlinsAitomaton:
                 # Import and call image export only 
                 from scripts.exportToTTS import export_card_images_with_mse
                 if self.verbose:
-                    logging.info(f"Running TTS image export with processed config")
+                    logging.debug(f"Running TTS image export with processed config")
                 
                 # Pass the already processed config directly
                 success = export_card_images_with_mse(
@@ -422,27 +420,27 @@ class MerlinsAitomaton:
             
             if success:
                 if mode == "complete":
-                    print("✅ Complete TTS export completed successfully!")
+                    logging.info("✅ Complete TTS export completed successfully!")
                 else:
-                    print("✅ TTS image export completed successfully!")
+                    logging.info("✅ TTS image export completed successfully!")
                 return True
             else:
                 if mode == "complete":
-                    print("❌ Complete TTS export failed!")
+                    logging.error("❌ Complete TTS export failed!")
                 else:
-                    print("❌ TTS image export failed!")
+                    logging.error("❌ TTS image export failed!")
                 return False
             
         except Exception as e:
-            print(f"❌ Unexpected error during TTS export: {e}")
+            logging.error(f"❌ Unexpected error during TTS export: {e}")
             if self.verbose:
                 logging.exception("Full error details:")
             return False
 
     def interactive_mode(self):
         """Run the orchestrator in interactive mode."""
-        print("\n🚀 WELCOME TO MERLIN'S AITOMATON - MTG CARD GENERATION ORCHESTRATOR")
-        print("="*71)
+        logging.info("\n🚀 WELCOME TO MERLIN'S AITOMATON - MTG CARD GENERATION ORCHESTRATOR")
+        logging.info("="*71)
         
         # Run config validation for interactive mode (no save)
         self._run_config_validation(save=False)
@@ -453,18 +451,18 @@ class MerlinsAitomaton:
         # Check prerequisites
         if not self.check_prerequisites():
             if not self.ask_user_confirmation("Continue anyway?", default=False):
-                print("Exiting due to prerequisite issues.")
+                logging.info("Exiting due to prerequisite issues.")
                 return
         
-        print("\n🎯 PIPELINE STEPS:")
-        print("   1. Generate Cards (square_generator.py)")
-        print("   2. Convert to MSE + Images (MTGCG_mse.py)")
-        print("      └─ Images handled via config 'image_method' setting")
-        print("   3. Export for TTS (exportToTTS.py) - Optional")
-        print("      └─ Export card images with meaningful names")
+        logging.info("\n🎯 PIPELINE STEPS:")
+        logging.info("   1. Generate Cards (square_generator.py)")
+        logging.info("   2. Convert to MSE + Images (MTGCG_mse.py)")
+        logging.info("      └─ Images handled via config 'image_method' setting")
+        logging.info("   3. Export for TTS (exportToTTS.py) - Optional")
+        logging.info("      └─ Export card images with meaningful names")
         
         # Step 1: Card Generation
-        print("\n" + "="*50)
+        logging.info("\n" + "="*50)
         current_cards = self.config["aitomaton_config"]["total_cards"]
         current_image_model = self.config["api_params"]["image_model"]
         current_concurrency = self.config["aitomaton_config"]["concurrency"]
@@ -490,48 +488,48 @@ class MerlinsAitomaton:
                         overrides["image_model"] = new_image_model
                         
                 except ValueError as e:
-                    print(f"Invalid input: {e}")
+                    logging.error(f"Invalid input: {e}")
                     return
             
             if not self.run_square_generator(**overrides):
                 if not self.ask_user_confirmation("Continue with remaining steps despite failure?", default=False):
-                    print("❌ Stopping pipeline due to card generation failure.")
+                    logging.error("❌ Stopping pipeline due to card generation failure.")
                     return
         else:
-            print("⏭️ Skipping card generation...")
+            logging.info("⏭️ Skipping card generation...")
         
         # Step 2: MSE Conversion + Images
-        print("\n" + "="*50)
+        logging.info("\n" + "="*50)
         current_image_method = self.config.get("mtgcg_mse_config", {}).get("image_method", "download")
         if self.ask_user_confirmation(f"📋 Convert cards to MSE format + handle images (method: {current_image_method})?"):
             if not self.run_mse_conversion():
-                print("❌ MSE conversion failed.")
+                logging.error("❌ MSE conversion failed.")
                 if not self.ask_user_confirmation("Continue with TTS export despite MSE failure?", default=False):
-                    print("❌ Stopping pipeline due to MSE conversion failure.")
+                    logging.error("❌ Stopping pipeline due to MSE conversion failure.")
                     return
         else:
-            print("⏭️ Skipping MSE conversion...")
+            logging.info("⏭️ Skipping MSE conversion...")
         
         # Step 3: TTS Export (Optional)
-        print("\n" + "="*50)
+        logging.info("\n" + "="*50)
         if self.ask_user_confirmation("🖼️ Export card images for Tabletop Simulator (TTS)?"):
             format_choice = input("Image format (png/jpg/bmp) [png]: ").strip().lower()
             if not format_choice:
                 format_choice = "png"
             elif format_choice not in ["png", "jpg", "bmp"]:
-                print(f"⚠️ Unknown format '{format_choice}', using 'png'")
+                logging.warning(f"⚠️ Unknown format '{format_choice}', using 'png'")
                 format_choice = "png"
             
             custom_dir = input("Custom output directory (leave empty for default): ").strip()
             output_dir = custom_dir if custom_dir else None
             
             if not self.run_tts_export(export_format=format_choice, output_dir=output_dir):
-                print("❌ TTS export failed.")
+                logging.error("❌ TTS export failed.")
         else:
-            print("⏭️ Skipping TTS export...")
+            logging.info("⏭️ Skipping TTS export...")
         
-        print("\n🎉 PIPELINE COMPLETE!")
-        print("="*30)
+        logging.info("\n🎉 PIPELINE COMPLETE!")
+        logging.info("="*30)
         
         # Show final results
         self.show_results()
@@ -542,8 +540,8 @@ class MerlinsAitomaton:
         config_name = Path(self.config_path).stem
         config_outdir = output_dir / config_name  # New schema: per-config subdirectory
 
-        print(f"📁 Base output dir : {output_dir.absolute()}")
-        print(f"📁 Config output dir: {config_outdir.absolute()} (new schema)")
+        logging.info(f"📁 Base output dir : {output_dir.absolute()}")
+        logging.info(f"📁 Config output dir: {config_outdir.absolute()} (new schema)")
 
         cards_file_new = config_outdir / f"{config_name}_cards.json"
         mse_set_file_new = config_outdir / f"{config_name}-mse-out.mse-set"
@@ -578,21 +576,21 @@ class MerlinsAitomaton:
                 results.append(f"✅ {candidate.relative_to(output_dir)} - Forge format files")
                 break
 
-        print("\n📊 Generated files:")
+        logging.info("\n📊 Generated files:")
         for r in results:
-            print(f"   {r}")
+            logging.info(f"   {r}")
 
         # Helpful next-step hint
         if mse_set_file_new.exists():
-            print(f"\n💡 To view your cards, open {mse_set_file_new} in Magic Set Editor")
+            logging.info(f"\n💡 To view your cards, open {mse_set_file_new} in Magic Set Editor")
         elif legacy_mse_file.exists():
-            print(f"\n💡 To view your cards, open {legacy_mse_file} in Magic Set Editor (legacy path)")
+            logging.info(f"\n💡 To view your cards, open {legacy_mse_file} in Magic Set Editor (legacy path)")
         else:
-            print("\nℹ️  Run the MSE conversion step to create a .mse-set archive.")
+            logging.info("\nℹ️  Run the MSE conversion step to create a .mse-set archive.")
     
     def module_mode(self, steps: list):
         """Run the orchestrator in module mode with specified steps."""
-        print(f"\n🤖 RUNNING MODULE MODE: {' -> '.join(steps)}")
+        logging.info(f"\n🤖 RUNNING MODULE MODE: {' -> '.join(steps)}")
         
         # Run config validation for module mode (no save)
         self._run_config_validation(save=False)
@@ -610,13 +608,13 @@ class MerlinsAitomaton:
         
         # Note: 'images' step is handled within MTGCG_mse.py based on config
         if "images" in steps:
-            print("ℹ️  Images are handled automatically by the MSE conversion step")
-            print("   Configure 'mtgcg_mse_config.image_method' in your config file")
+            logging.info("ℹ️  Images are handled automatically by the MSE conversion step")
+            logging.info("   Configure 'mtgcg_mse_config.image_method' in your config file")
         
         if success:
-            print("\n🎉 MODULE PROCESSING COMPLETE!")
+            logging.info("\n🎉 MODULE PROCESSING COMPLETE!")
         else:
-            print("\n❌ MODULE PROCESSING FAILED!")
+            logging.error("\n❌ MODULE PROCESSING FAILED!")
             sys.exit(1)
 
     def batch_mode(self, batch_count: int, steps: Optional[list] = None):
@@ -624,14 +622,17 @@ class MerlinsAitomaton:
         if steps is None:
             steps = ["cards", "mse", "tts"]  # Default to full pipeline
             
-        print(f"\n🔄 RUNNING BATCH MODE: {batch_count} iterations")
-        print(f"🎯 Pipeline steps: {' -> '.join(steps)}")
+        logging.info(f"\n🔄 RUNNING BATCH MODE: {batch_count} iterations")
+        logging.info(f"🎯 Pipeline steps: {' -> '.join(steps)}")
+        
+        # Run config validation for batch mode (no save) - this is obligatory!
+        self._run_config_validation(save=False)
         
         config_name = Path(self.config_path).stem
         base_output_dir = Path(self.config["aitomaton_config"]["output_dir"])
         batch_output_dir = base_output_dir / config_name
         
-        print(f"📁 Batch output directory: {batch_output_dir}")
+        logging.info(f"📁 Batch output directory: {batch_output_dir}")
         
         # Ensure output directory exists
         batch_output_dir.mkdir(parents=True, exist_ok=True)
@@ -640,9 +641,9 @@ class MerlinsAitomaton:
         failures = 0
         
         for i in range(1, batch_count + 1):
-            print(f"\n{'='*60}")
-            print(f"🚀 BATCH ITERATION {i}/{batch_count}")
-            print(f"{'='*60}")
+            logging.info(f"\n{'='*60}")
+            logging.info(f"🚀 BATCH ITERATION {i}/{batch_count}")
+            logging.info(f"{'='*60}")
             
             # Create a deep copy of the config for this iteration
             import copy
@@ -665,7 +666,7 @@ class MerlinsAitomaton:
                 
                 # Run only the specified steps in order
                 if "cards" in steps:
-                    print(f"\n🎲 RUNNING CARD GENERATION (iteration {i})...")
+                    logging.info(f"\n🎲 RUNNING CARD GENERATION (iteration {i})...")
                     
                     # Import and run card generation
                     from scripts.square_generator import generate_cards
@@ -677,29 +678,29 @@ class MerlinsAitomaton:
                             total = sum(slot["count"] for slot in pack_builder["pack"])
                             iteration_config["aitomaton_config"]["total_cards"] = total
                             if i == 1:  # Only show this message once
-                                print(f"📦 Pack builder enabled: generating {total} cards per iteration")
+                                logging.info(f"📦 Pack builder enabled: generating {total} cards per iteration")
                         else:
                             if i == 1:  # Only show this message once
-                                print(f"📦 Pack builder enabled but no pack definition found - using total_cards setting")
+                                logging.info(f"📦 Pack builder enabled but no pack definition found - using total_cards setting")
                     
                     # Generate cards with iteration-specific config
                     result = generate_cards(iteration_config, f"{config_name}-{i}")
                     if not result:
                         iteration_success = False
-                        print(f"❌ Card generation failed for iteration {i}")
+                        logging.error(f"❌ Card generation failed for iteration {i}")
                 
                 if "mse" in steps and iteration_success:
-                    print(f"\n📋 RUNNING MSE CONVERSION (iteration {i})...")
+                    logging.info(f"\n📋 RUNNING MSE CONVERSION (iteration {i})...")
                     from scripts.MTGCG_mse import main_with_config
                     
                     try:
                         main_with_config(iteration_config_path, iteration_config)
                     except Exception as e:
                         iteration_success = False
-                        print(f"❌ MSE conversion failed for iteration {i}: {e}")
+                        logging.error(f"❌ MSE conversion failed for iteration {i}: {e}")
                 
                 if "tts" in steps and iteration_success:
-                    print(f"\n🎮 RUNNING COMPLETE TTS EXPORT (iteration {i})...")
+                    logging.info(f"\n🎮 RUNNING COMPLETE TTS EXPORT (iteration {i})...")
                     
                     # Use the normal TTS export directory structure - don't override output_dir
                     # This ensures proper cleanup and consistent file organization
@@ -711,46 +712,46 @@ class MerlinsAitomaton:
                     
                     if not tts_success:
                         iteration_success = False
-                        print(f"❌ Complete TTS export failed for iteration {i}")
+                        logging.error(f"❌ Complete TTS export failed for iteration {i}")
                 
                 # Note: 'images' step is handled within MTGCG_mse.py based on config
                 if "images" in steps:
                     if i == 1:  # Only show this message once
-                        print("ℹ️  Images are handled automatically by the MSE conversion step")
-                        print("   Configure 'mtgcg_mse_config.image_method' in your config file")
+                        logging.info("ℹ️  Images are handled automatically by the MSE conversion step")
+                        logging.info("   Configure 'mtgcg_mse_config.image_method' in your config file")
                 
                 if iteration_success:
                     successes += 1
-                    print(f"✅ Iteration {i} completed successfully!")
+                    logging.info(f"✅ Iteration {i} completed successfully!")
                 else:
                     failures += 1
-                    print(f"❌ Iteration {i} failed!")
+                    logging.error(f"❌ Iteration {i} failed!")
                 
             except Exception as e:
                 failures += 1
-                print(f"❌ Iteration {i} failed: {str(e)}")
+                logging.error(f"❌ Iteration {i} failed: {str(e)}")
                 if self.verbose:
                     import traceback
                     traceback.print_exc()
                 continue
         
         # Final summary
-        print(f"\n{'='*60}")
-        print(f"🎯 BATCH MODE COMPLETE")
-        print(f"{'='*60}")
-        print(f"✅ Successful iterations: {successes}")
-        print(f"❌ Failed iterations: {failures}")
-        print(f"📁 Output directory: {batch_output_dir}")
+        logging.info(f"\n{'='*60}")
+        logging.info(f"🎯 BATCH MODE COMPLETE")
+        logging.info(f"{'='*60}")
+        logging.info(f"✅ Successful iterations: {successes}")
+        logging.info(f"❌ Failed iterations: {failures}")
+        logging.info(f"📁 Output directory: {batch_output_dir}")
         
         if successes > 0:
-            print(f"\n🎉 Generated {successes} sets of cards!")
+            logging.info(f"\n🎉 Generated {successes} sets of cards!")
         if failures > 0:
-            print(f"⚠️  {failures} iterations failed")
+            logging.warning(f"⚠️  {failures} iterations failed")
 
     def check_mode(self, save: bool = False):
         """Check configuration and display summary without running any steps."""
-        print("\n🔍 CONFIGURATION CHECK MODE")
-        print("="*50)
+        logging.info("\n🔍 CONFIGURATION CHECK MODE")
+        logging.info("="*50)
         
         # Run full configuration validation with optional save
         self._run_config_validation(save=save)
@@ -759,42 +760,42 @@ class MerlinsAitomaton:
         self.display_config_summary()
         
         # Check prerequisites 
-        print("\n🔧 PREREQUISITE CHECK:")
+        logging.info("\n🔧 PREREQUISITE CHECK:")
         prereq_ok = self.check_prerequisites()
         
         if prereq_ok:
-            print("✅ All prerequisites satisfied!")
+            logging.info("✅ All prerequisites satisfied!")
         else:
-            print("⚠️  Some prerequisites have issues (see above)")
+            logging.warning("⚠️  Some prerequisites have issues (see above)")
         
         # Check output directory structure
-        print("\n📁 OUTPUT DIRECTORY STRUCTURE:")
+        logging.info("\n📁 OUTPUT DIRECTORY STRUCTURE:")
         output_dir = Path(self.config["aitomaton_config"]["output_dir"])
         config_name = Path(self.config_path).stem
         config_subdir = output_dir / config_name
         
-        print(f"   Base output directory: {output_dir}")
-        print(f"   Config subdirectory: {config_subdir}")
-        print(f"   Cards file would be: {config_subdir / f'{config_name}_cards.json'}")
-        print(f"   MSE set file would be: {config_subdir / f'{config_name}-mse-out.mse-set'}")
+        logging.info(f"   Base output directory: {output_dir}")
+        logging.info(f"   Config subdirectory: {config_subdir}")
+        logging.info(f"   Cards file would be: {config_subdir / f'{config_name}_cards.json'}")
+        logging.info(f"   MSE set file would be: {config_subdir / f'{config_name}-mse-out.mse-set'}")
         
         # Check if output files already exist
         cards_file = config_subdir / f"{config_name}_cards.json"
         mse_file = config_subdir / f"{config_name}-mse-out.mse-set"
         
-        print("\n📊 EXISTING OUTPUT FILES:")
+        logging.info("\n📊 EXISTING OUTPUT FILES:")
         if cards_file.exists():
-            print(f"   ✅ Cards file exists: {cards_file}")
+            logging.info(f"   ✅ Cards file exists: {cards_file}")
         else:
-            print(f"   ❌ Cards file not found: {cards_file}")
+            logging.info(f"   ❌ Cards file not found: {cards_file}")
             
         if mse_file.exists():
-            print(f"   ✅ MSE set file exists: {mse_file}")
+            logging.info(f"   ✅ MSE set file exists: {mse_file}")
         else:
-            print(f"   ❌ MSE set file not found: {mse_file}")
+            logging.info(f"   ❌ MSE set file not found: {mse_file}")
         
-        print(f"\n✅ Configuration check complete for: {self.config_path}")
-        print("   Use without --check to run the pipeline.")
+        logging.info(f"\n✅ Configuration check complete for: {self.config_path}")
+        logging.info("   Use without --check to run the pipeline.")
 
 
 def main():
@@ -895,27 +896,27 @@ Examples:
             files = [p for p in configs_dir.glob('*.yml')
                      if p.name != 'DEFAULTSCONFIG.yml' and not p.name.startswith('__')]
             if not files:
-                print("(no user config files found)")
+                logging.info("(no user config files found)")
             else:
                 for f in sorted(files):
-                    print(f.name)
+                    logging.info(f.name)
         else:
-            print("configs/ directory not found")
+            logging.info("configs/ directory not found")
         return
 
     # Handle batch mode - may need interactive config selection
     if args.batch:
         if not args.config:
             # No config specified, need to prompt for one
-            print("🔄 BATCH MODE: No config specified, selecting configuration...")
+            logging.info("🔄 BATCH MODE: No config specified, selecting configuration...")
             # Create a temporary orchestrator just to resolve config path
             temp_orchestrator = MerlinsAitomaton(None, verbose=args.verbose)
             if temp_orchestrator.defaults_only:
-                print("❌ Batch mode requires a specific configuration file")
-                print("   Please specify a config file or ensure config files exist in configs/")
+                logging.error("❌ Batch mode requires a specific configuration file")
+                logging.error("   Please specify a config file or ensure config files exist in configs/")
                 return
             selected_config = temp_orchestrator.config_path
-            print(f"✅ Selected configuration: {selected_config}")
+            logging.info(f"✅ Selected configuration: {selected_config}")
         else:
             selected_config = args.config
         
